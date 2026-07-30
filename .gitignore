@@ -1,0 +1,11 @@
+# Root ignores (backend/ and admin-panel/ also have their own .gitignore)
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.cursor/
+.codex/
+.env
+.env.*
+!.env.example
