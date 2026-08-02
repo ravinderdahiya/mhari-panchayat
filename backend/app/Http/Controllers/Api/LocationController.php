@@ -116,7 +116,7 @@ class LocationController extends Controller
 
         // If a stale district name prevented the hierarchy lookup, use only a
         // globally unique exact village match and derive its tehsil/district.
-        if (! $village) {
+        if (! $village && ! $tehsil) {
             $allVillages = Village::query()
                 ->with(['tehsil.district:id,name', 'panchayat:id,name'])
                 ->orderBy('name')
@@ -168,7 +168,6 @@ class LocationController extends Controller
             [
                 $data['tehsil'] ?? null,
                 $data['locality'] ?? null,
-                $data['sub_administrative_area'] ?? null,
             ],
             [
                 $data['village'] ?? null,
@@ -227,12 +226,20 @@ class LocationController extends Controller
                 [$districtName, $address['county'] ?? null, $address['district'] ?? null],
                 [
                     $address['subdistrict'] ?? null,
-                    $address['county'] ?? null,
                     $address['city_district'] ?? null,
                     $address['municipality'] ?? null,
                     $address['town'] ?? null,
+                    $address['city'] ?? null,
+                    $address['county'] ?? null,
                 ],
-                [$villageName, $address['hamlet'] ?? null, $address['suburb'] ?? null],
+                [
+                    $villageName,
+                    $address['hamlet'] ?? null,
+                    $address['suburb'] ?? null,
+                    $address['town'] ?? null,
+                    $address['city'] ?? null,
+                    $address['municipality'] ?? null,
+                ],
                 $address['municipality'] ?? $address['city_district'] ?? $villageName,
             );
         });
