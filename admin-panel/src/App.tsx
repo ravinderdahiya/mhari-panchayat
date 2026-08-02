@@ -12,6 +12,8 @@ import SurveyorsPage from './pages/SurveyorsPage';
 import RolesPage from './pages/RolesPage';
 import UsersPage from './pages/UsersPage';
 import VillageAssetsPage from './pages/VillageAssetsPage';
+import AssetTypesPage from './pages/AssetTypesPage';
+import AssetSurveysPage from './pages/AssetSurveysPage';
 import ComingSoon from './components/ComingSoon';
 import Layout from './components/Layout';
 import type { View } from './components/Layout';
@@ -28,14 +30,18 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(!!api.getToken());
   const [activeView, setActiveView] = useState<View>('dashboard');
+  const [masterEntityKey, setMasterEntityKey] = useState('states');
   const [preAuthView, setPreAuthView] = useState<PreAuthView>('login');
   const [complaintsFilter, setComplaintsFilter] = useState<ComplaintStatus | 'All' | null>(null);
   const [complaintsInitialId, setComplaintsInitialId] = useState<number | null>(null);
 
-  const handleNavigate = (view: View) => {
+  const handleNavigate = (view: View, childId?: string) => {
     if (view !== 'complaints') {
       setComplaintsFilter(null);
       setComplaintsInitialId(null);
+    }
+    if (view === 'master' && childId) {
+      setMasterEntityKey(childId);
     }
     setActiveView(view);
   };
@@ -88,12 +94,16 @@ export default function App() {
   }
 
   return (
-    <Layout currentUser={currentUser} activeView={activeView} onNavigate={handleNavigate} onLogout={handleLogout}>
+    <Layout currentUser={currentUser} activeView={activeView}
+      activeChildId={activeView === 'master' ? masterEntityKey : null}
+      onNavigate={handleNavigate} onLogout={handleLogout}>
       {activeView === 'dashboard' && <DashboardPage onNavigateToComplaints={goToComplaints} onNavigateToComplaint={goToComplaint} />}
-      {activeView === 'master' && <MasterDataPage />}
+      {activeView === 'master' && <MasterDataPage initialEntityKey={masterEntityKey} />}
       {activeView === 'complaints' && <ComplaintsPage currentUser={currentUser} initialStatus={complaintsFilter} initialComplaintId={complaintsInitialId} />}
       {activeView === 'my-surveys' && <MySurveysPage currentUser={currentUser} onNavigateToComplaint={goToComplaint} />}
       {activeView === 'surveyors' && <SurveyorsPage onNavigateToComplaint={goToComplaint} />}
+      {activeView === 'asset-surveys' && <AssetSurveysPage />}
+      {activeView === 'asset-types' && <AssetTypesPage />}
       {activeView === 'village-assets' && <VillageAssetsPage />}
       {activeView === 'roles' && <RolesPage />}
       {activeView === 'users' && <UsersPage currentUser={currentUser} />}

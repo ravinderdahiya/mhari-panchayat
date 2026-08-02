@@ -19,4 +19,9 @@ class District extends Model
     {
         return $this->hasMany(Block::class);
     }
+
+    public function tehsils(): HasMany
+    {
+        return $this->hasMany(Tehsil::class);
+    }
 }

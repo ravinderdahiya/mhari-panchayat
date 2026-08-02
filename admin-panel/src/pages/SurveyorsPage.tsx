@@ -1,17 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, ExternalLink, ShieldCheck, Check, X, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, ExternalLink, ShieldCheck, Check, X, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import * as api from '../services/api';
-import type { AdminUser, Complaint, ComplaintStatus } from '../types';
+import type { AdminUser, Complaint, ComplaintStatus, Department } from '../types';
 
 const REGISTRATION_BADGE: Record<string, string> = {
-  pending_review: 'bg-accent/10 text-accent-dark border-accent/25',
+  pending_email: 'bg-accent/10 text-accent-dark border-accent/25',
+  email_verified: 'bg-blue-50 text-blue-700 border-blue-200',
+  pending_review: 'bg-amber-50 text-amber-800 border-amber-200',
   active: 'bg-status-closed/10 text-status-closed border-status-closed/25',
+  unapproved: 'bg-slate-100 text-slate-600 border-slate-200',
   rejected: 'bg-status-rejected/10 text-status-rejected border-status-rejected/25',
 };
 
 const REGISTRATION_LABEL: Record<string, string> = {
-  pending_review: 'Pending Review',
-  active: 'Active',
+  pending_email: 'Pending Email',
+  email_verified: 'Email Verified',
+  pending_review: 'Pending Approval',
+  active: 'Approved',
+  unapproved: 'Unapproved',
   rejected: 'Rejected',
 };
 
@@ -113,6 +119,7 @@ function Stepper({ c }: { c: Complaint }) {
 export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPageProps) {
   const [surveyors, setSurveyors] = useState<AdminUser[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -127,19 +134,30 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
 
   const [isApproving, setIsApproving] = useState(false);
+  const [isUnapproving, setIsUnapproving] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending_review' | 'pending_email' | 'active' | 'unapproved' | 'rejected'>('all');
+
+  const [editDepartmentIds, setEditDepartmentIds] = useState<number[]>([]);
+  const [isSavingDepartments, setIsSavingDepartments] = useState(false);
+  const [showDeptSavedPopup, setShowDeptSavedPopup] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      const [{ users }, { complaints }] = await Promise.all([api.getUsers(), api.getComplaints()]);
+      const [{ users }, { complaints }, deptRes] = await Promise.all([
+        api.getUsers(),
+        api.getComplaints(),
+        api.masterApi('departments').list(),
+      ]);
       const engineers = users.filter((u) => u.role === 'engineer');
       setSurveyors(engineers);
       setComplaints(complaints);
+      setDepartments(deptRes.items || []);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -153,15 +171,23 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, statusFilter]);
 
   const tasksFor = (surveyorId: number) => complaints.filter((c) => c.assigned_to_id === surveyorId);
 
   const filteredSurveyors = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return surveyors;
-    return surveyors.filter((s) => [s.name, s.username, s.department?.name].filter(Boolean).join(' ').toLowerCase().includes(q));
-  }, [surveyors, search]);
+    return surveyors.filter((s) => {
+      const status = s.registration_status || 'active';
+      if (statusFilter !== 'all' && status !== statusFilter) return false;
+      if (!q) return true;
+      return [s.name, s.username, s.email, s.employee_id, s.district?.name, s.department?.name, ...(s.departments || []).map((d) => d.name)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [surveyors, search, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSurveyors.length / PAGE_SIZE));
   const paginated = filteredSurveyors.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -193,6 +219,41 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setAssignComplaintId('');
     setAssignError('');
     setShowDeleteConfirm(false);
+    setEditDepartmentIds([]);
+    setShowDeptSavedPopup(false);
+  };
+
+  useEffect(() => {
+    if (!selected) {
+      setEditDepartmentIds([]);
+      return;
+    }
+    const ids =
+      selected.departments && selected.departments.length > 0
+        ? selected.departments.map((d) => d.id)
+        : selected.department_id
+          ? [selected.department_id]
+          : [];
+    setEditDepartmentIds(ids);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleDepartment = (id: number) => {
+    setEditDepartmentIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleSaveDepartments = async () => {
+    if (!selected) return;
+    setIsSavingDepartments(true);
+    setError('');
+    try {
+      const { user } = await api.updateUser(selected.id, { department_ids: editDepartmentIds });
+      setSurveyors((prev) => prev.map((s) => (s.id === selected.id ? { ...s, ...user } : s)));
+      setShowDeptSavedPopup(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSavingDepartments(false);
+    }
   };
 
   const handleAssign = async () => {
@@ -230,11 +291,37 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setError('');
     try {
       await api.approveRegistration(selected.id);
-      setSurveyors((prev) => prev.map((s) => (s.id === selected.id ? { ...s, registration_status: 'active', is_active: true } : s)));
+      setSurveyors((prev) =>
+        prev.map((s) =>
+          s.id === selected.id
+            ? { ...s, registration_status: 'active', is_active: true, rejection_reason: null }
+            : s,
+        ),
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const handleUnapprove = async () => {
+    if (!selected) return;
+    setIsUnapproving(true);
+    setError('');
+    try {
+      await api.unapproveRegistration(selected.id, 'Unapproved by admin');
+      setSurveyors((prev) =>
+        prev.map((s) =>
+          s.id === selected.id
+            ? { ...s, registration_status: 'unapproved', is_active: false, rejection_reason: 'Unapproved by admin' }
+            : s,
+        ),
+      );
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsUnapproving(false);
     }
   };
 
@@ -244,7 +331,13 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setError('');
     try {
       await api.rejectRegistration(selected.id, rejectReason.trim());
-      setSurveyors((prev) => prev.map((s) => (s.id === selected.id ? { ...s, registration_status: 'rejected', rejection_reason: rejectReason.trim() } : s)));
+      setSurveyors((prev) =>
+        prev.map((s) =>
+          s.id === selected.id
+            ? { ...s, registration_status: 'rejected', is_active: false, rejection_reason: rejectReason.trim() }
+            : s,
+        ),
+      );
       setShowReject(false);
       setRejectReason('');
     } catch (err) {
@@ -286,6 +379,32 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
         />
       </div>
 
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {(
+          [
+            ['all', 'All'],
+            ['pending_review', 'Pending Approval'],
+            ['pending_email', 'Pending Email'],
+            ['active', 'Approved'],
+            ['unapproved', 'Unapproved'],
+            ['rejected', 'Rejected'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setStatusFilter(value)}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer ${
+              statusFilter === value
+                ? 'bg-sidebar text-white border-sidebar'
+                : 'bg-white text-muted border-line hover:border-sidebar/40'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         {paginated.length === 0 ? (
           <p className="text-sm text-muted p-6 text-center">No surveyors found.</p>
@@ -293,23 +412,34 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
           <table className="w-full text-xs border-separate border-spacing-0">
             <thead>
               <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                <th className="text-left p-3 font-bold w-12">S.No</th>
                 <th className="text-left p-3 font-bold">Surveyor</th>
+                <th className="text-left p-3 font-bold">Emp ID / Code</th>
+                <th className="text-left p-3 font-bold">District</th>
+                <th className="text-left p-3 font-bold">Departments</th>
                 <th className="text-left p-3 font-bold">Status</th>
                 <th className="text-left p-3 font-bold">Active</th>
                 <th className="text-left p-3 font-bold">Completed</th>
                 <th className="text-left p-3 font-bold">Joined</th>
+                <th className="text-center p-3 font-bold w-16">Action</th>
               </tr>
             </thead>
             <tbody>
               {paginated.map((s, idx) => {
                 const active = tasksFor(s.id).filter((c) => SURVEYING_STATUSES.includes(c.status)).length;
                 const completed = tasksFor(s.id).filter((c) => RESOLVED_STATUSES.includes(c.status)).length;
+                const deptNames =
+                  s.departments && s.departments.length > 0
+                    ? s.departments.map((d) => d.name).join(', ')
+                    : s.department?.name || '—';
+                const serialNo = (page - 1) * PAGE_SIZE + idx + 1;
                 return (
                   <tr
                     key={s.id}
                     onClick={() => setSelectedId(s.id)}
                     className={`border-t border-slate-100 cursor-pointer transition-colors hover:bg-accent/5 ${idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'}`}
                   >
+                    <td className="p-3 text-slate-500 font-medium">{serialNo}</td>
                     <td className="p-3">
                       <div className="flex items-center gap-2.5">
                         <span className="w-8 h-8 rounded-full bg-sidebar text-white font-serif font-semibold text-[12px] flex items-center justify-center shrink-0">
@@ -317,9 +447,18 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                         </span>
                         <div className="min-w-0">
                           <p className="font-semibold text-ink truncate">{s.name || s.username}</p>
-                          <p className="text-[11px] text-muted truncate">{s.department?.name || s.username}</p>
+                          <p className="text-[11px] text-muted truncate">{s.mobile || s.username}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="p-3">
+                      <span className="font-mono text-[11.5px] font-semibold text-ink">
+                        {s.employee_id || '—'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-700">{s.district?.name || '—'}</td>
+                    <td className="p-3 text-slate-700 max-w-[160px]">
+                      <span className="line-clamp-2" title={deptNames}>{deptNames}</span>
                     </td>
                     <td className="p-3">
                       {s.registration_status ? <RegistrationBadge status={s.registration_status} /> : <RegistrationBadge status="active" />}
@@ -336,8 +475,25 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                         {completed}
                       </span>
                     </td>
-                    <td className="p-3 text-slate-500">
-                      {new Date(s.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+                    <td className="p-3 text-slate-500 whitespace-nowrap">
+                      {new Date(s.created_at).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </td>
+                    <td className="p-3 text-center">
+                      <button
+                        type="button"
+                        title="View surveyor"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(s.id);
+                        }}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-line text-sidebar hover:bg-sidebar hover:text-white hover:border-sidebar cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -399,9 +555,21 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                   {selected.registration_status && selected.registration_status !== 'active' && (
                     <RegistrationBadge status={selected.registration_status} />
                   )}
+                  {selected.registration_status === 'active' && <RegistrationBadge status="active" />}
                 </div>
                 <p className="text-[12.5px] text-muted">
-                  {[selected.department?.name, `Joined ${new Date(selected.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`].filter(Boolean).join(' · ')}
+                  {[
+                    selected.employee_id,
+                    selected.district?.name,
+                    selected.mobile || selected.username,
+                    `Joined ${new Date(selected.created_at).toLocaleDateString(undefined, {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </p>
                 {selected.registration_status === 'rejected' && selected.rejection_reason && (
                   <p className="text-[11.5px] text-status-rejected mt-0.5">Rejected: {selected.rejection_reason}</p>
@@ -423,34 +591,134 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
               </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-6 flex-wrap">
-              {selected.registration_status === 'pending_review' ? (
-                <>
-                  <button
-                    disabled={isApproving}
-                    onClick={handleApprove}
-                    className="flex items-center gap-1.5 bg-status-closed hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    {isApproving ? 'Approving…' : 'Approve'}
-                  </button>
-                  <button
-                    onClick={() => setShowReject((v) => !v)}
-                    className="flex items-center gap-1.5 border border-status-rejected text-status-rejected hover:bg-status-rejected/10 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Reject
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setShowAssign((v) => !v)}
-                  className="flex items-center gap-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
+            {showDeptSavedPopup && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowDeptSavedPopup(false)}>
+                <div
+                  className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Assign Complaint
+                  <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-status-closed/15 text-status-closed flex items-center justify-center">
+                    <Check className="w-6 h-6" />
+                  </div>
+                  <p className="font-serif font-semibold text-lg text-ink mb-1">Departments saved</p>
+                  <p className="text-sm text-muted mb-4">
+                    {editDepartmentIds.length === 0
+                      ? 'All departments cleared for this surveyor.'
+                      : `${editDepartmentIds.length} department${editDepartmentIds.length > 1 ? 's' : ''} assigned successfully.`}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeptSavedPopup(false)}
+                    className="bg-sidebar hover:opacity-90 text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-6 border border-line rounded-xl p-4 bg-cream/40">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-[11px] tracking-wide uppercase text-muted font-semibold">Survey Departments</p>
+                <button
+                  type="button"
+                  disabled={isSavingDepartments}
+                  onClick={handleSaveDepartments}
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sidebar text-white disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingDepartments ? 'Saving…' : 'Save departments'}
                 </button>
+              </div>
+              <p className="text-[11.5px] text-muted mb-2">
+                Assign departments this surveyor can work on. In the mobile app they first pick a department, then only that department&apos;s assets appear.
+              </p>
+              {departments.length === 0 ? (
+                <p className="text-xs text-muted">No departments in master data yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {departments.map((d) => {
+                    const on = editDepartmentIds.includes(d.id);
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => toggleDepartment(d.id)}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border cursor-pointer ${
+                          on
+                            ? 'bg-sidebar text-white border-sidebar'
+                            : 'bg-white text-muted border-line hover:border-sidebar/40'
+                        }`}
+                      >
+                        {d.name}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
+            </div>
+
+            <div className="flex items-center gap-2 mb-6 flex-wrap">
+              {(() => {
+                const status = selected.registration_status || 'active';
+                const canApprove = status === 'pending_review' || status === 'unapproved' || status === 'rejected';
+                const canUnapprove = status === 'active';
+                const canReject =
+                  status === 'pending_review' ||
+                  status === 'pending_email' ||
+                  status === 'email_verified' ||
+                  status === 'unapproved';
+                const waitingOnUser = status === 'pending_email' || status === 'email_verified';
+
+                return (
+                  <>
+                    {waitingOnUser && (
+                      <p className="w-full text-[11.5px] text-muted mb-1">
+                        {status === 'pending_email'
+                          ? 'Waiting for surveyor to verify email and set password before you can approve.'
+                          : 'Email verified — waiting for surveyor to set password before you can approve.'}
+                      </p>
+                    )}
+                    {canApprove && (
+                      <button
+                        disabled={isApproving}
+                        onClick={handleApprove}
+                        className="flex items-center gap-1.5 bg-status-closed hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        {isApproving ? 'Approving…' : 'Approve'}
+                      </button>
+                    )}
+                    {canUnapprove && (
+                      <button
+                        disabled={isUnapproving}
+                        onClick={handleUnapprove}
+                        className="flex items-center gap-1.5 border border-slate-400 text-slate-700 hover:bg-slate-100 disabled:opacity-50 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        {isUnapproving ? 'Unapproving…' : 'Unapprove'}
+                      </button>
+                    )}
+                    {canReject && (
+                      <button
+                        onClick={() => setShowReject((v) => !v)}
+                        className="flex items-center gap-1.5 border border-status-rejected text-status-rejected hover:bg-status-rejected/10 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Reject
+                      </button>
+                    )}
+                    {status === 'active' && (
+                      <button
+                        onClick={() => setShowAssign((v) => !v)}
+                        className="flex items-center gap-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Assign Complaint
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
               <button
                 disabled={isDeleting}
                 onClick={() => setShowDeleteConfirm(true)}
@@ -461,7 +729,9 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
               </button>
             </div>
 
-            {showReject && selected.registration_status === 'pending_review' && (
+            {showReject &&
+              selected.registration_status &&
+              ['pending_review', 'pending_email', 'email_verified', 'unapproved'].includes(selected.registration_status) && (
               <div className="mb-6 border border-status-rejected/25 rounded-xl p-4 bg-status-rejected/5 space-y-2">
                 <div className="flex gap-2">
                   <input

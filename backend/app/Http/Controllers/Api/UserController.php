@@ -15,14 +15,24 @@ class UserController extends Controller
 
     public function index()
     {
-        $users = User::with('department')->orderByDesc('created_at')->get();
+        $users = User::with(['department', 'departments', 'district'])
+            ->orderByDesc('created_at')
+            ->get();
 
-        return response()->json(['success' => true, 'users' => $users]);
+        // Ensure every surveyor has an emp code (safety net after migration).
+        foreach ($users as $user) {
+            if ($user->role !== 'engineer' || filled($user->employee_id)) {
+                continue;
+            }
+            $distCode = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($user->district?->code ?: 'GEN')) ?: 'GEN');
+            $user->forceFill([
+                'employee_id' => sprintf('SUR-%s-%04d', $distCode, $user->id),
+            ])->save();
+        }
+
+        return response()->json(['success' => true, 'users' => $users->values()]);
     }
 
-    // Lightweight, non-admin-gated user list for "assign/transfer to" pickers -
-    // just enough to label a dropdown, not the full user-management payload
-    // that /users (super_admin only) returns.
     public function assignable(Request $request)
     {
         if ($request->user()->role === 'citizen') {
@@ -44,6 +54,8 @@ class UserController extends Controller
         $data = $request->validate([
             'role' => ['sometimes', 'string', 'in:'.implode(',', self::ALL_ROLES)],
             'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
+            'department_ids' => ['sometimes', 'array'],
+            'department_ids.*' => ['integer', 'exists:departments,id'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
@@ -55,9 +67,24 @@ class UserController extends Controller
             return response()->json(['success' => false, 'message' => 'You cannot change your own role or deactivate your own account'], 400);
         }
 
-        $user->update($data);
+        $departmentIds = $data['department_ids'] ?? null;
+        unset($data['department_ids']);
 
-        return response()->json(['success' => true, 'message' => 'User updated successfully', 'user' => $user->fresh('department')]);
+        if ($departmentIds !== null) {
+            $user->departments()->sync($departmentIds);
+            // Keep legacy single department_id in sync with the first assigned dept.
+            $data['department_id'] = $departmentIds[0] ?? null;
+        }
+
+        if ($data !== []) {
+            $user->update($data);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User updated successfully',
+            'user' => $user->fresh(['department', 'departments', 'district']),
+        ]);
     }
 
     public function destroy(Request $request, int $id)

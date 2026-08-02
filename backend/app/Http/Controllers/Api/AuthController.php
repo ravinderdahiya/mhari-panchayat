@@ -6,11 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    private const CITIZEN_OTP_TTL_MINUTES = 10;
+
+    private const CITIZEN_OTP_MAX_ATTEMPTS = 5;
+
     public function register(Request $request)
     {
         $data = $request->validate([
@@ -31,6 +38,185 @@ class AuthController extends Controller
         ], 201);
     }
 
+    private function citizenOtpKey(string $mobile): string
+    {
+        return "citizen_login_otp:{$mobile}";
+    }
+
+    private function citizenOtpAttemptsKey(string $mobile): string
+    {
+        return "citizen_login_otp_attempts:{$mobile}";
+    }
+
+    private function sendOtpSms(string $mobile, string $otp): bool
+    {
+        $apiKey = config('services.pixabits.api_key');
+        if (! $apiKey) {
+            return false;
+        }
+
+        try {
+            $senderId = config('services.pixabits.sender_id');
+            $http = Http::connectTimeout(5)->timeout(12)->retry(3, 600);
+            if (! app()->environment('production')) {
+                $http = $http->withOptions(['verify' => false]);
+            }
+            $response = $http->post('https://sms.pixabits.in/smsapi/sms/custom/send', [
+                'key' => $apiKey,
+                'text' => "Your One Time Password is {$otp} for Mhari Panchayat. Don't share OTP with anyone.{$senderId}",
+                'senderId' => $senderId,
+                'tempDltId' => config('services.pixabits.dlt_id'),
+                'route' => 'Domestic',
+                'phoneno' => $mobile,
+                'groupIds' => [' '],
+                'trans' => 1,
+                'unicode' => 0,
+                'flash' => false,
+                'tiny' => false,
+            ]);
+
+            return $response->successful();
+        } catch (\Throwable $exception) {
+            Log::warning('Citizen OTP SMS provider connection failed', [
+                'provider' => 'pixabits',
+                'exception' => $exception::class,
+                'reason' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function issueCitizenOtp(Request $request, bool $resend = false)
+    {
+        $data = $request->validate([
+            'mobile' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
+        ]);
+        $mobile = $data['mobile'];
+
+        $existingUser = User::query()
+            ->where('mobile', $mobile)
+            ->orWhere('username', $mobile)
+            ->first();
+        if ($existingUser && $existingUser->role !== 'citizen') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This mobile number belongs to a staff account. Use Staff Login.',
+            ], 422);
+        }
+
+        $otp = (string) random_int(1000, 9999);
+        Cache::put($this->citizenOtpKey($mobile), $otp, now()->addMinutes(self::CITIZEN_OTP_TTL_MINUTES));
+        Cache::put($this->citizenOtpAttemptsKey($mobile), 0, now()->addMinutes(self::CITIZEN_OTP_TTL_MINUTES));
+        $smsSent = $this->sendOtpSms($mobile, $otp);
+
+        $message = $smsSent
+            ? ($resend ? 'OTP resent to your mobile number' : 'OTP sent to your mobile number')
+            : 'OTP created, but SMS delivery failed';
+        if (! $smsSent && ! app()->environment('production')) {
+            $message .= ". Development OTP: {$otp}";
+        }
+
+        $response = [
+            'success' => true,
+            'message' => $message,
+            'smsSent' => $smsSent,
+            'sms_sent' => $smsSent,
+        ];
+        if (! app()->environment('production')) {
+            $response['devOtp'] = $otp;
+        }
+
+        return response()->json($response);
+    }
+
+    public function sendOtp(Request $request)
+    {
+        return $this->issueCitizenOtp($request);
+    }
+
+    public function resendOtp(Request $request)
+    {
+        return $this->issueCitizenOtp($request, true);
+    }
+
+    public function verifyOtp(Request $request)
+    {
+        $data = $request->validate([
+            'mobile' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
+            'otp' => ['required', 'string', 'regex:/^\d{4}$/'],
+        ]);
+        $mobile = $data['mobile'];
+        $isLocalTestLogin = ! app()->environment('production')
+            && $mobile === '9999999999'
+            && $data['otp'] === '0000';
+
+        if (! $isLocalTestLogin) {
+            $cachedOtp = Cache::get($this->citizenOtpKey($mobile));
+            $attempts = Cache::increment($this->citizenOtpAttemptsKey($mobile));
+            if ($attempts > self::CITIZEN_OTP_MAX_ATTEMPTS) {
+                Cache::forget($this->citizenOtpKey($mobile));
+                Cache::forget($this->citizenOtpAttemptsKey($mobile));
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Too many incorrect attempts. Request a new OTP.',
+                ], 429);
+            }
+
+            if (! is_string($cachedOtp) || ! hash_equals($cachedOtp, $data['otp'])) {
+                return response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 400);
+            }
+        }
+
+        Cache::forget($this->citizenOtpKey($mobile));
+        Cache::forget($this->citizenOtpAttemptsKey($mobile));
+
+        $user = User::query()
+            ->where('mobile', $mobile)
+            ->orWhere('username', $mobile)
+            ->first();
+        if ($user && $user->role !== 'citizen') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This mobile number belongs to a staff account. Use Staff Login.',
+            ], 422);
+        }
+
+        if (! $user) {
+            $user = User::create([
+                'username' => $mobile,
+                'mobile' => $mobile,
+                'name' => 'Citizen '.substr($mobile, -4),
+                'password' => Str::random(40),
+                'role' => 'citizen',
+                'is_active' => true,
+                'registration_status' => 'active',
+                'phone_verified_at' => now(),
+            ]);
+        } else {
+            if ($user->registration_status === 'rejected') {
+                return response()->json(['success' => false, 'message' => 'Citizen account is rejected'], 403);
+            }
+            if ($user->registration_status !== 'active' || ! $user->is_active) {
+                return response()->json(['success' => false, 'message' => 'Citizen account is not active'], 403);
+            }
+            $user->forceFill([
+                'mobile' => $mobile,
+                'phone_verified_at' => $user->phone_verified_at ?? now(),
+            ])->save();
+        }
+
+        $token = $user->createToken('citizen-mobile')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'OTP verified. Login successful.',
+            'token' => $token,
+            'user' => $user,
+        ]);
+    }
+
     public function login(Request $request)
     {
         $request->validate([
@@ -38,7 +224,15 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::where('username', $request->input('username'))->first();
+        $login = trim((string) $request->input('username'));
+
+        // Surveyors often type Emp ID (SUR-…), mobile, or email; username is usually the mobile.
+        $user = User::query()
+            ->where('username', $login)
+            ->orWhere('employee_id', $login)
+            ->orWhere('mobile', $login)
+            ->orWhere('email', $login)
+            ->first();
 
         if (! $user || ! Hash::check($request->input('password'), $user->password)) {
             return response()->json(['success' => false, 'message' => 'Invalid credentials'], 401);
@@ -57,6 +251,7 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth')->plainTextToken;
+        $user->load(['department', 'departments', 'district']);
 
         return response()->json([
             'success' => true,
@@ -68,7 +263,9 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json(['success' => true, 'user' => $request->user()]);
+        $user = $request->user()->load(['department', 'departments', 'district']);
+
+        return response()->json(['success' => true, 'user' => $user]);
     }
 
     public function changePassword(Request $request)

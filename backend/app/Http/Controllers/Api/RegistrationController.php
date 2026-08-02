@@ -8,24 +8,23 @@ use App\Models\District;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
-// Surveyor/Officer registration: verify phone (OTP) and email FIRST, against
-// no user record yet - just short-lived cache entries keyed by mobile/email
-// - then a single final submit (name, verified phone/email, district,
-// password) creates the User directly as pending_review. Admin
-// approves/rejects; on approval the account is immediately active.
-//
-// No real email/SMS provider is wired up, so every "sent" step returns its
-// token/OTP directly in the JSON response under a `dev*` key when not in
-// production - same convention AuthController::forgotPasswordRequest uses.
+// Basmati-survey-app style lifecycle:
+//   phone OTP (pre-account) → Sign up creates pending_email user →
+//   email verify link → email_verified + password-setup token →
+//   set password → pending_review → admin approves → active
 class RegistrationController extends Controller
 {
     private const OTP_TTL_MINUTES = 10;
 
     private const EMAIL_TOKEN_TTL_MINUTES = 60 * 24;
+
+    private const PASSWORD_SETUP_TTL_MINUTES = 60 * 24;
 
     private const VERIFIED_TOKEN_TTL_MINUTES = 120;
 
@@ -42,6 +41,12 @@ class RegistrationController extends Controller
         $data = $request->validate([
             'mobile' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
         ]);
+
+        if (User::where(function ($q) use ($data) {
+            $q->where('username', $data['mobile'])->orWhere('mobile', $data['mobile']);
+        })->exists()) {
+            return response()->json(['success' => false, 'message' => 'This mobile number is already registered'], 400);
+        }
 
         $otp = (string) random_int(1000, 9999);
         Cache::put("reg_phone_otp:{$data['mobile']}", $otp, now()->addMinutes(self::OTP_TTL_MINUTES));
@@ -60,9 +65,6 @@ class RegistrationController extends Controller
         return response()->json($response);
     }
 
-    // Pixabits SMS gateway - same account/pattern as the EODB project's
-    // otp.controller.js. Delivery failure never blocks the flow: the OTP is
-    // already cached, and dev mode still exposes it directly in the response.
     private function sendOtpSms(string $mobile, string $otp): bool
     {
         $apiKey = config('services.pixabits.api_key');
@@ -72,10 +74,7 @@ class RegistrationController extends Controller
 
         try {
             $senderId = config('services.pixabits.sender_id');
-            $http = Http::timeout(10);
-            // Local Windows PHP installs commonly lack a CA bundle for cURL
-            // ("unable to get local issuer certificate"), which a real Linux
-            // deployment won't hit - skip verification only outside production.
+            $http = Http::connectTimeout(5)->timeout(12)->retry(3, 600);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
@@ -94,8 +93,12 @@ class RegistrationController extends Controller
             ]);
 
             return $response->successful();
-        } catch (\Throwable $e) {
-            report($e);
+        } catch (\Throwable $exception) {
+            Log::warning('Registration OTP SMS provider connection failed', [
+                'provider' => 'pixabits',
+                'exception' => $exception::class,
+                'reason' => $exception->getMessage(),
+            ]);
 
             return false;
         }
@@ -120,18 +123,33 @@ class RegistrationController extends Controller
         return response()->json(['success' => true, 'message' => 'Phone verified', 'phone_token' => $token]);
     }
 
+    /** Resend verification email for a pending_email registration (basmati-style). */
     public function sendEmailLink(Request $request)
     {
         $data = $request->validate(['email' => ['required', 'email']]);
 
-        $token = Str::random(48);
-        Cache::put("reg_email_token:{$data['email']}", $token, now()->addMinutes(self::EMAIL_TOKEN_TTL_MINUTES));
+        $user = User::where('email', $data['email'])
+            ->where('registration_status', 'pending_email')
+            ->first();
 
-        $emailSent = $this->sendVerificationEmail($data['email'], $token);
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No pending registration found for this email. Complete Sign up first.',
+            ], 404);
+        }
+
+        $token = Str::random(48);
+        $user->update([
+            'email_verification_token' => $token,
+            'email_verification_expires_at' => now()->addMinutes(self::EMAIL_TOKEN_TTL_MINUTES),
+        ]);
+
+        $emailSent = $this->sendVerificationEmail($user->email, $token);
 
         $response = [
             'success' => true,
-            'message' => $emailSent ? 'Verification code sent to your email' : 'Verification code created, but email delivery failed',
+            'message' => $emailSent ? 'Verification link sent to your email' : 'Verification link created, but email delivery failed',
             'email_sent' => $emailSent,
         ];
         if (! app()->environment('production')) {
@@ -141,8 +159,6 @@ class RegistrationController extends Controller
         return response()->json($response);
     }
 
-    // Mirrors sendOtpSms()'s silent-failure convention: delivery failure never
-    // blocks the flow, the token is already cached and dev mode still exposes it.
     private function sendVerificationEmail(string $email, string $token): bool
     {
         try {
@@ -156,44 +172,28 @@ class RegistrationController extends Controller
         }
     }
 
-    public function verifyEmailLink(Request $request)
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'token' => ['required', 'string'],
-        ]);
-
-        $cached = Cache::get("reg_email_token:{$data['email']}");
-        if ($cached === null || $cached !== $data['token']) {
-            return response()->json(['success' => false, 'message' => 'Invalid or expired verification link'], 400);
-        }
-
-        Cache::forget("reg_email_token:{$data['email']}");
-        $token = Str::random(40);
-        Cache::put("reg_email_verified:{$data['email']}", $token, now()->addMinutes(self::VERIFIED_TOKEN_TTL_MINUTES));
-
-        return response()->json(['success' => true, 'message' => 'Email verified', 'email_token' => $token]);
-    }
-
     /**
-     * HTTPS landing page linked from the verification email. Email clients
-     * (Gmail/Outlook) block custom-scheme buttons, so the CTA is always https;
-     * this page then opens the Flutter app via mharipanchayat:// (and an
-     * Android intent:// URL), mirroring basmati-survey-app's openAppBridgeHtml.
-     *
-     * The token is NOT consumed here — the app still POSTs
-     * /registrations/email/verify once it receives the deep link.
+     * HTTPS email CTA (and in-app deep link with ?format=json).
+     * Verifies the email, issues a password-setup token, then opens the app
+     * on set-password — same pattern as basmati-survey-app.
      */
     public function openEmailVerifyApp(Request $request)
     {
         $token = trim((string) $request->query('token', ''));
-        $email = trim((string) $request->query('email', ''));
+        $wantsJson = $request->query('format') === 'json'
+            || $request->header('X-Mhari-App') === '1'
+            || $request->expectsJson();
 
-        if ($token === '' || $email === '') {
+        if ($token === '') {
+            if ($wantsJson) {
+                return response()->json(['success' => false, 'message' => 'Missing verification token'], 400);
+            }
+
             return response(
                 $this->openAppBridgeHtml(
                     heading: 'Invalid link',
-                    message: 'This verification link is missing its token or email. Request a new one from the app.',
+                    message: 'This verification link is missing its token. Request a new one from Sign up.',
+                    deepLinkPath: 'verify-email',
                     token: '',
                     email: '',
                     autoOpen: false,
@@ -202,47 +202,165 @@ class RegistrationController extends Controller
             )->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
-        // Soft check: warn if token is already gone, but still try to open the
-        // app so a previously-verified user can resume the form if needed.
-        $cached = Cache::get("reg_email_token:{$email}");
-        if ($cached === null || $cached !== $token) {
+        $result = $this->completeEmailVerification($token);
+        if ($result instanceof \Illuminate\Http\JsonResponse) {
+            if ($wantsJson) {
+                return $result;
+            }
+            $payload = $result->getData(true);
+
             return response(
                 $this->openAppBridgeHtml(
                     heading: 'Link expired or already used',
-                    message: 'Request a new verification email from the app, or paste the code from your email into the Verification Token field.',
-                    token: $token,
-                    email: $email,
+                    message: $payload['message'] ?? 'Request a new verification email from the app.',
+                    deepLinkPath: 'set-password',
+                    token: '',
+                    email: '',
                     autoOpen: false,
                 ),
-                400,
+                $result->getStatusCode(),
             )->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        ['user' => $user, 'passwordSetupToken' => $setupToken] = $result;
+
+        if ($wantsJson) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Email verified',
+                'passwordSetupToken' => $setupToken,
+                'email' => $user->email,
+                'name' => $user->name,
+            ]);
         }
 
         return response(
             $this->openAppBridgeHtml(
-                heading: 'Open Mhari Panchayat',
-                message: 'Opening the app so your email can be verified and you can continue Sign up…',
-                token: $token,
-                email: $email,
+                heading: 'Email verified',
+                message: 'Opening Mhari Panchayat so you can set your password…',
+                deepLinkPath: 'set-password',
+                token: $setupToken,
+                email: $user->email,
                 autoOpen: true,
             )
         )->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
+    /** Legacy POST kept for older clients — same completion as the GET link. */
+    public function verifyEmailLink(Request $request)
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['nullable', 'email'],
+        ]);
+
+        $result = $this->completeEmailVerification($data['token'], $data['email'] ?? null);
+        if ($result instanceof \Illuminate\Http\JsonResponse) {
+            return $result;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified',
+            'passwordSetupToken' => $result['passwordSetupToken'],
+            'email' => $result['user']->email,
+        ]);
+    }
+
+    /**
+     * @return array{user: User, passwordSetupToken: string}|\Illuminate\Http\JsonResponse
+     */
+    private function completeEmailVerification(string $token, ?string $email = null): array|\Illuminate\Http\JsonResponse
+    {
+        $query = User::query()->where('email_verification_token', $token);
+        if ($email) {
+            $query->where('email', $email);
+        }
+        $user = $query->first();
+
+        if (! $user) {
+            // Already verified: if they still have a fresh set-password token, reuse it.
+            $existing = User::query()
+                ->when($email, fn ($q) => $q->where('email', $email))
+                ->whereNotNull('set_password_token')
+                ->where('set_password_token_expires_at', '>', now())
+                ->whereIn('registration_status', ['email_verified', 'pending_email'])
+                ->first();
+
+            if ($existing && $existing->set_password_token) {
+                return [
+                    'user' => $existing,
+                    'passwordSetupToken' => $existing->set_password_token,
+                ];
+            }
+
+            return response()->json(['success' => false, 'message' => 'Invalid or expired verification link'], 400);
+        }
+
+        if ($user->email_verification_expires_at && $user->email_verification_expires_at->isPast()) {
+            return response()->json(['success' => false, 'message' => 'Verification link has expired'], 400);
+        }
+
+        $setupToken = Str::random(48);
+        $user->update([
+            'email_verified_at' => now(),
+            'email_verification_token' => null,
+            'email_verification_expires_at' => null,
+            'registration_status' => 'email_verified',
+            'set_password_token' => $setupToken,
+            'set_password_token_expires_at' => now()->addMinutes(self::PASSWORD_SETUP_TTL_MINUTES),
+        ]);
+
+        return ['user' => $user->fresh(), 'passwordSetupToken' => $setupToken];
+    }
+
+    public function setPassword(Request $request)
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::where('set_password_token', $data['token'])->first();
+        if (
+            ! $user
+            || ! $user->set_password_token_expires_at
+            || $user->set_password_token_expires_at->isPast()
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This link has expired or was already used.',
+            ], 400);
+        }
+
+        $user->update([
+            'password' => $data['password'],
+            'set_password_token' => null,
+            'set_password_token_expires_at' => null,
+            'registration_status' => 'pending_review',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password saved. Wait for admin approval, then Sign in.',
+            'email' => $user->email,
+        ]);
+    }
+
     private function openAppBridgeHtml(
         string $heading,
         string $message,
+        string $deepLinkPath,
         string $token,
         string $email,
         bool $autoOpen,
     ): string {
         $emailQs = $email !== '' ? '&email='.rawurlencode($email) : '';
         $appLink = $token !== ''
-            ? 'mharipanchayat://verify-email?token='.rawurlencode($token).$emailQs
-            : 'mharipanchayat://verify-email';
-        // Matches android/app/build.gradle.kts applicationId for Gram Samadhan.
+            ? 'mharipanchayat://'.$deepLinkPath.'?token='.rawurlencode($token).$emailQs
+            : 'mharipanchayat://'.$deepLinkPath;
         $package = 'com.example.my_first_app';
-        $intentUrl = 'intent://verify-email?token='.rawurlencode($token).$emailQs
+        $intentUrl = 'intent://'.$deepLinkPath.'?token='.rawurlencode($token).$emailQs
             .'#Intent;scheme=mharipanchayat;package='.$package.';end';
 
         $safeHeading = e($heading);
@@ -266,6 +384,8 @@ class RegistrationController extends Controller
 HTML
             : '';
 
+        $btnLabel = $deepLinkPath === 'set-password' ? 'Open app &amp; set password' : 'Open app &amp; verify email';
+
         return <<<HTML
 <!doctype html>
 <html lang="en"><head>
@@ -288,8 +408,8 @@ HTML
     <div class="card">
       <h1>{$safeHeading}</h1>
       <p class="lead">{$safeMessage}</p>
-      <a class="btn" href="{$safeAppLink}">Open app &amp; verify email</a>
-      <p class="footer">If the app does not open, install Mhari Panchayat and tap the button again, or paste the code from your email into Sign up.</p>
+      <a class="btn" href="{$safeAppLink}">{$btnLabel}</a>
+      <p class="footer">If the app does not open, install Mhari Panchayat and tap the button again.</p>
     </div>
   </div>
 {$autoScript}
@@ -304,9 +424,7 @@ HTML;
             'mobile' => ['required', 'string', 'regex:/^[6-9]\d{9}$/', 'unique:users,username'],
             'phone_token' => ['required', 'string'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'email_token' => ['required', 'string'],
             'district_id' => ['required', 'exists:districts,id'],
-            'password' => ['required', 'string', 'min:8'],
         ];
         if ($role === 'department_officer') {
             $rules['employee_id'] = ['required', 'string', 'max:50'];
@@ -317,35 +435,51 @@ HTML;
         if (Cache::get("reg_phone_verified:{$data['mobile']}") !== $data['phone_token']) {
             return response()->json(['success' => false, 'message' => 'Phone number is not verified'], 400);
         }
-        if (Cache::get("reg_email_verified:{$data['email']}") !== $data['email_token']) {
-            return response()->json(['success' => false, 'message' => 'Email is not verified'], 400);
-        }
 
-        // Mobile number doubles as the login username - no separate
-        // username field in this form.
+        $emailToken = Str::random(48);
+        // Placeholder password — replaced after email verify via set-password.
         $user = User::create([
             'name' => $data['name'],
             'username' => $data['mobile'],
             'email' => $data['email'],
             'mobile' => $data['mobile'],
             'district_id' => $data['district_id'],
-            'employee_id' => $data['employee_id'] ?? null,
+            'employee_id' => $role === 'engineer' ? null : ($data['employee_id'] ?? null),
             'role' => $role,
             'is_active' => false,
-            'registration_status' => 'pending_review',
-            'password' => $data['password'],
-            'email_verified_at' => now(),
+            'registration_status' => 'pending_email',
+            'password' => Hash::make(Str::random(64)),
             'phone_verified_at' => now(),
+            'email_verification_token' => $emailToken,
+            'email_verification_expires_at' => now()->addMinutes(self::EMAIL_TOKEN_TTL_MINUTES),
         ]);
 
-        Cache::forget("reg_phone_verified:{$data['mobile']}");
-        Cache::forget("reg_email_verified:{$data['email']}");
+        // Auto emp code for surveyors: SUR-{DISTRICT_CODE}-{USER_ID}
+        if ($role === 'engineer') {
+            $district = District::find($data['district_id']);
+            $distCode = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($district?->code ?: 'GEN')) ?: 'GEN');
+            $user->update([
+                'employee_id' => sprintf('SUR-%s-%04d', $distCode, $user->id),
+            ]);
+        }
 
-        return response()->json([
+        Cache::forget("reg_phone_verified:{$data['mobile']}");
+
+        $emailSent = $this->sendVerificationEmail($user->email, $emailToken);
+
+        $response = [
             'success' => true,
-            'message' => 'Registered. Your account is pending admin review.',
+            'message' => $emailSent
+                ? 'Registration submitted. Check your email to verify, then set your password.'
+                : 'Registration submitted, but the verification email could not be sent. Use Resend from the app.',
             'user_id' => $user->id,
-        ], 201);
+            'email_sent' => $emailSent,
+        ];
+        if (! app()->environment('production')) {
+            $response['devEmailToken'] = $emailToken;
+        }
+
+        return response()->json($response, 201);
     }
 
     public function registerSurveyor(Request $request)
@@ -374,9 +508,6 @@ HTML;
         ]);
     }
 
-    // Admin-facing: role-gated (district_admin/state_admin/super_admin) via
-    // the route middleware. Scoped here per-role since district_admin and
-    // state_admin each only review one registration type.
     public function pending(Request $request)
     {
         $reviewer = $request->user();
@@ -387,18 +518,17 @@ HTML;
         } elseif ($reviewer->role === 'state_admin') {
             $query->where('role', 'department_officer');
         }
-        // super_admin sees both types, unscoped.
 
         return response()->json(['success' => true, 'users' => $query->orderBy('created_at')->get()]);
     }
 
-    private function findReviewable(Request $request, int $id): User|\Illuminate\Http\JsonResponse
+    private function findReviewable(Request $request, int $id, array $allowedStatuses = ['pending_review']): User|\Illuminate\Http\JsonResponse
     {
         $reviewer = $request->user();
         $user = User::find($id);
 
-        if (! $user || $user->registration_status !== 'pending_review') {
-            return response()->json(['success' => false, 'message' => 'No pending registration found'], 404);
+        if (! $user || ! in_array($user->registration_status, $allowedStatuses, true)) {
+            return response()->json(['success' => false, 'message' => 'No reviewable registration found'], 404);
         }
 
         $allowed = match ($reviewer->role) {
@@ -417,14 +547,23 @@ HTML;
 
     public function approve(Request $request, int $id)
     {
-        $user = $this->findReviewable($request, $id);
+        // pending_review (after set-password) or previously unapproved accounts.
+        $user = $this->findReviewable($request, $id, ['pending_review', 'unapproved', 'rejected']);
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
+        }
+
+        if (in_array($user->registration_status, ['pending_email', 'email_verified'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Surveyor must verify email and set a password before approval.',
+            ], 400);
         }
 
         $user->update([
             'registration_status' => 'active',
             'is_active' => true,
+            'rejection_reason' => null,
             'reviewed_by_id' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
@@ -432,9 +571,34 @@ HTML;
         return response()->json(['success' => true, 'message' => 'Registration approved. Account is now active.']);
     }
 
+    public function unapprove(Request $request, int $id)
+    {
+        $user = $this->findReviewable($request, $id, ['active']);
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            return $user;
+        }
+
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
+
+        $user->update([
+            'registration_status' => 'unapproved',
+            'is_active' => false,
+            'rejection_reason' => $data['reason'] ?? 'Unapproved by admin',
+            'reviewed_by_id' => $request->user()->id,
+            'reviewed_at' => now(),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Account unapproved. Surveyor can no longer sign in.']);
+    }
+
     public function reject(Request $request, int $id)
     {
-        $user = $this->findReviewable($request, $id);
+        $user = $this->findReviewable($request, $id, [
+            'pending_review',
+            'pending_email',
+            'email_verified',
+            'unapproved',
+        ]);
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
         }
@@ -443,6 +607,7 @@ HTML;
 
         $user->update([
             'registration_status' => 'rejected',
+            'is_active' => false,
             'rejection_reason' => $data['reason'],
             'reviewed_by_id' => $request->user()->id,
             'reviewed_at' => now(),
