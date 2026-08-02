@@ -56,29 +56,77 @@ class LocationController extends Controller
         return null;
     }
 
+    private function findUniqueExactByName(Collection $items, array $candidates)
+    {
+        $normalizedCandidates = collect($candidates)
+            ->filter()
+            ->map(fn ($value) => $this->normalizeName((string) $value))
+            ->filter(fn ($value) => mb_strlen($value) >= 2)
+            ->unique();
+
+        foreach ($normalizedCandidates as $candidate) {
+            $matches = $items
+                ->filter(fn ($item) => $this->normalizeName($item->name) === $candidate)
+                ->values();
+            if ($matches->count() === 1) {
+                return $matches->first();
+            }
+        }
+
+        return null;
+    }
+
     private function resolveHierarchy(
         array $districtCandidates,
         array $tehsilCandidates,
         array $villageCandidates,
         ?string $panchayatName = null
     ): array {
-        $district = $this->findByName(
-            District::query()->orderBy('name')->get(['id', 'name']),
-            $districtCandidates
-        );
-
-        $tehsil = null;
+        $districts = District::query()->orderBy('name')->get(['id', 'name']);
+        $tehsils = Tehsil::query()
+            ->with('district:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'district_id']);
+        $district = $this->findByName($districts, $districtCandidates);
+        $tehsil = $this->findUniqueExactByName($tehsils, $tehsilCandidates)
+            ?: $this->findByName($tehsils, $tehsilCandidates);
         $village = null;
-        if ($district) {
+
+        // A tehsil is more specific than a district. This also handles newly
+        // created districts (for example Hansi) while phone geocoders may
+        // still return their former parent district (Hisar).
+        if ($tehsil) {
+            $district = $tehsil->district ?: $district;
             $villages = Village::query()
-                ->with(['tehsil:id,name,district_id', 'panchayat:id,name'])
+                ->with(['tehsil.district:id,name', 'panchayat:id,name'])
+                ->where('tehsil_id', $tehsil->id)
+                ->get(['id', 'name', 'panchayat_id', 'tehsil_id']);
+            $village = $this->findByName($villages, $villageCandidates);
+        } elseif ($district) {
+            $villages = Village::query()
+                ->with(['tehsil.district:id,name', 'panchayat:id,name'])
                 ->whereHas('tehsil', fn ($query) => $query->where('district_id', $district->id))
                 ->get(['id', 'name', 'panchayat_id', 'tehsil_id']);
             $village = $this->findByName($villages, $villageCandidates);
             $tehsil = $village?->tehsil ?: $this->findByName(
-                Tehsil::where('district_id', $district->id)->get(['id', 'name', 'district_id']),
+                $tehsils->where('district_id', $district->id)->values(),
                 $tehsilCandidates
             );
+        }
+
+        // If a stale district name prevented the hierarchy lookup, use only a
+        // globally unique exact village match and derive its tehsil/district.
+        if (! $village) {
+            $allVillages = Village::query()
+                ->with(['tehsil.district:id,name', 'panchayat:id,name'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'panchayat_id', 'tehsil_id']);
+            $village = $this->findUniqueExactByName($allVillages, $villageCandidates);
+        }
+
+        if ($village?->tehsil) {
+            $tehsil = $village->tehsil;
+            $district = $tehsil->district ?: $district;
         }
 
         return [
@@ -100,6 +148,11 @@ class LocationController extends Controller
             'tehsil' => ['nullable', 'string', 'max:150'],
             'village' => ['nullable', 'string', 'max:150'],
             'panchayat' => ['nullable', 'string', 'max:150'],
+            'administrative_area' => ['nullable', 'string', 'max:150'],
+            'sub_administrative_area' => ['nullable', 'string', 'max:150'],
+            'locality' => ['nullable', 'string', 'max:150'],
+            'sub_locality' => ['nullable', 'string', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
         ]);
 
         if (collect($data)->filter(fn ($value) => trim((string) $value) !== '')->isEmpty()) {
@@ -107,9 +160,22 @@ class LocationController extends Controller
         }
 
         return response()->json(['location' => $this->resolveHierarchy(
-            [$data['district'] ?? null],
-            [$data['tehsil'] ?? null],
-            [$data['village'] ?? null],
+            [
+                $data['district'] ?? null,
+                $data['sub_administrative_area'] ?? null,
+                $data['administrative_area'] ?? null,
+            ],
+            [
+                $data['tehsil'] ?? null,
+                $data['locality'] ?? null,
+                $data['sub_administrative_area'] ?? null,
+            ],
+            [
+                $data['village'] ?? null,
+                $data['sub_locality'] ?? null,
+                $data['locality'] ?? null,
+                $data['name'] ?? null,
+            ],
             $data['panchayat'] ?? null,
         )]);
     }
