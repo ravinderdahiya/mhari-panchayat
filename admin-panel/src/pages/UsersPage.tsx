@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Users as UsersIcon, Inbox, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { Search, Users as UsersIcon, Inbox, ChevronLeft, ChevronRight, Lock, Trash2 } from 'lucide-react';
 import * as api from '../services/api';
 import { masterApi } from '../services/api';
 import { ALL_ROLES } from '../types';
@@ -25,7 +25,10 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [editRole, setEditRole] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
@@ -71,6 +74,10 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   const selectUser = (u: AdminUser) => {
     setSelected(u);
     setEditRole(u.role);
@@ -100,8 +107,37 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
     }
   };
 
+  const removeUser = async () => {
+    if (!deleteTarget || deleteTarget.id === currentUser.id) return;
+    setIsDeleting(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const { message } = await api.deleteUser(deleteTarget.id);
+      setUsers((prev) => prev.filter((user) => user.id !== deleteTarget.id));
+      if (selected?.id === deleteTarget.id) setSelected(null);
+      setSuccessMessage(message || 'User deleted successfully');
+      setDeleteTarget(null);
+    } catch (err) {
+      setError((err as Error).message);
+      setDeleteTarget(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {successMessage && (
+        <div role="alert" className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+          {successMessage}
+        </div>
+      )}
+      {error && !selected && (
+        <div role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -146,6 +182,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
                 <th className="text-left p-2.5">Department</th>
                 <th className="text-left p-2.5">Status</th>
                 <th className="text-left p-2.5">Joined</th>
+                <th className="text-right p-2.5">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -175,6 +212,22 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
                     </span>
                   </td>
                   <td className="p-2.5 text-slate-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="p-2.5 text-right" onClick={(event) => event.stopPropagation()}>
+                    <button
+                      type="button"
+                      disabled={u.id === currentUser.id}
+                      onClick={() => {
+                        setError('');
+                        setSuccessMessage('');
+                        setDeleteTarget(u);
+                      }}
+                      title={u.id === currentUser.id ? 'You cannot delete your own account' : `Delete ${u.name || u.username}`}
+                      aria-label={`Delete ${u.name || u.username}`}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50 disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -261,6 +314,48 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
           >
             {isSubmitting ? 'Saving…' : 'Save Changes'}
           </button>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-5"
+          onClick={() => { if (!isDeleting) setDeleteTarget(null); }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <h2 id="delete-user-title" className="text-lg font-bold text-slate-900">Delete user?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              <b className="text-slate-800">{deleteTarget.name || deleteTarget.username}</b> का account permanently delete हो जाएगा। यह action undo नहीं हो सकता।
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={removeUser}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {isDeleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
