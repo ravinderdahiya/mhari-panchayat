@@ -9,3 +9,16 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Deployed SPA at IIS physical path (built from admin-panel/dist)
+/index.html
+/favicon.svg
+/icons.svg
+/web.config
+/assets/
+/arcgis/
+/village-photos/
+/www/
+
+# Portable PHP + Composer used on this server
+/tools/

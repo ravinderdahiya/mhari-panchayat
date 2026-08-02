@@ -3,25 +3,28 @@ import { useEffect, useState } from 'react';
 // Real photographs of villages in Haryana, India - sourced from Wikimedia
 // Commons, all CC BY-SA 4.0 (attribution required, kept in `credit` below
 // and shown on-screen for the currently visible photo).
+// BASE_URL is `/` in local dev and `/mhari-panchayat/` on IIS.
+const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+
 const PHOTOS = [
   {
-    src: '/village-photos/village-sunset.jpg',
+    src: asset('village-photos/village-sunset.jpg'),
     credit: 'Village pond at sunset, Kaithal — Vasupriye, CC BY-SA 4.0',
   },
   {
-    src: '/village-photos/sisana-village-road.jpg',
+    src: asset('village-photos/sisana-village-road.jpg'),
     credit: 'Banyan-lined village road, Sisana, Sonipat — Ashudahiya01, CC BY-SA 4.0',
   },
   {
-    src: '/village-photos/bachini-farms-winter.jpg',
+    src: asset('village-photos/bachini-farms-winter.jpg'),
     credit: 'Winter morning over farms, Bachini, Mahendragarh — ND Nikhil, CC BY-SA 4.0',
   },
   {
-    src: '/village-photos/shivalya-pond.jpg',
+    src: asset('village-photos/shivalya-pond.jpg'),
     credit: 'Shivalya pond, Sisana, Sonipat — Ashudahiya01, CC BY-SA 4.0',
   },
   {
-    src: '/village-photos/village-gate-pipli.jpg',
+    src: asset('village-photos/village-gate-pipli.jpg'),
     credit: 'Village gate, Pipli, Sirsa — Mulkh Singh, CC BY-SA 4.0',
   },
 ];

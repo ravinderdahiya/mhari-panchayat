@@ -19,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['role' => EnsureRole::class, 'permission' => EnsurePermission::class]);
+        // API-only app: never redirect guests to a named "login" web route
+        // (that route does not exist and caused 500s on unauthenticated /api/*).
+        $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
