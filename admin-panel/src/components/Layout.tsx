@@ -1,35 +1,83 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
-  Users, ShieldCheck, Settings, ScrollText, Landmark, LogOut, MapPinned,
-  ChevronRight, ClipboardCheck, HardHat,
+  Users, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, MapPinned,
+  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'users' | 'roles' | 'settings' | 'audit-log';
+  | 'surveyors' | 'asset-surveys' | 'asset-types' | 'users' | 'roles' | 'settings' | 'audit-log';
 
 interface LayoutProps {
   currentUser: User;
   activeView: View;
-  onNavigate: (view: View) => void;
+  activeChildId?: string | null;
+  onNavigate: (view: View, childId?: string) => void;
   onLogout: () => void;
   children: React.ReactNode;
 }
 
 const ADMIN_ROLES = ['super_admin'];
 
-const NAV_ITEMS: {
-  id: View; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; roles?: string[]; section?: 'operations' | 'system';
-}[] = [
+interface NavChild {
+  id: string;
+  label: string;
+}
+
+interface NavGroup {
+  id: string;
+  label: string;
+  children: NavChild[];
+}
+
+interface NavItem {
+  id: View;
+  label: string;
+  icon: typeof LayoutDashboard;
+  adminOnly?: boolean;
+  roles?: string[];
+  section?: 'operations' | 'system';
+  children?: NavChild[];
+  groups?: NavGroup[];
+}
+
+const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'master', label: 'Master Management', icon: Database, adminOnly: true },
+  { id: 'master', label: 'Master Management', icon: Database, adminOnly: true, groups: [
+    { id: 'geographic', label: 'Geographic Hierarchy', children: [
+      { id: 'states', label: 'States' },
+      { id: 'districts', label: 'Districts' },
+      { id: 'tehsils', label: 'Tehsils / Sub-Tehsils' },
+      { id: 'blocks', label: 'Blocks' },
+      { id: 'panchayats', label: 'Panchayats' },
+      { id: 'villages', label: 'Villages' },
+    ] },
+    { id: 'organization', label: 'Organization', children: [
+      { id: 'departments', label: 'Departments' },
+      { id: 'designations', label: 'Designations' },
+    ] },
+    { id: 'complaint-setup', label: 'Complaint Setup', children: [
+      { id: 'complaint-categories', label: 'Complaint Categories' },
+      { id: 'complaint-priorities', label: 'Complaint Priorities' },
+    ] },
+    { id: 'reference', label: 'Reference (read-only)', children: [
+      { id: 'roles', label: 'Roles' },
+      { id: 'complaint-statuses', label: 'Complaint Statuses' },
+    ] },
+  ] },
   { id: 'reports', label: 'Reports', icon: FileBarChart },
   { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, section: 'operations' },
   { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['engineer'], section: 'operations' },
   { id: 'village-assets', label: 'Village Assets', icon: MapPinned, section: 'operations' },
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
+  { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, adminOnly: true, section: 'operations', children: [
+    { id: 'pending-review', label: 'Pending review' },
+    { id: 'approved', label: 'Approved' },
+    { id: 'rejected', label: 'Rejected' },
+  ] },
+  { id: 'asset-types', label: 'Asset Types', icon: Layers3, adminOnly: true, section: 'operations' },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true, section: 'operations' },
   { id: 'roles', label: 'Roles', icon: ShieldCheck, adminOnly: true, section: 'operations' },
   { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true, section: 'system' },
@@ -43,7 +91,9 @@ const PAGE_SUBTITLES: Record<View, string> = {
   complaints: 'Track and resolve citizen grievances',
   'my-surveys': 'Your assigned field surveys',
   'village-assets': 'GIS infrastructure tracking',
-  surveyors: 'Assign villages, track visits, and verify submitted reports',
+  surveyors: 'Assign departments so surveyors can pick department → assets in the app',
+  'asset-surveys': 'Review field asset surveys submitted from the mobile app',
+  'asset-types': 'Map infrastructure assets to departments for mobile surveys',
   users: 'Manage admin users and access',
   roles: 'Configure role-based permissions',
   settings: 'System configuration',
@@ -54,13 +104,31 @@ function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]!.toUpperCase()).join('');
 }
 
-export default function Layout({ currentUser, activeView, onNavigate, onLogout, children }: LayoutProps) {
+export default function Layout({ currentUser, activeView, activeChildId, onNavigate, onLogout, children }: LayoutProps) {
   const [expanded, setExpanded] = useState(true);
+  const [openMenus, setOpenMenus] = useState<Partial<Record<View, boolean>>>({});
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [activeChildren, setActiveChildren] = useState<Partial<Record<View, string>>>({});
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     (!item.adminOnly || ADMIN_ROLES.includes(currentUser.role)) &&
     (!item.roles || item.roles.includes(currentUser.role)));
   const activeLabel = NAV_ITEMS.find((item) => item.id === activeView)?.label ?? '';
   const displayName = currentUser.name || currentUser.username;
+
+  useEffect(() => {
+    const activeItem = NAV_ITEMS.find((item) => item.id === activeView);
+    if (activeItem?.children?.length || activeItem?.groups?.length) {
+      setOpenMenus((current) => ({ ...current, [activeView]: true }));
+    }
+    if (activeItem && activeChildId) {
+      setActiveChildren((current) => ({ ...current, [activeView]: activeChildId }));
+      const activeGroup = activeItem.groups?.find((group) =>
+        group.children.some((child) => child.id === activeChildId));
+      if (activeGroup) {
+        setOpenGroups((current) => ({ ...current, [`${activeView}:${activeGroup.id}`]: true }));
+      }
+    }
+  }, [activeChildId, activeView]);
 
   let lastSection: string | undefined;
 
@@ -92,6 +160,8 @@ export default function Layout({ currentUser, activeView, onNavigate, onLogout, 
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+            const hasChildren = !!item.children?.length || !!item.groups?.length;
+            const isMenuOpen = !!openMenus[item.id];
             const showDivider = !!item.section && item.section !== lastSection;
             lastSection = item.section;
             return (
@@ -107,7 +177,18 @@ export default function Layout({ currentUser, activeView, onNavigate, onLogout, 
                   </>
                 )}
                 <button
-                  onClick={() => onNavigate(item.id)}
+                  onClick={() => {
+                    if (hasChildren) {
+                      if (!expanded) {
+                        setExpanded(true);
+                        setOpenMenus((current) => ({ ...current, [item.id]: true }));
+                      } else {
+                        setOpenMenus((current) => ({ ...current, [item.id]: !current[item.id] }));
+                      }
+                    }
+                    onNavigate(item.id);
+                  }}
+                  aria-expanded={hasChildren ? isMenuOpen : undefined}
                   className={`group relative w-full flex items-center gap-3.5 px-3 py-2.5 rounded-md mb-0.5 text-[13.5px] border-l-[3px] transition-colors whitespace-nowrap cursor-pointer ${
                     isActive
                       ? 'bg-sidebar-active text-white border-accent'
@@ -118,12 +199,86 @@ export default function Layout({ currentUser, activeView, onNavigate, onLogout, 
                   <span className={`transition-opacity duration-150 ${expanded ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
                     {item.label}
                   </span>
+                  {hasChildren && expanded && (
+                    <ChevronRight className={`ml-auto w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${isMenuOpen ? 'rotate-90' : ''}`} />
+                  )}
                   {!expanded && (
                     <span className="pointer-events-none absolute left-[60px] top-1/2 -translate-y-1/2 whitespace-nowrap bg-sidebar text-white text-xs px-2.5 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
                       {item.label}
                     </span>
                   )}
                 </button>
+                {hasChildren && (
+                  <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out ${expanded && isMenuOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                    <div className="overflow-hidden">
+                      <div className="pb-1">
+                        {item.groups?.map((group) => {
+                          const groupKey = `${item.id}:${group.id}`;
+                          const isGroupOpen = !!openGroups[groupKey];
+                          const isGroupActive = isActive && group.children.some((child) =>
+                            activeChildren[item.id] === child.id);
+                          return (
+                            <div key={group.id}>
+                              <button type="button" onClick={() => setOpenGroups((current) => ({
+                                ...current, [groupKey]: !current[groupKey],
+                              }))}
+                                aria-expanded={isGroupOpen}
+                                className={`w-full flex items-center gap-1.5 pl-[43px] pr-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide transition-colors cursor-pointer ${
+                                  isGroupActive ? 'text-accent' : 'text-white/45 hover:text-white/80'
+                                }`}>
+                                <span className="min-w-0 flex-1 whitespace-normal leading-tight">{group.label}</span>
+                                <ChevronRight className={`w-3 h-3 shrink-0 transition-transform duration-200 ${isGroupOpen ? 'rotate-90' : ''}`} />
+                              </button>
+                              <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out ${isGroupOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                                <div className="overflow-hidden">
+                                  <div className="pl-[51px] pr-1 pb-1">
+                                    {group.children.map((child) => {
+                                      const isChildActive = isActive && activeChildren[item.id] === child.id;
+                                      return (
+                                        <button key={child.id} type="button"
+                                          onClick={() => {
+                                            setActiveChildren((current) => ({ ...current, [item.id]: child.id }));
+                                            setOpenGroups((current) => ({ ...current, [groupKey]: true }));
+                                            onNavigate(item.id, child.id);
+                                          }}
+                                          className={`w-full text-left px-2 py-1.5 rounded-md text-[11.5px] leading-tight transition-colors cursor-pointer ${
+                                            isChildActive
+                                              ? 'bg-sidebar-hover text-white'
+                                              : 'text-white/65 hover:bg-sidebar-hover/70 hover:text-white'
+                                          }`}>
+                                          {child.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {!!item.children?.length && <div className="pl-[37px] pr-1">
+                          {item.children.map((child) => {
+                            const isChildActive = isActive && activeChildren[item.id] === child.id;
+                            return (
+                              <button key={child.id} type="button"
+                                onClick={() => {
+                                  setActiveChildren((current) => ({ ...current, [item.id]: child.id }));
+                                  onNavigate(item.id, child.id);
+                                }}
+                                className={`w-full text-left px-2.5 py-1.5 rounded-md text-[12px] transition-colors cursor-pointer ${
+                                  isChildActive
+                                    ? 'bg-sidebar-hover text-white'
+                                    : 'text-white/65 hover:bg-sidebar-hover/70 hover:text-white'
+                                }`}>
+                                {child.label}
+                              </button>
+                            );
+                          })}
+                        </div>}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

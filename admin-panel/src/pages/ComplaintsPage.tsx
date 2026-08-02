@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Inbox, MapPin, User, UserCheck, Flag, FileText, Search, Wrench, CheckCircle2, Star, XCircle,
   RotateCcw, ArrowLeftRight, Repeat, Download, X, ChevronLeft, ChevronRight, CalendarClock,
-  Navigation, Camera, ExternalLink, UserX,
+  Navigation, Camera, ExternalLink, UserX, Building2, Landmark,
 } from 'lucide-react';
 import * as api from '../services/api';
 import { masterApi } from '../services/api';
@@ -50,7 +50,7 @@ function toCsvValue(value: string | number | null | undefined): string {
 }
 
 function downloadCsv(rows: Complaint[]) {
-  const headers = ['ID', 'Category', 'Status', 'Priority', 'Village', 'Panchayat', 'Reported By', 'Assigned To', 'Filed Date', 'Repeat Of'];
+  const headers = ['ID', 'Category', 'Status', 'Priority', 'Department', 'Asset', 'Location', 'Reported By', 'Assigned To', 'Filed Date', 'Repeat Of'];
   const lines = [headers.join(',')];
   for (const c of rows) {
     lines.push([
@@ -58,8 +58,9 @@ function downloadCsv(rows: Complaint[]) {
       c.category.name,
       c.status,
       c.priority.name,
-      c.village ?? '',
-      c.panchayat ?? '',
+      c.department?.name ?? '',
+      c.asset_type?.name ?? '',
+      [c.village, c.panchayat, c.tehsil?.name, c.district?.name].filter(Boolean).join(', '),
       c.user?.name || c.user?.username || '',
       c.assigned_to?.name || c.assigned_to?.username || '',
       new Date(c.created_at).toLocaleDateString(),
@@ -142,6 +143,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
         if (!q) return true;
         const haystack = [
           String(c.id), c.category.name, c.description, c.village, c.panchayat,
+          c.tehsil?.name, c.district?.name,
+          c.department?.name, c.asset_type?.name,
           c.user?.name, c.user?.username, c.assigned_to?.name, c.assigned_to?.username,
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(q);
@@ -261,6 +264,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
               <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
                 <th className="text-left p-3 font-bold">ID</th>
                 <th className="text-left p-3 font-bold">Category</th>
+                <th className="text-left p-3 font-bold">Department / Asset</th>
                 <th className="text-left p-3 font-bold">Location</th>
                 <th className="text-left p-3 font-bold">Status</th>
                 <th className="text-left p-3 font-bold">Priority</th>
@@ -292,8 +296,12 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                       {c.category.name}
                     </span>
                   </td>
+                  <td className="p-3 max-w-[190px]">
+                    <p className="font-semibold text-slate-700 truncate">{c.department?.name || '—'}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{c.asset_type?.name || '—'}</p>
+                  </td>
                   <td className="p-3 text-slate-500 max-w-[160px] truncate">
-                    {[c.village, c.panchayat].filter(Boolean).join(', ') || <span className="text-slate-300 italic">No location</span>}
+                    {[c.village, c.panchayat, c.tehsil?.name, c.district?.name].filter(Boolean).join(', ') || <span className="text-slate-300 italic">No location</span>}
                   </td>
                   <td className="p-3"><StatusBadge status={c.status} /></td>
                   <td className="p-3"><PriorityBadge priority={c.priority.name} /></td>
@@ -385,7 +393,9 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
                 { icon: User, label: 'Reported by', value: selected.user?.name || selected.user?.username || '—' },
-                { icon: MapPin, label: 'Location', value: [selected.village, selected.panchayat].filter(Boolean).join(', ') || '—' },
+                { icon: MapPin, label: 'Location', value: [selected.village, selected.panchayat, selected.tehsil?.name, selected.district?.name].filter(Boolean).join(', ') || '—' },
+                { icon: Building2, label: 'Department', value: selected.department?.name || '—' },
+                { icon: Landmark, label: 'Asset', value: selected.asset_type?.name || '—' },
                 { icon: UserCheck, label: 'Assigned to', value: selected.assigned_to?.name || selected.assigned_to?.username || 'Unassigned' },
                 { icon: CalendarClock, label: 'Filed', value: new Date(selected.created_at).toLocaleString() },
               ].map(({ icon: Icon, label, value }) => (

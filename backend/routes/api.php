@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AssetTypeController;
+use App\Http\Controllers\Api\AssetController;
+use App\Http\Controllers\Api\AssetSurveyController;
 use App\Http\Controllers\Api\ComplaintController;
+use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RolePermissionController;
@@ -11,29 +15,43 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::post('/auth/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
+Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:otp-send');
+Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
 Route::post('/auth/forgot-password/request', [AuthController::class, 'forgotPasswordRequest'])->middleware('throttle:forgot-password');
 Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswordReset']);
 
-// Surveyor/Officer registration workflow - all public (no auth). Phone and
-// email are verified BEFORE any user record exists (each just yields a
-// short-lived verified-token), and the final submit creates the account
-// directly with password already chosen.
+// Surveyor/Officer registration — basmati-survey-app lifecycle:
+// phone OTP → Sign up (pending_email) → email verify link → set password →
+// pending_review → admin approve → active.
 Route::get('/registrations/districts', [RegistrationController::class, 'districts']);
 Route::post('/registrations/phone/send-otp', [RegistrationController::class, 'sendPhoneOtp']);
 Route::post('/registrations/phone/verify-otp', [RegistrationController::class, 'verifyPhoneOtp']);
 Route::post('/registrations/email/send-link', [RegistrationController::class, 'sendEmailLink']);
-// HTTPS page from the email CTA (Gmail blocks custom schemes). Hands off
-// into the installed app via mharipanchayat:// — same pattern as basmati-survey-app.
 Route::get('/registrations/email/verify-link', [RegistrationController::class, 'openEmailVerifyApp']);
 Route::post('/registrations/email/verify', [RegistrationController::class, 'verifyEmailLink']);
+Route::post('/registrations/set-password', [RegistrationController::class, 'setPassword']);
 Route::post('/registrations/surveyor', [RegistrationController::class, 'registerSurveyor']);
 Route::post('/registrations/officer', [RegistrationController::class, 'registerOfficer']);
 Route::get('/registrations/{id}/status', [RegistrationController::class, 'status']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/location/reverse', [LocationController::class, 'reverse']);
+    Route::get('/location/resolve', [LocationController::class, 'resolve']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
     Route::get('/users/assignable', [UserController::class, 'assignable']);
+    Route::get('/survey-departments', [AssetTypeController::class, 'departments']);
+    Route::get('/asset-types', [AssetTypeController::class, 'index']);
+    Route::get('/survey-options', [AssetSurveyController::class, 'options']);
+    Route::get('/assets', [AssetController::class, 'index']);
+    Route::get('/assets/nearby', [AssetController::class, 'nearby']);
+    Route::get('/assets/{id}', [AssetController::class, 'show']);
+    Route::get('/complaint-categories', [ComplaintController::class, 'categories']);
+    Route::get('/surveys', [AssetSurveyController::class, 'index']);
+    Route::post('/surveys', [AssetSurveyController::class, 'store']);
+    Route::get('/surveys/{id}', [AssetSurveyController::class, 'show']);
+    Route::put('/surveys/{id}', [AssetSurveyController::class, 'update']);
 
     // Master data - read is gated by the master_data.view permission (every
     // role has it by default - dropdowns need it everywhere), write by
@@ -48,6 +66,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/master/{entity}', [MasterDataController::class, 'store']);
         Route::put('/master/{entity}/{id}', [MasterDataController::class, 'update']);
         Route::delete('/master/{entity}/{id}', [MasterDataController::class, 'destroy']);
+        Route::get('/admin/asset-types', [AssetTypeController::class, 'adminIndex']);
+        Route::post('/admin/asset-types', [AssetTypeController::class, 'store']);
+        Route::put('/admin/asset-types/{id}', [AssetTypeController::class, 'update']);
+        Route::delete('/admin/asset-types/{id}', [AssetTypeController::class, 'destroy']);
     });
 
     // Role/permission management - deliberately gated by role:super_admin
@@ -67,12 +89,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:district_admin,state_admin,super_admin')->group(function () {
         Route::get('/registrations/pending', [RegistrationController::class, 'pending']);
         Route::patch('/registrations/{id}/approve', [RegistrationController::class, 'approve']);
+        Route::patch('/registrations/{id}/unapprove', [RegistrationController::class, 'unapprove']);
         Route::patch('/registrations/{id}/reject', [RegistrationController::class, 'reject']);
     });
 
     // Complaints
     Route::post('/complaints', [ComplaintController::class, 'store'])
         ->middleware('permission:complaints.file');
+    Route::get('/complaints/form-options', [ComplaintController::class, 'formOptions'])
+        ->middleware('permission:complaints.file');
+    Route::get('/complaints/mobile-reports', [ComplaintController::class, 'mobileReports']);
     Route::get('/complaints', [ComplaintController::class, 'index'])
         ->middleware('permission:complaints.view');
     Route::get('/complaints/reports', [ComplaintController::class, 'reports'])

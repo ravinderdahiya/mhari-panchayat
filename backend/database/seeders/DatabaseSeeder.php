@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\District;
 use App\Models\Panchayat;
 use App\Models\State;
+use App\Models\Tehsil;
 use App\Models\User;
 use App\Models\Village;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -32,9 +33,10 @@ class DatabaseSeeder extends Seeder
 
         $state = State::create(['name' => 'Haryana', 'code' => 'HR']);
         $district = District::create(['name' => 'Sonipat', 'code' => 'SNP', 'state_id' => $state->id]);
+        $tehsil = Tehsil::create(['name' => 'Gohana', 'code' => 'GHN-T', 'district_id' => $district->id]);
         $block = Block::create(['name' => 'Gohana', 'code' => 'GHN', 'district_id' => $district->id]);
         $panchayat = Panchayat::create(['name' => 'Sisana Gram Panchayat', 'code' => 'SGP', 'block_id' => $block->id]);
-        Village::create(['name' => 'Sisana', 'code' => 'SSN', 'panchayat_id' => $panchayat->id]);
+        Village::create(['name' => 'Sisana', 'code' => 'SSN', 'panchayat_id' => $panchayat->id, 'tehsil_id' => $tehsil->id]);
 
         foreach ([
             ['name' => 'Public Works Department', 'code' => 'PWD'],
@@ -51,5 +53,7 @@ class DatabaseSeeder extends Seeder
         foreach (['Pond', 'Road', 'Sanitation', 'Water_Supply', 'Building', 'Other'] as $name) {
             ComplaintCategory::create(['name' => $name]);
         }
+
+        $this->call(InfrastructureAssetSeeder::class);
     }
 }

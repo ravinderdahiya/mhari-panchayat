@@ -21,15 +21,42 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // 5 attempts / 5 minutes, keyed by IP + the submitted username - prevents
-        // brute-forcing a single account without penalizing the whole IP for
-        // unrelated traffic.
+        // Local: generous so repeated manual testing isn't blocked.
+        // Production keeps the tight 5 / 5-minute window.
         RateLimiter::for('login', function ($request) {
-            return Limit::perMinutes(5, 5)->by($request->ip().'|'.$request->input('username'));
+            $key = $request->ip().'|'.$request->input('username');
+            if (app()->environment('local')) {
+                return Limit::perMinute(60)->by($key);
+            }
+
+            return Limit::perMinutes(5, 5)->by($key);
         });
 
         RateLimiter::for('forgot-password', function ($request) {
-            return Limit::perMinutes(5, 5)->by($request->ip().'|'.$request->input('username'));
+            $key = $request->ip().'|'.$request->input('username');
+            if (app()->environment('local')) {
+                return Limit::perMinute(30)->by($key);
+            }
+
+            return Limit::perMinutes(5, 5)->by($key);
+        });
+
+        RateLimiter::for('otp-send', function ($request) {
+            $key = $request->ip().'|'.$request->input('mobile');
+            if (app()->environment('local')) {
+                return Limit::perMinute(60)->by($key);
+            }
+
+            return Limit::perMinutes(10, 5)->by($key);
+        });
+
+        RateLimiter::for('otp-verify', function ($request) {
+            $key = $request->ip().'|'.$request->input('mobile');
+            if (app()->environment('local')) {
+                return Limit::perMinute(120)->by($key);
+            }
+
+            return Limit::perMinutes(10, 10)->by($key);
         });
     }
 }

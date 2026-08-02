@@ -1,4 +1,4 @@
-import type { AdminUser, AssetCategoryDef, AssignableUser, Complaint, ComplaintReports, RolePermissionMatrix, User, VillageAsset } from '../types';
+import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, Complaint, ComplaintReports, RolePermissionMatrix, User, VillageAsset } from '../types';
 
 // 127.0.0.1, not localhost - on this machine "localhost" resolves to ::1
 // first, and the dev server only listens on IPv4, so every request pays a
@@ -67,8 +67,27 @@ export const resetPassword = (token: string, new_password: string, new_password_
 // --- MASTER DATA (Super Admin manages; any authenticated user can read) ---
 // One generic helper reused for every master entity instead of ~9 bespoke
 // functions - matches the backend's MasterDataController factory.
+export interface MasterPagination {
+  currentPage: number;
+  lastPage: number;
+  perPage: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
 export const masterApi = (entity: string) => ({
-  list: () => request<{ success: boolean; items: any[] }>(`/api/master/${entity}`),
+  list: (options: { paginated?: boolean; page?: number; perPage?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (options.paginated) params.set('paginated', '1');
+    if (options.page) params.set('page', String(options.page));
+    if (options.perPage) params.set('per_page', String(options.perPage));
+    const query = params.toString();
+
+    return request<{ success: boolean; items: any[]; pagination?: MasterPagination }>(
+      `/api/master/${entity}${query ? `?${query}` : ''}`,
+    );
+  },
   create: (data: object) => jsonRequest<{ success: boolean; item: any }>(`/api/master/${entity}`, 'POST', data),
   update: (id: number, data: object) => jsonRequest<{ success: boolean; item: any }>(`/api/master/${entity}/${id}`, 'PUT', data),
   remove: (id: number) => jsonRequest<{ success: boolean }>(`/api/master/${entity}/${id}`, 'DELETE'),
@@ -126,8 +145,15 @@ export const updateRolePermissions = (role: string, permissions: string[]) =>
 // --- USERS (admin management) ---
 export const getUsers = () => request<{ success: boolean; users: AdminUser[] }>('/api/users');
 
-export const updateUser = (id: number, fields: { role?: string; department_id?: number | null; is_active?: boolean }) =>
-  jsonRequest<{ success: boolean; message: string; user: AdminUser }>(`/api/users/${id}`, 'PATCH', fields);
+export const updateUser = (
+  id: number,
+  fields: {
+    role?: string;
+    department_id?: number | null;
+    department_ids?: number[];
+    is_active?: boolean;
+  },
+) => jsonRequest<{ success: boolean; message: string; user: AdminUser }>(`/api/users/${id}`, 'PATCH', fields);
 
 export const deleteUser = (id: number) =>
   jsonRequest<{ success: boolean; message: string }>(`/api/users/${id}`, 'DELETE');
@@ -135,6 +161,11 @@ export const deleteUser = (id: number) =>
 // --- REGISTRATION REVIEW (self-registered surveyors/officers) ---
 export const approveRegistration = (id: number) =>
   jsonRequest<{ success: boolean; message: string }>(`/api/registrations/${id}/approve`, 'PATCH');
+
+export const unapproveRegistration = (id: number, reason?: string) =>
+  jsonRequest<{ success: boolean; message: string }>(`/api/registrations/${id}/unapprove`, 'PATCH', {
+    reason: reason || undefined,
+  });
 
 export const rejectRegistration = (id: number, reason: string) =>
   jsonRequest<{ success: boolean; message: string }>(`/api/registrations/${id}/reject`, 'PATCH', { reason });
@@ -164,3 +195,72 @@ export const updateVillageAsset = (id: number, form: FormData) => {
 
 export const deleteVillageAsset = (id: number) =>
   jsonRequest<{ success: boolean }>(`/api/village-assets/${id}`, 'DELETE');
+
+// --- SURVEY ASSET TYPES (department-linked catalog for mobile app) ---
+export const listAdminAssetTypes = (options: {
+  paginated?: boolean;
+  page?: number;
+  perPage?: number;
+  departmentId?: number | 'all';
+} = {}) => {
+  const params = new URLSearchParams();
+  if (options.paginated) params.set('paginated', '1');
+  if (options.page) params.set('page', String(options.page));
+  if (options.perPage) params.set('per_page', String(options.perPage));
+  if (options.departmentId && options.departmentId !== 'all') {
+    params.set('department_id', String(options.departmentId));
+  }
+  const query = params.toString();
+
+  return request<{ success: boolean; items: any[]; pagination?: MasterPagination }>(
+    `/api/admin/asset-types${query ? `?${query}` : ''}`,
+  );
+};
+
+export const createAdminAssetType = (data: {
+  name: string;
+  icon_key?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  department_ids: number[];
+}) => jsonRequest<{ success: boolean; item: any }>('/api/admin/asset-types', 'POST', data);
+
+export const updateAdminAssetType = (
+  id: number,
+  data: {
+    name?: string;
+    icon_key?: string;
+    sort_order?: number;
+    is_active?: boolean;
+    department_ids?: number[];
+  },
+) => jsonRequest<{ success: boolean; item: any }>(`/api/admin/asset-types/${id}`, 'PUT', data);
+
+export const deleteAdminAssetType = (id: number) =>
+  jsonRequest<{ success: boolean }>(`/api/admin/asset-types/${id}`, 'DELETE');
+
+// --- MOBILE ASSET SURVEYS ---
+export const getAssetSurveys = (options: {
+  page?: number;
+  perPage?: number;
+  query?: string;
+  condition?: string;
+} = {}) => {
+  const params = new URLSearchParams({
+    paginated: '1',
+    page: String(options.page ?? 1),
+    per_page: String(options.perPage ?? 10),
+  });
+  if (options.query?.trim()) params.set('q', options.query.trim());
+  if (options.condition && options.condition !== 'ALL') params.set('condition', options.condition);
+
+  return request<{
+    success: boolean;
+    surveys: AssetSurvey[];
+    pagination: import('../types').AssetSurveyPagination;
+    stats: import('../types').AssetSurveyStats;
+  }>(`/api/surveys?${params.toString()}`);
+};
+
+export const getAssetSurvey = (id: string) =>
+  request<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}`);

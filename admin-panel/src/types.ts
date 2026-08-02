@@ -31,6 +31,7 @@ export type ComplaintStatus =
 export interface NamedEntity { id: number; name: string; code?: string | null }
 export interface State extends NamedEntity {}
 export interface District extends NamedEntity { state_id: number; state?: State }
+export interface Tehsil extends NamedEntity { district_id: number; district?: District }
 export interface Block extends NamedEntity { district_id: number; district?: District }
 export interface Panchayat extends NamedEntity { block_id: number; block?: Block }
 export interface Village extends NamedEntity { panchayat_id: number; panchayat?: Panchayat }
@@ -70,11 +71,21 @@ export interface Complaint {
   assigned_to_id: number | null;
   category_id: number;
   category: ComplaintCategory;
+  district_id: number | null;
+  tehsil_id: number | null;
+  village_id: number | null;
+  panchayat_id: number | null;
+  district: { id: number; name: string } | null;
+  tehsil: { id: number; name: string } | null;
   village: string | null;
   panchayat: string | null;
   description: string | null;
   priority_id: number;
   priority: ComplaintPriority;
+  department_id: number | null;
+  asset_type_id: number | null;
+  department: { id: number; name: string; code: string | null } | null;
+  asset_type: { id: number; name: string; icon_key: string } | null;
   lat: number | null;
   long: number | null;
   before_photo_url: string | null;
@@ -150,8 +161,20 @@ export interface AdminUser {
   is_active: boolean;
   department_id: number | null;
   department: Department | null;
+  departments?: Department[];
+  district_id: number | null;
+  district: District | null;
+  employee_id: string | null;
+  mobile: string | null;
   created_at: string;
-  registration_status: 'pending_review' | 'active' | 'rejected' | null;
+  registration_status:
+    | 'pending_email'
+    | 'email_verified'
+    | 'pending_review'
+    | 'active'
+    | 'unapproved'
+    | 'rejected'
+    | null;
   rejection_reason: string | null;
 }
 
@@ -191,4 +214,48 @@ export interface VillageAsset {
   created_by: number;
   creator?: { id: number; name: string | null; username: string };
   created_at: string;
+}
+
+export interface AssetSurvey {
+  id: string;
+  assetId: string;
+  departmentId: string;
+  departmentName: string | null;
+  assetTypeId: string;
+  assetTypeName: string | null;
+  assetName: string;
+  district: string;
+  panchayat: string;
+  village: string;
+  latitude: number;
+  longitude: number;
+  condition: 'GOOD' | 'FAIR' | 'POOR' | 'DAMAGED';
+  description: string | null;
+  surveyDate: string;
+  photoUrls: string[];
+  surveyedById: string;
+  surveyedByName: string | null;
+  surveyor: {
+    id: number; name: string; username: string; employeeId: string | null;
+    email: string | null; mobile: string | null; role: string;
+  } | null;
+  department: { id: number; name: string; code: string | null } | null;
+  assetType: { id: number; name: string; iconKey: string | null } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetSurveyPagination {
+  currentPage: number;
+  lastPage: number;
+  perPage: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
+export interface AssetSurveyStats {
+  totalSurveys: number;
+  activeSurveyors: number;
+  poorDamaged: number;
 }

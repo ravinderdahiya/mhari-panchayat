@@ -11,6 +11,7 @@ use App\Models\Designation;
 use App\Models\District;
 use App\Models\Panchayat;
 use App\Models\State;
+use App\Models\Tehsil;
 use App\Models\Village;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class MasterDataController extends Controller
     private const ENTITIES = [
         'states' => ['model' => State::class, 'with' => []],
         'districts' => ['model' => District::class, 'with' => ['state']],
+        'tehsils' => ['model' => Tehsil::class, 'with' => ['district']],
         'blocks' => ['model' => Block::class, 'with' => ['district']],
         'panchayats' => ['model' => Panchayat::class, 'with' => ['block']],
         'villages' => ['model' => Village::class, 'with' => ['panchayat']],
@@ -130,12 +132,31 @@ class MasterDataController extends Controller
         return self::ENTITIES[$entity];
     }
 
-    public function index(string $entity)
+    public function index(Request $request, string $entity)
     {
         $config = $this->resolve($entity);
-        $items = $config['model']::with($config['with'])->orderBy($config['orderBy'] ?? 'name')->get();
+        $query = $config['model']::with($config['with'])->orderBy($config['orderBy'] ?? 'name');
 
-        return response()->json(['success' => true, 'items' => $items]);
+        // Keep the original unpaginated response for mobile/dropdown consumers.
+        if (! $request->boolean('paginated')) {
+            return response()->json(['success' => true, 'items' => $query->get()]);
+        }
+
+        $perPage = max(5, min(100, $request->integer('per_page', 10)));
+        $paginator = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'items' => $paginator->items(),
+            'pagination' => [
+                'currentPage' => $paginator->currentPage(),
+                'lastPage' => $paginator->lastPage(),
+                'perPage' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+        ]);
     }
 
     public function store(Request $request, string $entity)
@@ -180,14 +201,47 @@ class MasterDataController extends Controller
         return response()->json(['success' => true, 'message' => 'Deleted']);
     }
 
-    public function roles()
+    private function referenceItems(Request $request, array $items)
     {
-        return response()->json(['success' => true, 'items' => array_map(fn ($r) => ['name' => $r], self::ROLES)]);
+        if (! $request->boolean('paginated')) {
+            return response()->json(['success' => true, 'items' => $items]);
+        }
+
+        $perPage = max(5, min(100, $request->integer('per_page', 10)));
+        $total = count($items);
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $currentPage = min(max(1, $request->integer('page', 1)), $lastPage);
+        $from = $total === 0 ? null : (($currentPage - 1) * $perPage) + 1;
+        $pageItems = array_slice($items, ($currentPage - 1) * $perPage, $perPage);
+
+        return response()->json([
+            'success' => true,
+            'items' => array_values($pageItems),
+            'pagination' => [
+                'currentPage' => $currentPage,
+                'lastPage' => $lastPage,
+                'perPage' => $perPage,
+                'total' => $total,
+                'from' => $from,
+                'to' => $from === null ? null : $from + count($pageItems) - 1,
+            ],
+        ]);
     }
 
-    public function complaintStatuses()
+    public function roles(Request $request)
     {
-        return response()->json(['success' => true, 'items' => array_map(fn ($s) => ['name' => $s], self::COMPLAINT_STATUSES)]);
+        return $this->referenceItems(
+            $request,
+            array_map(fn ($role) => ['name' => $role], self::ROLES),
+        );
+    }
+
+    public function complaintStatuses(Request $request)
+    {
+        return $this->referenceItems(
+            $request,
+            array_map(fn ($status) => ['name' => $status], self::COMPLAINT_STATUSES),
+        );
     }
 
     public function assetCategories()

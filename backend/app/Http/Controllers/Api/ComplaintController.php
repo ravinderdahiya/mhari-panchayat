@@ -7,7 +7,12 @@ use App\Models\Complaint;
 use App\Models\ComplaintPriority;
 use App\Models\ComplaintTimelineEvent;
 use App\Models\ComplaintTransfer;
+use App\Models\ComplaintCategory;
+use App\Models\AssetType;
+use App\Models\District;
+use App\Models\Tehsil;
 use App\Models\User;
+use App\Models\Village;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,9 +20,139 @@ class ComplaintController extends Controller
 {
     private const WITH = [
         'user', 'assignedTo', 'verifiedBy', 'category', 'priority', 'timeline.performedBy',
+        'department:id,name,code', 'assetType:id,name,icon_key',
+        'district:id,name', 'tehsil:id,name', 'villageMaster:id,name,panchayat_id',
+        'panchayatMaster:id,name',
         'transfers.fromUser', 'transfers.toUser', 'transfers.transferredBy',
         'duplicateOf.category',
     ];
+
+    public function categories(Request $request)
+    {
+        $query = ComplaintCategory::query()
+            ->whereDoesntHave('children')
+            ->orderBy('sort_order')
+            ->orderBy('name');
+
+        $districtId = $request->user()->district_id;
+        $query->where(function ($scoped) use ($districtId) {
+            $scoped->whereNull('district_id');
+            if ($districtId) {
+                $scoped->orWhere('district_id', $districtId);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'categories' => $query->get(['id', 'name', 'code'])
+                ->map(fn ($category) => [
+                    'id' => $category->id,
+                    'name' => str_replace('_', ' ', $category->name),
+                    'code' => $category->code,
+                ]),
+        ]);
+    }
+
+    public function formOptions(Request $request)
+    {
+        $districtId = $request->integer('district_id') ?: null;
+        $tehsilId = $request->integer('tehsil_id') ?: null;
+        if ($districtId && ! District::whereKey($districtId)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid district'], 422);
+        }
+        if ($tehsilId && ! Tehsil::whereKey($tehsilId)->where('district_id', $districtId)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid tehsil for the selected district'], 422);
+        }
+
+        $categories = ComplaintCategory::query()
+            ->whereDoesntHave('children')
+            ->where(function ($query) use ($districtId) {
+                $query->whereNull('district_id');
+                if ($districtId) {
+                    $query->orWhere('district_id', $districtId);
+                }
+            })
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (ComplaintCategory $category) => [
+                'id' => $category->id,
+                'name' => str_replace('_', ' ', $category->name),
+                'code' => $category->code,
+            ]);
+
+        $payload = [
+            'districts' => District::orderBy('name')->get(['id', 'name']),
+            'categories' => $categories,
+            'priorities' => ComplaintPriority::orderBy('level')->orderBy('name')->get(['id', 'name', 'level']),
+            'tehsils' => [],
+            'villages' => [],
+        ];
+
+        if ($districtId) {
+            $payload['tehsils'] = Tehsil::where('district_id', $districtId)
+                ->orderBy('name')
+                ->get(['id', 'name', 'district_id']);
+        }
+
+        if ($tehsilId) {
+            $payload['villages'] = Village::query()
+                ->with('panchayat:id,name,block_id')
+                ->where('tehsil_id', $tehsilId)
+                ->orderBy('name')
+                ->get(['id', 'name', 'panchayat_id'])
+                ->map(fn (Village $village) => [
+                    'id' => $village->id,
+                    'name' => $village->name,
+                    'panchayatId' => $village->panchayat_id,
+                    'panchayatName' => $village->panchayat?->name,
+                ]);
+        }
+
+        return response()->json(['success' => true, ...$payload]);
+    }
+
+    public function mobileReports(Request $request)
+    {
+        $query = Complaint::query()->with(['category:id,name', 'timeline']);
+        if (! in_array($request->user()->role, ['super_admin', 'state_admin', 'district_admin'], true)) {
+            $query->where('assigned_to_id', $request->user()->id);
+        }
+        $complaints = $query->get();
+        $resolvedStatuses = ['Resolved', 'Closed'];
+        $resolved = $complaints->filter(fn (Complaint $complaint) => in_array($complaint->status, $resolvedStatuses, true));
+
+        $resolutionDays = $resolved->map(function (Complaint $complaint) {
+            $event = $complaint->timeline->firstWhere('status', 'Resolved');
+            if (! $event?->created_at) {
+                return null;
+            }
+
+            return $complaint->created_at->diffInSeconds($event->created_at) / 86400;
+        })->filter(fn ($days) => $days !== null);
+
+        $categories = $complaints->groupBy('category_id')->map(function ($items) use ($resolvedStatuses) {
+            $first = $items->first();
+            $complete = $items->filter(fn (Complaint $complaint) => in_array($complaint->status, $resolvedStatuses, true))->count();
+            $total = $items->count();
+
+            return [
+                'id' => $first->category_id,
+                'name' => str_replace('_', ' ', $first->category?->name ?? 'Uncategorised'),
+                'resolved' => $complete,
+                'total' => $total,
+                'percent' => $total > 0 ? round($complete / $total, 4) : 0,
+            ];
+        })->sortBy('name')->values();
+
+        return response()->json(['success' => true, 'reports' => [
+            'resolved' => $resolved->count(),
+            'averageResolutionDays' => $resolutionDays->isEmpty()
+                ? null
+                : round($resolutionDays->average(), 1),
+            'categories' => $categories,
+        ]]);
+    }
 
     private function storeFile($file, string $subdir): ?string
     {
@@ -39,13 +174,16 @@ class ComplaintController extends Controller
     {
         $data = $request->validate([
             'category_id' => ['required', 'exists:complaint_categories,id'],
-            'priority_id' => ['nullable', 'exists:complaint_priorities,id'],
-            'village' => ['nullable', 'string'],
-            'panchayat' => ['nullable', 'string'],
-            'description' => ['nullable', 'string'],
+            'priority_id' => ['required', 'exists:complaint_priorities,id'],
+            'department_id' => ['required', 'exists:departments,id'],
+            'asset_type_id' => ['required', 'exists:asset_types,id'],
+            'district_id' => ['required', 'exists:districts,id'],
+            'tehsil_id' => ['required', 'exists:tehsils,id'],
+            'village_id' => ['required', 'exists:villages,id'],
+            'description' => ['required', 'string', 'min:10', 'max:2000'],
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'long' => ['nullable', 'numeric', 'between:-180,180'],
-            'photo' => ['nullable', 'file', 'max:15360'],
+            'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'voice_note' => ['nullable', 'file', 'max:15360'],
         ], [
             'category_id.required' => 'categoryId is required',
@@ -55,9 +193,35 @@ class ComplaintController extends Controller
             'long.between' => 'Invalid longitude',
         ]);
 
-        $priorityId = $data['priority_id'] ?? ComplaintPriority::where('name', 'Medium')->value('id');
-        if (! $priorityId) {
-            return response()->json(['success' => false, 'message' => "priorityId is required (no default 'Medium' priority found)"], 400);
+        $tehsil = Tehsil::whereKey($data['tehsil_id'])
+            ->where('district_id', $data['district_id'])
+            ->first();
+        if (! $tehsil) {
+            return response()->json(['success' => false, 'message' => 'Selected tehsil does not belong to the district'], 422);
+        }
+
+        $village = Village::with('panchayat.block')->find($data['village_id']);
+        if (! $village?->panchayat ||
+            $village->panchayat->block?->district_id !== (int) $data['district_id'] ||
+            $village->tehsil_id !== $tehsil->id) {
+            return response()->json(['success' => false, 'message' => 'Selected village does not belong to the tehsil'], 422);
+        }
+
+        $categoryIsAllowed = ComplaintCategory::whereKey($data['category_id'])
+            ->whereDoesntHave('children')
+            ->where(fn ($query) => $query->whereNull('district_id')->orWhere('district_id', $data['district_id']))
+            ->exists();
+        if (! $categoryIsAllowed) {
+            return response()->json(['success' => false, 'message' => 'Selected category is not available for this district'], 422);
+        }
+
+        $assetTypeIsAllowed = AssetType::query()
+            ->whereKey($data['asset_type_id'])
+            ->where('is_active', true)
+            ->whereHas('departments', fn ($query) => $query->where('departments.id', $data['department_id']))
+            ->exists();
+        if (! $assetTypeIsAllowed) {
+            return response()->json(['success' => false, 'message' => 'Selected asset is not available for this department'], 422);
         }
 
         $beforePhotoUrl = $this->storeFile($request->file('photo'), 'photos');
@@ -66,9 +230,9 @@ class ComplaintController extends Controller
         // Same category + same village, still open (not Resolved/Rejected/Closed) -
         // a same-location/same-issue-type signal, not a geo-radius calculation.
         $duplicateOfId = null;
-        if (! empty($data['village'])) {
+        if ($village->name) {
             $duplicateOfId = Complaint::where('category_id', $data['category_id'])
-                ->whereRaw('LOWER(village) = ?', [mb_strtolower($data['village'])])
+                ->where('village_id', $village->id)
                 ->whereNotIn('status', ['Resolved', 'Rejected', 'Closed'])
                 ->orderByDesc('created_at')
                 ->value('id');
@@ -77,12 +241,19 @@ class ComplaintController extends Controller
         $complaint = Complaint::create([
             'user_id' => $request->user()->id,
             'category_id' => $data['category_id'],
-            'priority_id' => $priorityId,
-            'village' => $data['village'] ?? null,
-            'panchayat' => $data['panchayat'] ?? null,
-            'description' => $data['description'] ?? null,
+            'priority_id' => $data['priority_id'],
+            'department_id' => $data['department_id'],
+            'asset_type_id' => $data['asset_type_id'],
+            'district_id' => $data['district_id'],
+            'tehsil_id' => $tehsil->id,
+            'village_id' => $village->id,
+            'panchayat_id' => $village->panchayat_id,
+            'village' => $village->name,
+            'panchayat' => $village->panchayat->name,
+            'description' => $data['description'],
             'lat' => $data['lat'] ?? null,
             'long' => $data['long'] ?? null,
+            'status' => 'Pending',
             'before_photo_url' => $beforePhotoUrl,
             'voice_note_url' => $voiceNoteUrl,
             'duplicate_of_id' => $duplicateOfId,
