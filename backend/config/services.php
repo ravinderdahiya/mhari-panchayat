@@ -36,9 +36,11 @@ return [
     ],
 
     'pixabits' => [
+        'url' => env('SMS_API_URL', 'https://sms.pixabits.in/smsapi/sms/custom/send'),
         'api_key' => env('SMS_API_KEY'),
         'sender_id' => env('SMS_SENDER_ID'),
         'dlt_id' => env('SMS_TEMP_DLT_ID'),
+        'route' => env('SMS_ROUTE', 'Domestic'),
     ],
 
 ];

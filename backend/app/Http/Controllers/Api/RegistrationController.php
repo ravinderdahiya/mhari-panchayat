@@ -69,6 +69,12 @@ class RegistrationController extends Controller
     {
         $apiKey = config('services.pixabits.api_key');
         if (! $apiKey) {
+            Log::warning('Registration OTP SMS provider is not configured', [
+                'api_key' => false,
+                'sender_id' => filled(config('services.pixabits.sender_id')),
+                'dlt_id' => filled(config('services.pixabits.dlt_id')),
+            ]);
+
             return false;
         }
 
@@ -78,12 +84,12 @@ class RegistrationController extends Controller
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
-            $response = $http->post('https://sms.pixabits.in/smsapi/sms/custom/send', [
+            $response = $http->post(config('services.pixabits.url'), [
                 'key' => $apiKey,
                 'text' => "Your One Time Password is {$otp} for Mhari Panchayat. Don't share OTP with anyone.{$senderId}",
                 'senderId' => $senderId,
                 'tempDltId' => config('services.pixabits.dlt_id'),
-                'route' => 'Domestic',
+                'route' => config('services.pixabits.route'),
                 'phoneno' => $mobile,
                 'groupIds' => [' '],
                 'trans' => 1,
@@ -91,6 +97,13 @@ class RegistrationController extends Controller
                 'flash' => false,
                 'tiny' => false,
             ]);
+
+            if (! $response->successful()) {
+                Log::warning('Registration OTP SMS provider rejected request', [
+                    'provider' => 'pixabits',
+                    'status' => $response->status(),
+                ]);
+            }
 
             return $response->successful();
         } catch (\Throwable $exception) {
