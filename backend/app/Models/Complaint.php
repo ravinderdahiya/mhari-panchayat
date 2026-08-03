@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'user_id', 'assigned_to_id', 'category_id', 'priority_id', 'village', 'panchayat',
     'district_id', 'tehsil_id', 'village_id', 'panchayat_id',
+    'location_state', 'location_district', 'location_tehsil', 'location_block',
     'department_id', 'asset_type_id',
     'description', 'lat', 'long', 'before_photo_url', 'during_photo_url', 'after_photo_url',
     'voice_note_url', 'status', 'citizen_rating', 'citizen_feedback', 'duplicate_of_id',

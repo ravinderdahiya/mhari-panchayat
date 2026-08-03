@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'code'])]
+#[Fillable(['name', 'name_hi', 'code'])]
 class Department extends Model
 {
     public function users(): BelongsToMany

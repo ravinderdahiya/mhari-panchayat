@@ -16,6 +16,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with(['department', 'departments', 'district'])
+            ->where('role', '!=', 'citizen')
             ->orderByDesc('created_at')
             ->get();
 

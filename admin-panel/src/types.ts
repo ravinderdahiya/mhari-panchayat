@@ -178,6 +178,25 @@ export interface AdminUser {
   rejection_reason: string | null;
 }
 
+export interface CitizenProfile {
+  id: number;
+  userId: number;
+  name: string | null;
+  mobile: string;
+  email: string | null;
+  registrationSource: string;
+  registeredAt: string;
+  lastLoginAt: string | null;
+  isActive: boolean;
+  complaintsCount: number;
+}
+
+export interface CitizenStats {
+  registeredCitizens: number;
+  activeCitizens: number;
+  complaintsFiled: number;
+}
+
 // --- VILLAGE ASSETS (GIS infrastructure tracking) ---
 export type AssetGeometryType = 'Point' | 'Line' | 'Polygon';
 export type AssetStatus = 'Working' | 'Not Working' | 'Under Construction';

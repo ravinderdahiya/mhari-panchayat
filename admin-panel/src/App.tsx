@@ -11,6 +11,7 @@ import MySurveysPage from './pages/MySurveysPage';
 import SurveyorsPage from './pages/SurveyorsPage';
 import RolesPage from './pages/RolesPage';
 import UsersPage from './pages/UsersPage';
+import CitizensPage from './pages/CitizensPage';
 import VillageAssetsPage from './pages/VillageAssetsPage';
 import AssetTypesPage from './pages/AssetTypesPage';
 import AssetSurveysPage from './pages/AssetSurveysPage';
@@ -107,6 +108,7 @@ export default function App() {
       {activeView === 'village-assets' && <VillageAssetsPage />}
       {activeView === 'roles' && <RolesPage />}
       {activeView === 'users' && <UsersPage currentUser={currentUser} />}
+      {activeView === 'citizens' && <CitizensPage />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>
   );

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AssetTypeController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AssetSurveyController;
 use App\Http\Controllers\Api\ComplaintController;
+use App\Http\Controllers\Api\CitizenController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -79,6 +80,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);
         Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'update']);
         Route::get('/users', [UserController::class, 'index']);
+        Route::get('/citizens', [CitizenController::class, 'index']);
+        Route::delete('/citizens/{citizen}', [CitizenController::class, 'destroy']);
         Route::patch('/users/{id}', [UserController::class, 'update']);
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });

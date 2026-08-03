@@ -29,10 +29,22 @@ class ComplaintController extends Controller
 
     public function categories(Request $request)
     {
+        $assetTypeId = $request->integer('asset_type_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
         $query = ComplaintCategory::query()
+            ->with('defaultPriority:id,name,level')
             ->whereDoesntHave('children')
             ->orderBy('sort_order')
             ->orderBy('name');
+
+        if ($assetTypeId) {
+            $query->where('asset_type_id', $assetTypeId);
+            $departmentId
+                ? $query->where('department_id', $departmentId)
+                : $query->whereNull('department_id');
+        } else {
+            $query->whereNull('asset_type_id')->whereNull('department_id');
+        }
 
         $districtId = $request->user()->district_id;
         $query->where(function ($scoped) use ($districtId) {
@@ -44,11 +56,12 @@ class ComplaintController extends Controller
 
         return response()->json([
             'success' => true,
-            'categories' => $query->get(['id', 'name', 'code'])
+            'categories' => $query->get(['id', 'name', 'code', 'default_priority_id'])
                 ->map(fn ($category) => [
                     'id' => $category->id,
                     'name' => str_replace('_', ' ', $category->name),
                     'code' => $category->code,
+                    'defaultPriorityId' => $category->default_priority_id,
                 ]),
         ]);
     }
@@ -66,6 +79,8 @@ class ComplaintController extends Controller
 
         $categories = ComplaintCategory::query()
             ->whereDoesntHave('children')
+            ->whereNull('asset_type_id')
+            ->whereNull('department_id')
             ->where(function ($query) use ($districtId) {
                 $query->whereNull('district_id');
                 if ($districtId) {
@@ -97,7 +112,10 @@ class ComplaintController extends Controller
 
         if ($tehsilId) {
             $payload['villages'] = Village::query()
-                ->with('panchayat:id,name,block_id')
+                ->with([
+                    'panchayat:id,name,block_id',
+                    'panchayat.block:id,name',
+                ])
                 ->where('tehsil_id', $tehsilId)
                 ->orderBy('name')
                 ->get(['id', 'name', 'panchayat_id'])
@@ -106,6 +124,8 @@ class ComplaintController extends Controller
                     'name' => $village->name,
                     'panchayatId' => $village->panchayat_id,
                     'panchayatName' => $village->panchayat?->name,
+                    'blockId' => $village->panchayat?->block_id,
+                    'blockName' => $village->panchayat?->block?->name,
                 ]);
         }
 
@@ -177,9 +197,14 @@ class ComplaintController extends Controller
             'priority_id' => ['required', 'exists:complaint_priorities,id'],
             'department_id' => ['required', 'exists:departments,id'],
             'asset_type_id' => ['required', 'exists:asset_types,id'],
-            'district_id' => ['required', 'exists:districts,id'],
-            'tehsil_id' => ['required', 'exists:tehsils,id'],
-            'village_id' => ['required', 'exists:villages,id'],
+            'district_id' => ['nullable', 'exists:districts,id'],
+            'tehsil_id' => ['nullable', 'exists:tehsils,id'],
+            'village_id' => ['nullable', 'exists:villages,id'],
+            'location_state' => ['nullable', 'string', 'max:150'],
+            'location_district' => ['required_without:district_id', 'nullable', 'string', 'max:150'],
+            'location_tehsil' => ['nullable', 'string', 'max:150'],
+            'location_village' => ['required_without:village_id', 'nullable', 'string', 'max:150'],
+            'location_block' => ['nullable', 'string', 'max:150'],
             'description' => ['required', 'string', 'min:10', 'max:2000'],
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'long' => ['nullable', 'numeric', 'between:-180,180'],
@@ -193,23 +218,40 @@ class ComplaintController extends Controller
             'long.between' => 'Invalid longitude',
         ]);
 
-        $tehsil = Tehsil::whereKey($data['tehsil_id'])
-            ->where('district_id', $data['district_id'])
-            ->first();
-        if (! $tehsil) {
-            return response()->json(['success' => false, 'message' => 'Selected tehsil does not belong to the district'], 422);
-        }
+        $tehsil = null;
+        $village = null;
+        if (! empty($data['district_id']) && ! empty($data['tehsil_id']) && ! empty($data['village_id'])) {
+            $tehsil = Tehsil::whereKey($data['tehsil_id'])
+                ->where('district_id', $data['district_id'])
+                ->first();
+            if (! $tehsil) {
+                return response()->json(['success' => false, 'message' => 'Selected tehsil does not belong to the district'], 422);
+            }
 
-        $village = Village::with('panchayat.block')->find($data['village_id']);
-        if (! $village?->panchayat ||
-            $village->panchayat->block?->district_id !== (int) $data['district_id'] ||
-            $village->tehsil_id !== $tehsil->id) {
-            return response()->json(['success' => false, 'message' => 'Selected village does not belong to the tehsil'], 422);
+            $village = Village::with('panchayat.block')->find($data['village_id']);
+            if (! $village?->panchayat ||
+                $village->panchayat->block?->district_id !== (int) $data['district_id'] ||
+                $village->tehsil_id !== $tehsil->id) {
+                return response()->json(['success' => false, 'message' => 'Selected village does not belong to the tehsil'], 422);
+            }
         }
 
         $categoryIsAllowed = ComplaintCategory::whereKey($data['category_id'])
             ->whereDoesntHave('children')
-            ->where(fn ($query) => $query->whereNull('district_id')->orWhere('district_id', $data['district_id']))
+            ->where(function ($query) use ($data) {
+                $query->where(function ($global) {
+                    $global->whereNull('asset_type_id')->whereNull('department_id');
+                })->orWhere(function ($scoped) use ($data) {
+                    $scoped->where('asset_type_id', $data['asset_type_id'])
+                        ->where('department_id', $data['department_id']);
+                });
+            })
+            ->where(function ($query) use ($data) {
+                $query->whereNull('district_id');
+                if (! empty($data['district_id'])) {
+                    $query->orWhere('district_id', $data['district_id']);
+                }
+            })
             ->exists();
         if (! $categoryIsAllowed) {
             return response()->json(['success' => false, 'message' => 'Selected category is not available for this district'], 422);
@@ -230,7 +272,7 @@ class ComplaintController extends Controller
         // Same category + same village, still open (not Resolved/Rejected/Closed) -
         // a same-location/same-issue-type signal, not a geo-radius calculation.
         $duplicateOfId = null;
-        if ($village->name) {
+        if ($village?->name) {
             $duplicateOfId = Complaint::where('category_id', $data['category_id'])
                 ->where('village_id', $village->id)
                 ->whereNotIn('status', ['Resolved', 'Rejected', 'Closed'])
@@ -244,12 +286,16 @@ class ComplaintController extends Controller
             'priority_id' => $data['priority_id'],
             'department_id' => $data['department_id'],
             'asset_type_id' => $data['asset_type_id'],
-            'district_id' => $data['district_id'],
-            'tehsil_id' => $tehsil->id,
-            'village_id' => $village->id,
-            'panchayat_id' => $village->panchayat_id,
-            'village' => $village->name,
-            'panchayat' => $village->panchayat->name,
+            'district_id' => $data['district_id'] ?? null,
+            'tehsil_id' => $tehsil?->id,
+            'village_id' => $village?->id,
+            'panchayat_id' => $village?->panchayat_id,
+            'village' => $village?->name ?? $data['location_village'] ?? null,
+            'panchayat' => $village?->panchayat?->name,
+            'location_state' => $data['location_state'] ?? null,
+            'location_district' => $data['location_district'] ?? $village?->tehsil?->district?->name,
+            'location_tehsil' => $data['location_tehsil'] ?? $tehsil?->name,
+            'location_block' => $data['location_block'] ?? $village?->panchayat?->block?->name,
             'description' => $data['description'],
             'lat' => $data['lat'] ?? null,
             'long' => $data['long'] ?? null,

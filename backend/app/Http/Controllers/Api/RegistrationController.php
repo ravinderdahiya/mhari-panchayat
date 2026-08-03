@@ -56,6 +56,7 @@ class RegistrationController extends Controller
         $response = [
             'success' => true,
             'message' => $smsSent ? 'OTP sent to your mobile number' : 'OTP created, but SMS delivery failed',
+            'smsSent' => $smsSent,
             'sms_sent' => $smsSent,
         ];
         if (! app()->environment('production')) {

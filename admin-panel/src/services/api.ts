@@ -1,4 +1,4 @@
-import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, Complaint, ComplaintReports, RolePermissionMatrix, User, VillageAsset } from '../types';
+import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, RolePermissionMatrix, User, VillageAsset } from '../types';
 
 // 127.0.0.1, not localhost - on this machine "localhost" resolves to ::1
 // first, and the dev server only listens on IPv4, so every request pays a
@@ -144,6 +144,29 @@ export const updateRolePermissions = (role: string, permissions: string[]) =>
 
 // --- USERS (admin management) ---
 export const getUsers = () => request<{ success: boolean; users: AdminUser[] }>('/api/users');
+export const getCitizens = (options: {
+  page?: number;
+  perPage?: number;
+  query?: string;
+  status?: 'all' | 'active' | 'inactive';
+} = {}) => {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    per_page: String(options.perPage ?? 10),
+  });
+  if (options.query?.trim()) params.set('q', options.query.trim());
+  if (options.status && options.status !== 'all') params.set('status', options.status);
+
+  return request<{
+    success: boolean;
+    citizens: CitizenProfile[];
+    pagination: MasterPagination;
+    stats: CitizenStats;
+  }>(`/api/citizens?${params.toString()}`);
+};
+
+export const deleteCitizen = (id: number) =>
+  jsonRequest<{ success: boolean; message: string }>(`/api/citizens/${id}`, 'DELETE');
 
 export const updateUser = (
   id: number,

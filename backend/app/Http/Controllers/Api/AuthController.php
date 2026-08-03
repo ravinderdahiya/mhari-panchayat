@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PasswordResetToken;
+use App\Models\CitizenProfile;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -15,6 +16,8 @@ use Illuminate\Support\Str;
 class AuthController extends Controller
 {
     private const CITIZEN_OTP_TTL_MINUTES = 10;
+
+    private const CITIZEN_OTP_RESEND_COOLDOWN_SECONDS = 30;
 
     private const CITIZEN_OTP_MAX_ATTEMPTS = 5;
 
@@ -46,6 +49,11 @@ class AuthController extends Controller
     private function citizenOtpAttemptsKey(string $mobile): string
     {
         return "citizen_login_otp_attempts:{$mobile}";
+    }
+
+    private function citizenOtpResendKey(string $mobile): string
+    {
+        return "citizen_login_otp_resend_at:{$mobile}";
     }
 
     private function sendOtpSms(string $mobile, string $otp): bool
@@ -118,9 +126,25 @@ class AuthController extends Controller
             ], 422);
         }
 
+        $resendAvailableAt = (int) Cache::get($this->citizenOtpResendKey($mobile), 0);
+        $retryAfter = max(0, $resendAvailableAt - now()->timestamp);
+        if ($resend && $retryAfter > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Please wait {$retryAfter} seconds before requesting another OTP.",
+                'retryAfter' => $retryAfter,
+            ], 429);
+        }
+
         $otp = (string) random_int(1000, 9999);
         Cache::put($this->citizenOtpKey($mobile), $otp, now()->addMinutes(self::CITIZEN_OTP_TTL_MINUTES));
         Cache::put($this->citizenOtpAttemptsKey($mobile), 0, now()->addMinutes(self::CITIZEN_OTP_TTL_MINUTES));
+        $nextResendAt = now()->addSeconds(self::CITIZEN_OTP_RESEND_COOLDOWN_SECONDS);
+        Cache::put(
+            $this->citizenOtpResendKey($mobile),
+            $nextResendAt->timestamp,
+            $nextResendAt,
+        );
         $smsSent = $this->sendOtpSms($mobile, $otp);
 
         $message = $smsSent
@@ -135,6 +159,10 @@ class AuthController extends Controller
             'message' => $message,
             'smsSent' => $smsSent,
             'sms_sent' => $smsSent,
+            'expiresIn' => self::CITIZEN_OTP_TTL_MINUTES * 60,
+            'expires_in' => self::CITIZEN_OTP_TTL_MINUTES * 60,
+            'resendAfter' => self::CITIZEN_OTP_RESEND_COOLDOWN_SECONDS,
+            'resend_after' => self::CITIZEN_OTP_RESEND_COOLDOWN_SECONDS,
         ];
         if (! app()->environment('production')) {
             $response['devOtp'] = $otp;
@@ -184,6 +212,7 @@ class AuthController extends Controller
 
         Cache::forget($this->citizenOtpKey($mobile));
         Cache::forget($this->citizenOtpAttemptsKey($mobile));
+        Cache::forget($this->citizenOtpResendKey($mobile));
 
         $user = User::query()
             ->where('mobile', $mobile)
@@ -219,6 +248,18 @@ class AuthController extends Controller
                 'phone_verified_at' => $user->phone_verified_at ?? now(),
             ])->save();
         }
+
+        CitizenProfile::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'full_name' => $user->name,
+                'mobile' => $mobile,
+                'email' => $user->email,
+                'registration_source' => 'mobile_app',
+                'registered_at' => $user->created_at ?? now(),
+                'last_login_at' => now(),
+            ],
+        );
 
         $token = $user->createToken('citizen-mobile')->plainTextToken;
 

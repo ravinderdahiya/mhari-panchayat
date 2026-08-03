@@ -55,5 +55,6 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(InfrastructureAssetSeeder::class);
+        $this->call(ComplaintMasterSeeder::class);
     }
 }
