@@ -287,7 +287,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                 >
                   <td className="p-3">
                     <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
-                      #{c.id}
+                      CMP-{c.id}
                     </span>
                   </td>
                   <td className="p-3">
@@ -372,7 +372,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="font-bold text-lg text-slate-900">{selected.category.name}</h2>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">#{selected.id}</p>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">CMP-{selected.id}</p>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={selected.status} />
@@ -385,7 +385,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
             {selected.duplicate_of_id && (
               <p className="flex items-center gap-1.5 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 <Repeat className="w-3.5 h-3.5 shrink-0" />
-                Possible repeat of complaint #{selected.duplicate_of_id}
+                Possible repeat of complaint CMP-{selected.duplicate_of_id}
                 {selected.duplicate_of && ` (${selected.duplicate_of.category.name})`}
               </p>
             )}

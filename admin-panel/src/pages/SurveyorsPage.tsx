@@ -969,7 +969,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                       const inAssignedVillage = c.village_id !== null && assignedVillageIds.has(c.village_id);
                       return (
                         <option key={c.id} value={c.id}>
-                          {inAssignedVillage ? '★ ' : ''}#{c.id} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
+                          {inAssignedVillage ? '★ ' : ''}CMP-{c.id} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
                           {inAssignedVillage ? ' (assigned area)' : ''}
                         </option>
                       );

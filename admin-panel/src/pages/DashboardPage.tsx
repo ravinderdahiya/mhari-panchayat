@@ -155,7 +155,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         uniqueValueInfos: MAP_LEGEND.map(({ label, color }) => ({ value: label, symbol: dotSymbol(color) })),
       }),
       popupTemplate: {
-        title: 'Complaint #{id}',
+        title: 'Complaint CMP-{id}',
         content: '{category} — {statusLabel}',
         actions: [{ type: 'button', title: 'View Details', id: 'view-details' }],
       },
