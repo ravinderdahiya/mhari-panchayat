@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, Eye, Inbox, Search, Smartphone, Trash2,
+  Camera, ChevronLeft, ChevronRight, Eye, ExternalLink, Inbox, Search, Smartphone, Trash2,
   UserRound, UsersRound, X,
 } from 'lucide-react';
 import * as api from '../services/api';
-import type { CitizenProfile, CitizenStats } from '../types';
+import { StatusBadge as ComplaintStatusBadge } from '../components/StatusBadge';
+import type { CitizenComplaintSummary, CitizenProfile, CitizenStats } from '../types';
 import type { MasterPagination } from '../services/api';
 
 const EMPTY_PAGINATION: MasterPagination = {
@@ -315,20 +316,83 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 cursor-pointer"><X className="h-4 w-4" /></button>
         </div>
-        <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
-          <Info label="Name" value={citizen.name || 'Citizen'} />
-          <Info label="Mobile" value={`+91 ${citizen.mobile}`} />
-          <Info label="Email" value={citizen.email || '—'} />
-          <Info label="Status" value={citizen.isActive ? 'Active' : 'Inactive'} />
-          <Info label="Registration source" value={citizen.registrationSource.replace(/_/g, ' ')} />
-          <Info label="Complaints filed" value={String(citizen.complaintsCount)} />
-          <Info label="Registered on" value={formatDate(citizen.registeredAt, true)} />
-          <Info label="Last login" value={formatDate(citizen.lastLoginAt, true)} />
+        <div className="max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
+            <Info label="Name" value={citizen.name || 'Citizen'} />
+            <Info label="Mobile" value={`+91 ${citizen.mobile}`} />
+            <Info label="Email" value={citizen.email || '—'} />
+            <Info label="Status" value={citizen.isActive ? 'Active' : 'Inactive'} />
+            <Info label="Registration source" value={citizen.registrationSource.replace(/_/g, ' ')} />
+            <Info label="Complaints filed" value={String(citizen.complaintsCount)} />
+            <Info label="Registered on" value={formatDate(citizen.registeredAt, true)} />
+            <Info label="Last login" value={formatDate(citizen.lastLoginAt, true)} />
+          </div>
+
+          {citizen.complaints.length > 0 && (
+            <div className="border-t border-slate-200 px-5 py-4 space-y-3">
+              <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Complaints Filed</h3>
+              {citizen.complaints.map((complaint) => (
+                <ComplaintSummaryCard key={complaint.id} complaint={complaint} />
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex justify-end border-t border-slate-200 px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-lg bg-sidebar px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer">Close</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ComplaintSummaryCard({ complaint }: { complaint: CitizenComplaintSummary }) {
+  const photos = ([
+    ['Before', complaint.beforePhotoUrl],
+    ['During', complaint.duringPhotoUrl],
+    ['After', complaint.afterPhotoUrl],
+  ] as const).filter(([, url]) => url);
+
+  return (
+    <div className="rounded-xl border border-slate-200 p-3.5 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 inline-block">
+            {complaint.code ?? `CMP-${complaint.id}`}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">{complaint.category || 'General Complaint'}</p>
+        </div>
+        <ComplaintStatusBadge status={complaint.status} />
+      </div>
+      {complaint.description && (
+        <p className="text-xs text-slate-500 leading-5">{complaint.description}</p>
+      )}
+      <p className="text-[11px] text-slate-400">Filed {formatDate(complaint.filedAt, true)}</p>
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map(([stage, url]) => (
+            <a
+              key={stage}
+              href={api.mediaUrl(url!)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative block rounded-lg overflow-hidden border border-slate-200 aspect-square"
+            >
+              <img src={api.mediaUrl(url!)} alt={`${stage} photo`} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                <ExternalLink className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase text-white bg-black/50 rounded px-1 py-0.5">
+                {stage}
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
+      {photos.length === 0 && (
+        <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+          <Camera className="w-3 h-3" /> No photos uploaded
+        </p>
+      )}
     </div>
   );
 }

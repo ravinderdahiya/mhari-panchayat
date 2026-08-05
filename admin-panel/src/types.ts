@@ -185,6 +185,18 @@ export interface AdminUser {
   rejection_reason: string | null;
 }
 
+export interface CitizenComplaintSummary {
+  id: number;
+  code: string | null;
+  category: string | null;
+  status: ComplaintStatus;
+  description: string | null;
+  beforePhotoUrl: string | null;
+  duringPhotoUrl: string | null;
+  afterPhotoUrl: string | null;
+  filedAt: string;
+}
+
 export interface CitizenProfile {
   id: number;
   userId: number;
@@ -196,6 +208,7 @@ export interface CitizenProfile {
   lastLoginAt: string | null;
   isActive: boolean;
   complaintsCount: number;
+  complaints: CitizenComplaintSummary[];
 }
 
 export interface CitizenStats {
