@@ -135,10 +135,17 @@ class MasterDataController extends Controller
     public function index(Request $request, string $entity)
     {
         $config = $this->resolve($entity);
-        $query = $config['model']::with($config['with'])->orderBy($config['orderBy'] ?? 'name');
+        $paginated = $request->boolean('paginated');
 
-        // Keep the original unpaginated response for mobile/dropdown consumers.
-        if (! $request->boolean('paginated')) {
+        // Unpaginated callers (mobile/dropdown/filter consumers) only ever read
+        // id/name/foreign-key columns, never the relation objects - eager-loading
+        // them here was adding seconds to the villages list (7k+ rows x 2 joins)
+        // for data nobody rendered. The admin CRUD table is the only relation
+        // consumer and always requests `paginated`, so it keeps the eager load.
+        $with = $paginated ? $config['with'] : [];
+        $query = $config['model']::with($with)->orderBy($config['orderBy'] ?? 'name');
+
+        if (! $paginated) {
             return response()->json(['success' => true, 'items' => $query->get()]);
         }
 
