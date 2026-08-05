@@ -34,7 +34,12 @@ export interface District extends NamedEntity { state_id: number; state?: State 
 export interface Tehsil extends NamedEntity { district_id: number; district?: District }
 export interface Block extends NamedEntity { district_id: number; district?: District }
 export interface Panchayat extends NamedEntity { block_id: number; block?: Block }
-export interface Village extends NamedEntity { panchayat_id: number; panchayat?: Panchayat }
+export interface Village extends NamedEntity {
+  panchayat_id: number;
+  panchayat?: Panchayat;
+  tehsil_id?: number | null;
+  tehsil?: Tehsil | null;
+}
 export interface Department extends NamedEntity {}
 export interface Designation extends NamedEntity {}
 export interface ComplaintCategory extends NamedEntity {
@@ -162,6 +167,7 @@ export interface AdminUser {
   department_id: number | null;
   department: Department | null;
   departments?: Department[];
+  villages?: Village[];
   district_id: number | null;
   district: District | null;
   employee_id: string | null;

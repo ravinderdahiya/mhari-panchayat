@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, ExternalLink, ShieldCheck, Check, X, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import * as api from '../services/api';
-import type { AdminUser, Complaint, ComplaintStatus, Department } from '../types';
+import type { AdminUser, Complaint, ComplaintStatus, Department, District, Tehsil, Village } from '../types';
 
 const REGISTRATION_BADGE: Record<string, string> = {
   pending_email: 'bg-accent/10 text-accent-dark border-accent/25',
@@ -46,6 +46,14 @@ function nextStage(status: ComplaintStatus): 'Before' | 'During' | 'After' | nul
 
 function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]!.toUpperCase()).join('') || '?';
+}
+
+// Seed data appends a trailing code to some village names, e.g.
+// "Abdulagarh (247)" / "Bhatla(113)" / "Sadalpur (20F)" - strip it for display only.
+// Only strips parens containing a digit, so a genuine descriptive suffix like
+// "Village (North)" is left alone.
+function villageDisplayName(name: string): string {
+  return name.replace(/\s*\([^()]*\d[^()]*\)\s*$/, '').trim();
 }
 
 function timeAgo(iso: string): string {
@@ -146,6 +154,17 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   const [isSavingDepartments, setIsSavingDepartments] = useState(false);
   const [showDeptSavedPopup, setShowDeptSavedPopup] = useState(false);
 
+  const [villages, setVillages] = useState<Village[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [tehsils, setTehsils] = useState<Tehsil[]>([]);
+  const [editVillageIds, setEditVillageIds] = useState<number[]>([]);
+  const [villageDistrictFilter, setVillageDistrictFilter] = useState<number | ''>('');
+  const [villageTehsilFilter, setVillageTehsilFilter] = useState<number | ''>('');
+  const [isSavingVillages, setIsSavingVillages] = useState(false);
+  const [showVillageSavedPopup, setShowVillageSavedPopup] = useState(false);
+  const [villageMasterLoaded, setVillageMasterLoaded] = useState(false);
+  const [isLoadingVillageMaster, setIsLoadingVillageMaster] = useState(false);
+
   const load = async () => {
     setIsLoading(true);
     try {
@@ -169,6 +188,27 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     load();
   }, []);
 
+  // Villages is a large master list (thousands of rows) only needed once the
+  // admin opens a surveyor's modal - loading it eagerly on page load would
+  // block the whole Surveyors table behind a multi-second request.
+  useEffect(() => {
+    if (!selectedId || villageMasterLoaded || isLoadingVillageMaster) return;
+    setIsLoadingVillageMaster(true);
+    Promise.all([
+      api.masterApi('villages').list(),
+      api.masterApi('districts').list(),
+      api.masterApi('tehsils').list(),
+    ])
+      .then(([villageRes, districtRes, tehsilRes]) => {
+        setVillages(villageRes.items || []);
+        setDistricts(districtRes.items || []);
+        setTehsils(tehsilRes.items || []);
+        setVillageMasterLoaded(true);
+      })
+      .catch((err) => setError((err as Error).message))
+      .finally(() => setIsLoadingVillageMaster(false));
+  }, [selectedId, villageMasterLoaded, isLoadingVillageMaster]);
+
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
@@ -181,7 +221,16 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
       const status = s.registration_status || 'active';
       if (statusFilter !== 'all' && status !== statusFilter) return false;
       if (!q) return true;
-      return [s.name, s.username, s.email, s.employee_id, s.district?.name, s.department?.name, ...(s.departments || []).map((d) => d.name)]
+      return [
+        s.name,
+        s.username,
+        s.email,
+        s.employee_id,
+        s.district?.name,
+        s.department?.name,
+        ...(s.departments || []).map((d) => d.name),
+        ...(s.villages || []).map((v) => v.name),
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -207,9 +256,16 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
 
   // Open complaints not already assigned to the selected surveyor - candidates
   // for the "Assign Complaint" action (reuses the existing transfer endpoint).
-  const assignableComplaints = complaints.filter(
-    (c) => !['Closed', 'Rejected'].includes(c.status) && c.assigned_to_id !== selected?.id,
-  );
+  // Complaints in one of the surveyor's assigned villages are surfaced first
+  // (not hidden) since that's their coverage area.
+  const assignedVillageIds = new Set((selected?.villages || []).map((v) => v.id));
+  const assignableComplaints = complaints
+    .filter((c) => !['Closed', 'Rejected'].includes(c.status) && c.assigned_to_id !== selected?.id)
+    .sort((a, b) => {
+      const aMatch = a.village_id !== null && assignedVillageIds.has(a.village_id) ? 1 : 0;
+      const bMatch = b.village_id !== null && assignedVillageIds.has(b.village_id) ? 1 : 0;
+      return bMatch - aMatch;
+    });
 
   const closeModal = () => {
     setSelectedId(null);
@@ -221,11 +277,16 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setShowDeleteConfirm(false);
     setEditDepartmentIds([]);
     setShowDeptSavedPopup(false);
+    setEditVillageIds([]);
+    setVillageDistrictFilter('');
+    setVillageTehsilFilter('');
+    setShowVillageSavedPopup(false);
   };
 
   useEffect(() => {
     if (!selected) {
       setEditDepartmentIds([]);
+      setEditVillageIds([]);
       return;
     }
     const ids =
@@ -235,6 +296,9 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
           ? [selected.department_id]
           : [];
     setEditDepartmentIds(ids);
+    setEditVillageIds((selected.villages || []).map((v) => v.id));
+    setVillageDistrictFilter('');
+    setVillageTehsilFilter('');
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleDepartment = (id: number) => {
@@ -255,6 +319,35 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
       setIsSavingDepartments(false);
     }
   };
+
+  const toggleVillage = (id: number) => {
+    setEditVillageIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleSaveVillages = async () => {
+    if (!selected) return;
+    setIsSavingVillages(true);
+    setError('');
+    try {
+      const { user } = await api.updateUser(selected.id, { village_ids: editVillageIds });
+      setSurveyors((prev) => prev.map((s) => (s.id === selected.id ? { ...s, ...user } : s)));
+      setShowVillageSavedPopup(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSavingVillages(false);
+    }
+  };
+
+  const filteredTehsilsForVillagePicker = villageDistrictFilter
+    ? tehsils.filter((t) => t.district_id === villageDistrictFilter)
+    : tehsils;
+
+  const filteredVillagesForPicker = villages.filter((v) => {
+    if (villageTehsilFilter) return v.tehsil_id === villageTehsilFilter;
+    if (villageDistrictFilter) return filteredTehsilsForVillagePicker.some((t) => t.id === v.tehsil_id);
+    return true;
+  });
 
   const handleAssign = async () => {
     if (!selected || !assignComplaintId) return;
@@ -417,6 +510,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                 <th className="text-left p-3 font-bold">Emp ID / Code</th>
                 <th className="text-left p-3 font-bold">District</th>
                 <th className="text-left p-3 font-bold">Departments</th>
+                <th className="text-left p-3 font-bold">Villages</th>
                 <th className="text-left p-3 font-bold">Status</th>
                 <th className="text-left p-3 font-bold">Active</th>
                 <th className="text-left p-3 font-bold">Completed</th>
@@ -432,6 +526,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                   s.departments && s.departments.length > 0
                     ? s.departments.map((d) => d.name).join(', ')
                     : s.department?.name || '—';
+                const villageNames = s.villages && s.villages.length > 0 ? s.villages.map((v) => villageDisplayName(v.name)).join(', ') : '—';
                 const serialNo = (page - 1) * PAGE_SIZE + idx + 1;
                 return (
                   <tr
@@ -459,6 +554,9 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                     <td className="p-3 text-slate-700">{s.district?.name || '—'}</td>
                     <td className="p-3 text-slate-700 max-w-[160px]">
                       <span className="line-clamp-2" title={deptNames}>{deptNames}</span>
+                    </td>
+                    <td className="p-3 text-slate-700 max-w-[160px]">
+                      <span className="line-clamp-2" title={villageNames}>{villageNames}</span>
                     </td>
                     <td className="p-3">
                       {s.registration_status ? <RegistrationBadge status={s.registration_status} /> : <RegistrationBadge status="active" />}
@@ -657,6 +755,112 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
               )}
             </div>
 
+            {showVillageSavedPopup && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowVillageSavedPopup(false)}>
+                <div
+                  className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-status-closed/15 text-status-closed flex items-center justify-center">
+                    <Check className="w-6 h-6" />
+                  </div>
+                  <p className="font-serif font-semibold text-lg text-ink mb-1">Villages saved</p>
+                  <p className="text-sm text-muted mb-4">
+                    {editVillageIds.length === 0
+                      ? 'All villages cleared for this surveyor.'
+                      : `${editVillageIds.length} village${editVillageIds.length > 1 ? 's' : ''} assigned successfully.`}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowVillageSavedPopup(false)}
+                    className="bg-sidebar hover:opacity-90 text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-6 border border-line rounded-xl p-4 bg-cream/40">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-[11px] tracking-wide uppercase text-muted font-semibold">Survey Villages</p>
+                <button
+                  type="button"
+                  disabled={isSavingVillages || !villageMasterLoaded}
+                  onClick={handleSaveVillages}
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sidebar text-white disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingVillages ? 'Saving…' : 'Save villages'}
+                </button>
+              </div>
+              <p className="text-[11.5px] text-muted mb-2">
+                Assign the district/tehsil/village(s) this surveyor is responsible for. This is for tracking coverage only — it does not restrict what they can survey in the mobile app.
+              </p>
+              {!villageMasterLoaded ? (
+                <p className="text-xs text-muted">Loading villages…</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-3 mb-2.5">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase tracking-wide text-muted font-semibold">District</span>
+                      <select
+                        value={villageDistrictFilter}
+                        onChange={(e) => {
+                          setVillageDistrictFilter(e.target.value ? Number(e.target.value) : '');
+                          setVillageTehsilFilter('');
+                        }}
+                        className="text-xs border border-line rounded-lg px-2.5 py-1.5 bg-white"
+                      >
+                        <option value="">Select district…</option>
+                        {districts.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase tracking-wide text-muted font-semibold">Tehsil</span>
+                      <select
+                        value={villageTehsilFilter}
+                        disabled={!villageDistrictFilter}
+                        onChange={(e) => setVillageTehsilFilter(e.target.value ? Number(e.target.value) : '')}
+                        className="text-xs border border-line rounded-lg px-2.5 py-1.5 bg-white disabled:opacity-50"
+                      >
+                        <option value="">All tehsils</option>
+                        {filteredTehsilsForVillagePicker.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {!villageDistrictFilter ? (
+                    <p className="text-xs text-muted">Select a district (then optionally a tehsil) to see its villages.</p>
+                  ) : filteredVillagesForPicker.length === 0 ? (
+                    <p className="text-xs text-muted">No villages match this filter.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                      {filteredVillagesForPicker.map((v) => {
+                        const on = editVillageIds.includes(v.id);
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => toggleVillage(v.id)}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border cursor-pointer ${
+                              on
+                                ? 'bg-sidebar text-white border-sidebar'
+                                : 'bg-white text-muted border-line hover:border-sidebar/40'
+                            }`}
+                          >
+                            {villageDisplayName(v.name)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             <div className="flex items-center gap-2 mb-6 flex-wrap">
               {(() => {
                 const status = selected.registration_status || 'active';
@@ -761,11 +965,15 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                     className="flex-1 text-xs border border-line rounded-lg px-2.5 py-2 bg-white"
                   >
                     <option value="">Select a complaint…</option>
-                    {assignableComplaints.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        #{c.id} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
-                      </option>
-                    ))}
+                    {assignableComplaints.map((c) => {
+                      const inAssignedVillage = c.village_id !== null && assignedVillageIds.has(c.village_id);
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {inAssignedVillage ? '★ ' : ''}#{c.id} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
+                          {inAssignedVillage ? ' (assigned area)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                   <button
                     disabled={!assignComplaintId || isAssigning}

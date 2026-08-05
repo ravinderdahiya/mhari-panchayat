@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
   Users, UserRound, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, MapPinned,
-  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks,
+  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'settings' | 'audit-log';
+  | 'surveyors' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log';
 
 interface LayoutProps {
   currentUser: User;
@@ -81,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'users', label: 'Users', icon: Users, adminOnly: true, section: 'operations' },
   { id: 'citizens', label: 'Citizens', icon: UserRound, adminOnly: true, section: 'operations' },
   { id: 'roles', label: 'Roles', icon: ShieldCheck, adminOnly: true, section: 'operations' },
+  { id: 'project-meeting', label: 'Project Meeting', icon: Presentation, adminOnly: true, section: 'system' },
   { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true, section: 'system' },
   { id: 'audit-log', label: 'Audit Log', icon: ScrollText, adminOnly: true, section: 'system' },
 ];
@@ -98,6 +99,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   users: 'Manage admin users and access',
   citizens: 'Mobile app citizen registrations',
   roles: 'Configure role-based permissions',
+  'project-meeting': 'Slide-style project overview, workflows and next actions',
   settings: 'System configuration',
   'audit-log': 'System activity history',
 };

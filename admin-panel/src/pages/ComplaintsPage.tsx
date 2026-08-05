@@ -453,12 +453,12 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                   ] as const).filter(([, url]) => url).map(([stage, url]) => (
                     <a
                       key={stage}
-                      href={url!}
+                      href={api.mediaUrl(url!)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group relative block rounded-xl overflow-hidden border border-slate-200 aspect-square"
                     >
-                      <img src={url!} alt={`${stage} photo`} className="w-full h-full object-cover" />
+                      <img src={api.mediaUrl(url!)} alt={`${stage} photo`} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
                         <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>

@@ -72,6 +72,12 @@ class User extends Authenticatable
         return $this->belongsToMany(Department::class)->withTimestamps();
     }
 
+    /** Multi-village assignment (survey coverage area). */
+    public function villages(): BelongsToMany
+    {
+        return $this->belongsToMany(Village::class, 'user_villages')->withTimestamps();
+    }
+
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);

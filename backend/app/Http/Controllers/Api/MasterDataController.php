@@ -29,7 +29,7 @@ class MasterDataController extends Controller
         'tehsils' => ['model' => Tehsil::class, 'with' => ['district']],
         'blocks' => ['model' => Block::class, 'with' => ['district']],
         'panchayats' => ['model' => Panchayat::class, 'with' => ['block']],
-        'villages' => ['model' => Village::class, 'with' => ['panchayat']],
+        'villages' => ['model' => Village::class, 'with' => ['panchayat', 'tehsil.district']],
         'departments' => ['model' => Department::class, 'with' => []],
         'designations' => ['model' => Designation::class, 'with' => []],
         'complaint-categories' => ['model' => ComplaintCategory::class, 'with' => ['parent', 'district'], 'orderBy' => 'sort_order'],

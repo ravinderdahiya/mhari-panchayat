@@ -725,7 +725,7 @@ export default function VillageAssetsPage() {
           {actionError && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{actionError}</p>}
 
           {selected.photo_url && (
-            <img src={selected.photo_url} alt={selected.asset_name} className="w-full max-w-xs rounded-xl border border-slate-200" />
+            <img src={api.mediaUrl(selected.photo_url)} alt={selected.asset_name} className="w-full max-w-xs rounded-xl border border-slate-200" />
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

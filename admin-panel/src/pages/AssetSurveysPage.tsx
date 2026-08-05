@@ -178,7 +178,7 @@ function SurveyDetails({ survey, onClose }: { survey: AssetSurvey; onClose: () =
         <a href={`https://www.google.com/maps?q=${survey.latitude},${survey.longitude}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"><MapPin className="w-3.5 h-3.5" /> Open GPS location</a>
         <div><p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted mb-2"><Camera className="w-3.5 h-3.5" /> Survey photos ({survey.photoUrls.length})</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{survey.photoUrls.map((url, index) =>
-            <a key={url} href={url} target="_blank" rel="noreferrer" className="block aspect-[4/3] rounded-lg overflow-hidden border border-line bg-cream"><img src={url} alt={`Survey ${index + 1}`} className="w-full h-full object-cover" /></a>)}</div>
+            <a key={url} href={api.mediaUrl(url)} target="_blank" rel="noreferrer" className="block aspect-[4/3] rounded-lg overflow-hidden border border-line bg-cream"><img src={api.mediaUrl(url)} alt={`Survey ${index + 1}`} className="w-full h-full object-cover" /></a>)}</div>
         </div>
       </div>
     </div>

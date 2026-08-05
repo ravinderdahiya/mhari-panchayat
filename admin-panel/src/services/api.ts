@@ -7,6 +7,18 @@ import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenP
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8081';
 const TOKEN_KEY = 'mhari_panchayat_token';
 
+// Uploaded media URLs may have been persisted with an older host/port.
+// Keep the stored path, but always serve it from the API currently in use.
+export function mediaUrl(value: string): string {
+  try {
+    const parsed = new URL(value, API_BASE_URL);
+    const api = new URL(API_BASE_URL);
+    return `${api.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return value;
+  }
+}
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
@@ -174,6 +186,7 @@ export const updateUser = (
     role?: string;
     department_id?: number | null;
     department_ids?: number[];
+    village_ids?: number[];
     is_active?: boolean;
   },
 ) => jsonRequest<{ success: boolean; message: string; user: AdminUser }>(`/api/users/${id}`, 'PATCH', fields);

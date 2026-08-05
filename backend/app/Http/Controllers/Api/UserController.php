@@ -15,7 +15,7 @@ class UserController extends Controller
 
     public function index()
     {
-        $users = User::with(['department', 'departments', 'district'])
+        $users = User::with(['department', 'departments', 'district', 'villages'])
             ->where('role', '!=', 'citizen')
             ->orderByDesc('created_at')
             ->get();
@@ -57,6 +57,8 @@ class UserController extends Controller
             'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
             'department_ids' => ['sometimes', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
+            'village_ids' => ['sometimes', 'array'],
+            'village_ids.*' => ['integer', 'exists:villages,id'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
@@ -77,6 +79,13 @@ class UserController extends Controller
             $data['department_id'] = $departmentIds[0] ?? null;
         }
 
+        $villageIds = $data['village_ids'] ?? null;
+        unset($data['village_ids']);
+
+        if ($villageIds !== null) {
+            $user->villages()->sync($villageIds);
+        }
+
         if ($data !== []) {
             $user->update($data);
         }
@@ -84,7 +93,7 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
-            'user' => $user->fresh(['department', 'departments', 'district']),
+            'user' => $user->fresh(['department', 'departments', 'district', 'villages']),
         ]);
     }
 
