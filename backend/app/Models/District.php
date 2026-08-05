@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'code', 'state_id'])]
+#[Fillable(['name', 'code', 'short_code', 'state_id'])]
 class District extends Model
 {
     public function state(): BelongsTo

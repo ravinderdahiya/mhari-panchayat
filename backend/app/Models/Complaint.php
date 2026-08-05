@@ -27,16 +27,17 @@ class Complaint extends Model
         });
     }
 
-    // COMP-{districtCode}-{MM_YYYY}-{seq}, seq resetting to 1 each month per
-    // district. `complaint_sequences` holds the last issued number per
+    // COMP-{districtShortCode}-{MM_YYYY}-{seq}, seq resetting to 1 each month
+    // per district. `complaint_sequences` holds the last issued number per
     // (district, year, month) row, locked with SELECT ... FOR UPDATE so two
     // complaints filed at the same moment in the same district never get the
     // same number. Districtless complaints (district_id is nullable on this
-    // table) share sequence bucket 0 and code "00".
+    // table) share sequence bucket 0 and code "GEN" - matching the "GEN"
+    // fallback UserController already uses for district-less employee IDs.
     private static function generateCode(?int $districtId): string
     {
-        $districtCode = $districtId ? District::find($districtId)?->code : null;
-        $districtCode ??= '00';
+        $districtCode = $districtId ? District::find($districtId)?->short_code : null;
+        $districtCode ??= 'GEN';
 
         $year = (int) now()->format('Y');
         $month = (int) now()->format('n');
