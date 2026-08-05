@@ -72,6 +72,7 @@ export interface TransferEntry {
 
 export interface Complaint {
   id: number;
+  code: string | null;
   user_id: number;
   assigned_to_id: number | null;
   category_id: number;
@@ -101,7 +102,7 @@ export interface Complaint {
   citizen_rating: number | null;
   citizen_feedback: string | null;
   duplicate_of_id: number | null;
-  duplicate_of: { id: number; category: { name: string } } | null;
+  duplicate_of: { id: number; code: string | null; category: { name: string } } | null;
   verified_at: string | null;
   verified_by: { id: number; name: string | null; username: string } | null;
   created_at: string;
@@ -184,6 +185,18 @@ export interface AdminUser {
   rejection_reason: string | null;
 }
 
+export interface CitizenComplaintSummary {
+  id: number;
+  code: string | null;
+  category: string | null;
+  status: ComplaintStatus;
+  description: string | null;
+  beforePhotoUrl: string | null;
+  duringPhotoUrl: string | null;
+  afterPhotoUrl: string | null;
+  filedAt: string;
+}
+
 export interface CitizenProfile {
   id: number;
   userId: number;
@@ -195,6 +208,7 @@ export interface CitizenProfile {
   lastLoginAt: string | null;
   isActive: boolean;
   complaintsCount: number;
+  complaints: CitizenComplaintSummary[];
 }
 
 export interface CitizenStats {

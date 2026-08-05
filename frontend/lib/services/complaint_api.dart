@@ -446,6 +446,7 @@ class ComplaintApi {
       complaintCode:
           json['complaintCode']?.toString() ??
           json['complaint_code']?.toString() ??
+          json['code']?.toString() ??
           '',
       assetId: json['assetId']?.toString() ?? '',
       assetCode: asset['assetId'] as String? ?? '',

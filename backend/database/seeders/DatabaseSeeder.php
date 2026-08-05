@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $state = State::create(['name' => 'Haryana', 'code' => 'HR']);
-        $district = District::create(['name' => 'Sonipat', 'code' => 'SNP', 'state_id' => $state->id]);
+        $district = District::create(['name' => 'Sonipat', 'code' => 'SNP', 'short_code' => 'SNP', 'state_id' => $state->id]);
         $tehsil = Tehsil::create(['name' => 'Gohana', 'code' => 'GHN-T', 'district_id' => $district->id]);
         $block = Block::create(['name' => 'Gohana', 'code' => 'GHN', 'district_id' => $district->id]);
         $panchayat = Panchayat::create(['name' => 'Sisana Gram Panchayat', 'code' => 'SGP', 'block_id' => $block->id]);

@@ -8,6 +8,7 @@ import * as api from '../services/api';
 import { masterApi } from '../services/api';
 import type { AssignableUser, Complaint, ComplaintCategory, ComplaintStatus, User as UserType } from '../types';
 import { StatusBadge, PriorityBadge, statusAccent } from '../components/StatusBadge';
+import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 
 interface ComplaintsPageProps {
   currentUser: UserType;
@@ -50,11 +51,12 @@ function toCsvValue(value: string | number | null | undefined): string {
 }
 
 function downloadCsv(rows: Complaint[]) {
-  const headers = ['ID', 'Category', 'Status', 'Priority', 'Department', 'Asset', 'Location', 'Reported By', 'Assigned To', 'Filed Date', 'Repeat Of'];
+  const headers = ['S.No', 'Complaint No', 'Category', 'Status', 'Priority', 'Department', 'Asset', 'Location', 'Reported By', 'Assigned To', 'Filed Date', 'Repeat Of'];
   const lines = [headers.join(',')];
-  for (const c of rows) {
+  rows.forEach((c, idx) => {
     lines.push([
-      c.id,
+      idx + 1,
+      c.code ?? `CMP-${c.id}`,
       c.category.name,
       c.status,
       c.priority.name,
@@ -64,9 +66,9 @@ function downloadCsv(rows: Complaint[]) {
       c.user?.name || c.user?.username || '',
       c.assigned_to?.name || c.assigned_to?.username || '',
       new Date(c.created_at).toLocaleDateString(),
-      c.duplicate_of_id ?? '',
+      c.duplicate_of?.code ?? (c.duplicate_of_id ?? ''),
     ].map(toCsvValue).join(','));
-  }
+  });
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -89,6 +91,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
   const [selected, setSelected] = useState<Complaint | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const [assignedToId, setAssignedToId] = useState('');
   const [surveyNotes, setSurveyNotes] = useState('');
@@ -262,7 +265,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
           <table className="w-full text-xs border-separate border-spacing-0">
             <thead>
               <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
-                <th className="text-left p-3 font-bold">ID</th>
+                <th className="text-left p-3 font-bold w-16">S.No.</th>
+                <th className="text-left p-3 font-bold">Complaint No</th>
                 <th className="text-left p-3 font-bold">Category</th>
                 <th className="text-left p-3 font-bold">Department / Asset</th>
                 <th className="text-left p-3 font-bold">Location</th>
@@ -285,9 +289,12 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     isSelected ? 'bg-accent/10' : idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
                   }`}
                 >
+                  <td className="p-3 font-semibold text-slate-500 tabular-nums">
+                    {(page - 1) * PAGE_SIZE + idx + 1}
+                  </td>
                   <td className="p-3">
                     <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
-                      #{c.id}
+                      {c.code ?? `CMP-${c.id}`}
                     </span>
                   </td>
                   <td className="p-3">
@@ -372,7 +379,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="font-bold text-lg text-slate-900">{selected.category.name}</h2>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">#{selected.id}</p>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{selected.code ?? `CMP-${selected.id}`}</p>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={selected.status} />
@@ -385,7 +392,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
             {selected.duplicate_of_id && (
               <p className="flex items-center gap-1.5 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 <Repeat className="w-3.5 h-3.5 shrink-0" />
-                Possible repeat of complaint #{selected.duplicate_of_id}
+                Possible repeat of complaint {selected.duplicate_of?.code ?? `CMP-${selected.duplicate_of_id}`}
                 {selected.duplicate_of && ` (${selected.duplicate_of.category.name})`}
               </p>
             )}
@@ -451,21 +458,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     ['During', selected.during_photo_url],
                     ['After', selected.after_photo_url],
                   ] as const).filter(([, url]) => url).map(([stage, url]) => (
-                    <a
-                      key={stage}
-                      href={api.mediaUrl(url!)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative block rounded-xl overflow-hidden border border-slate-200 aspect-square"
-                    >
-                      <img src={api.mediaUrl(url!)} alt={`${stage} photo`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                        <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <span className="absolute bottom-1 left-1.5 text-[9px] font-bold uppercase text-white bg-black/50 rounded px-1.5 py-0.5">
-                        {stage}
-                      </span>
-                    </a>
+                    <PhotoThumbnail key={stage} url={api.mediaUrl(url!)} label={stage} onView={setLightboxUrl} />
                   ))}
                 </div>
               </div>
@@ -659,6 +652,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
           </div>
         </div>
       )}
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }

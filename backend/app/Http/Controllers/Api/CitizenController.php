@@ -20,7 +20,11 @@ class CitizenController extends Controller
         ]);
 
         $query = CitizenProfile::query()
-            ->with(['user' => fn ($userQuery) => $userQuery->withCount('complaints')]);
+            ->with(['user' => fn ($userQuery) => $userQuery
+                ->withCount('complaints')
+                ->with(['complaints' => fn ($complaintsQuery) => $complaintsQuery
+                    ->with('category:id,name')
+                    ->orderByDesc('created_at')])]);
 
         $search = trim((string) ($data['q'] ?? ''));
         if ($search !== '') {
@@ -55,6 +59,17 @@ class CitizenController extends Controller
                 'lastLoginAt' => $profile->last_login_at,
                 'isActive' => (bool) $profile->user?->is_active,
                 'complaintsCount' => (int) ($profile->user?->complaints_count ?? 0),
+                'complaints' => ($profile->user?->complaints ?? collect())->map(fn (Complaint $complaint) => [
+                    'id' => $complaint->id,
+                    'code' => $complaint->code,
+                    'category' => $complaint->category?->name,
+                    'status' => $complaint->status,
+                    'description' => $complaint->description,
+                    'beforePhotoUrl' => $complaint->before_photo_url,
+                    'duringPhotoUrl' => $complaint->during_photo_url,
+                    'afterPhotoUrl' => $complaint->after_photo_url,
+                    'filedAt' => $complaint->created_at,
+                ])->values(),
             ]);
 
         return response()->json([

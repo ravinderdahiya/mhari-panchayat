@@ -969,7 +969,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                       const inAssignedVillage = c.village_id !== null && assignedVillageIds.has(c.village_id);
                       return (
                         <option key={c.id} value={c.id}>
-                          {inAssignedVillage ? '★ ' : ''}#{c.id} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
+                          {inAssignedVillage ? '★ ' : ''}{c.code ?? `CMP-${c.id}`} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
                           {inAssignedVillage ? ' (assigned area)' : ''}
                         </option>
                       );
@@ -1002,7 +1002,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                           <p className="text-[13.5px] font-semibold text-ink">{c.category.name}{c.village ? ` — ${c.village}` : ''}</p>
                           <p className="text-[11.5px] text-muted mt-0.5">{[c.village, c.panchayat].filter(Boolean).join(' · ') || 'No location'}</p>
                         </div>
-                        <span className="font-mono text-[10.5px] text-muted border border-line px-2 py-1 rounded">CMP-{c.id}</span>
+                        <span className="font-mono text-[10.5px] text-muted border border-line px-2 py-1 rounded">{c.code ?? `CMP-${c.id}`}</span>
                       </div>
                       <Stepper c={c} />
                       <div className="flex justify-between items-center px-4 pb-3.5 text-[11.5px] text-muted">
