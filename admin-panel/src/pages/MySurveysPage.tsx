@@ -112,7 +112,7 @@ export default function MySurveysPage({ currentUser, onNavigateToComplaint }: My
                   className="w-full text-left p-4 flex flex-wrap items-center gap-3 cursor-pointer"
                 >
                   <span className="font-mono text-[10px] font-bold text-muted bg-cream border border-line rounded px-1.5 py-0.5 shrink-0">
-                    CMP-{c.id}
+                    {c.code ?? `CMP-${c.id}`}
                   </span>
                   <span className="flex items-center gap-2 font-semibold text-ink text-sm shrink-0">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(c.category.name) }} />

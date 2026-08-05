@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'user_id', 'assigned_to_id', 'category_id', 'priority_id', 'village', 'panchayat',
@@ -18,6 +20,51 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class Complaint extends Model
 {
+    protected static function booted(): void
+    {
+        static::creating(function (Complaint $complaint) {
+            $complaint->code ??= self::generateCode($complaint->district_id);
+        });
+    }
+
+    // COMP-{districtCode}-{MM_YYYY}-{seq}, seq resetting to 1 each month per
+    // district. `complaint_sequences` holds the last issued number per
+    // (district, year, month) row, locked with SELECT ... FOR UPDATE so two
+    // complaints filed at the same moment in the same district never get the
+    // same number. Districtless complaints (district_id is nullable on this
+    // table) share sequence bucket 0 and code "00".
+    private static function generateCode(?int $districtId): string
+    {
+        $districtCode = $districtId ? District::find($districtId)?->code : null;
+        $districtCode ??= '00';
+
+        $year = (int) now()->format('Y');
+        $month = (int) now()->format('n');
+        $key = ['district_id' => $districtId ?? 0, 'year' => $year, 'month' => $month];
+
+        $sequenceNumber = DB::transaction(function () use ($key) {
+            $sequence = ComplaintSequence::where($key)->lockForUpdate()->first();
+
+            if (! $sequence) {
+                try {
+                    $sequence = ComplaintSequence::create([...$key, 'last_number' => 0]);
+                } catch (QueryException) {
+                    // Lost the create race to a concurrent request - read its row instead.
+                    $sequence = ComplaintSequence::where($key)->lockForUpdate()->firstOrFail();
+                }
+            }
+
+            $sequence->increment('last_number');
+
+            return $sequence->last_number;
+        });
+
+        $monthYear = sprintf('%02d_%04d', $month, $year);
+        $paddedNumber = str_pad((string) $sequenceNumber, 3, '0', STR_PAD_LEFT);
+
+        return "COMP-{$districtCode}-{$monthYear}-{$paddedNumber}";
+    }
+
     protected function casts(): array
     {
         return [

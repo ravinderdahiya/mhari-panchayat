@@ -132,6 +132,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       geometry: toArcgisPoint(c.lat!, c.long!),
       attributes: {
         id: c.id,
+        code: c.code ?? `CMP-${c.id}`,
         legendGroup: groupOf(c.status),
         category: c.category.name,
         statusLabel: c.status.replace('_', ' '),
@@ -144,6 +145,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       geometryType: 'point',
       fields: [
         { name: 'id', type: 'oid' },
+        { name: 'code', type: 'string' },
         { name: 'legendGroup', type: 'string' },
         { name: 'category', type: 'string' },
         { name: 'statusLabel', type: 'string' },
@@ -155,7 +157,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         uniqueValueInfos: MAP_LEGEND.map(({ label, color }) => ({ value: label, symbol: dotSymbol(color) })),
       }),
       popupTemplate: {
-        title: 'Complaint CMP-{id}',
+        title: 'Complaint {code}',
         content: '{category} — {statusLabel}',
         actions: [{ type: 'button', title: 'View Details', id: 'view-details' }],
       },
