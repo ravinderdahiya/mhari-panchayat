@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
-  Camera, ChevronLeft, ChevronRight, Eye, ExternalLink, Inbox, Search, Smartphone, Trash2,
+  Camera, ChevronLeft, ChevronRight, Eye, Inbox, Search, Smartphone, Trash2,
   UserRound, UsersRound, X,
 } from 'lucide-react';
 import * as api from '../services/api';
 import { StatusBadge as ComplaintStatusBadge } from '../components/StatusBadge';
+import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 import type { CitizenComplaintSummary, CitizenProfile, CitizenStats } from '../types';
 import type { MasterPagination } from '../services/api';
 
@@ -303,6 +304,8 @@ function StatusBadge({ active }: { active: boolean }) {
 }
 
 function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose: () => void }) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-5" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="citizen-detail-title" className="w-full max-w-2xl rounded-2xl bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
@@ -332,7 +335,7 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
             <div className="border-t border-slate-200 px-5 py-4 space-y-3">
               <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Complaints Filed</h3>
               {citizen.complaints.map((complaint) => (
-                <ComplaintSummaryCard key={complaint.id} complaint={complaint} />
+                <ComplaintSummaryCard key={complaint.id} complaint={complaint} onViewPhoto={setLightboxUrl} />
               ))}
             </div>
           )}
@@ -341,11 +344,13 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
           <button type="button" onClick={onClose} className="rounded-lg bg-sidebar px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer">Close</button>
         </div>
       </div>
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }
 
-function ComplaintSummaryCard({ complaint }: { complaint: CitizenComplaintSummary }) {
+function ComplaintSummaryCard({ complaint, onViewPhoto }: { complaint: CitizenComplaintSummary; onViewPhoto: (url: string) => void }) {
   const photos = ([
     ['Before', complaint.beforePhotoUrl],
     ['During', complaint.duringPhotoUrl],
@@ -370,21 +375,7 @@ function ComplaintSummaryCard({ complaint }: { complaint: CitizenComplaintSummar
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {photos.map(([stage, url]) => (
-            <a
-              key={stage}
-              href={api.mediaUrl(url!)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group relative block rounded-lg overflow-hidden border border-slate-200 aspect-square"
-            >
-              <img src={api.mediaUrl(url!)} alt={`${stage} photo`} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                <ExternalLink className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase text-white bg-black/50 rounded px-1 py-0.5">
-                {stage}
-              </span>
-            </a>
+            <PhotoThumbnail key={stage} url={api.mediaUrl(url!)} label={stage} onView={onViewPhoto} />
           ))}
         </div>
       )}

@@ -8,6 +8,7 @@ import * as api from '../services/api';
 import { masterApi } from '../services/api';
 import type { AssignableUser, Complaint, ComplaintCategory, ComplaintStatus, User as UserType } from '../types';
 import { StatusBadge, PriorityBadge, statusAccent } from '../components/StatusBadge';
+import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 
 interface ComplaintsPageProps {
   currentUser: UserType;
@@ -90,6 +91,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
   const [selected, setSelected] = useState<Complaint | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const [assignedToId, setAssignedToId] = useState('');
   const [surveyNotes, setSurveyNotes] = useState('');
@@ -456,21 +458,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     ['During', selected.during_photo_url],
                     ['After', selected.after_photo_url],
                   ] as const).filter(([, url]) => url).map(([stage, url]) => (
-                    <a
-                      key={stage}
-                      href={api.mediaUrl(url!)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative block rounded-xl overflow-hidden border border-slate-200 aspect-square"
-                    >
-                      <img src={api.mediaUrl(url!)} alt={`${stage} photo`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                        <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <span className="absolute bottom-1 left-1.5 text-[9px] font-bold uppercase text-white bg-black/50 rounded px-1.5 py-0.5">
-                        {stage}
-                      </span>
-                    </a>
+                    <PhotoThumbnail key={stage} url={api.mediaUrl(url!)} label={stage} onView={setLightboxUrl} />
                   ))}
                 </div>
               </div>
@@ -664,6 +652,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
           </div>
         </div>
       )}
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }
