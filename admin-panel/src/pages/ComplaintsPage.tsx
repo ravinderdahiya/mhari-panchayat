@@ -50,11 +50,12 @@ function toCsvValue(value: string | number | null | undefined): string {
 }
 
 function downloadCsv(rows: Complaint[]) {
-  const headers = ['ID', 'Category', 'Status', 'Priority', 'Department', 'Asset', 'Location', 'Reported By', 'Assigned To', 'Filed Date', 'Repeat Of'];
+  const headers = ['S.No', 'Complaint No', 'Category', 'Status', 'Priority', 'Department', 'Asset', 'Location', 'Reported By', 'Assigned To', 'Filed Date', 'Repeat Of'];
   const lines = [headers.join(',')];
-  for (const c of rows) {
+  rows.forEach((c, idx) => {
     lines.push([
-      c.id,
+      idx + 1,
+      c.code ?? `CMP-${c.id}`,
       c.category.name,
       c.status,
       c.priority.name,
@@ -64,9 +65,9 @@ function downloadCsv(rows: Complaint[]) {
       c.user?.name || c.user?.username || '',
       c.assigned_to?.name || c.assigned_to?.username || '',
       new Date(c.created_at).toLocaleDateString(),
-      c.duplicate_of_id ?? '',
+      c.duplicate_of?.code ?? (c.duplicate_of_id ?? ''),
     ].map(toCsvValue).join(','));
-  }
+  });
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -262,7 +263,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
           <table className="w-full text-xs border-separate border-spacing-0">
             <thead>
               <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
-                <th className="text-left p-3 font-bold">ID</th>
+                <th className="text-left p-3 font-bold w-16">S.No.</th>
+                <th className="text-left p-3 font-bold">Complaint No</th>
                 <th className="text-left p-3 font-bold">Category</th>
                 <th className="text-left p-3 font-bold">Department / Asset</th>
                 <th className="text-left p-3 font-bold">Location</th>
@@ -285,6 +287,9 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     isSelected ? 'bg-accent/10' : idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
                   }`}
                 >
+                  <td className="p-3 font-semibold text-slate-500 tabular-nums">
+                    {(page - 1) * PAGE_SIZE + idx + 1}
+                  </td>
                   <td className="p-3">
                     <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
                       {c.code ?? `CMP-${c.id}`}
