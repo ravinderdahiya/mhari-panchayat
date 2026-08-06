@@ -94,7 +94,7 @@ class AssetSurveyController extends Controller
 
     private function photoUrl(Request $request, string $path): string
     {
-        return rtrim($request->getSchemeAndHttpHost(), '/').'/storage/'.ltrim($path, '/');
+        return rtrim(config('app.url'), '/').'/storage/'.ltrim($path, '/');
     }
 
     private function mapSurvey(Request $request, AssetSurvey $survey): array
