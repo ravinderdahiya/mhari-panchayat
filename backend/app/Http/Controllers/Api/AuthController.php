@@ -192,7 +192,13 @@ class AuthController extends Controller
             && $mobile === '9999999999'
             && $data['otp'] === '0000';
 
-        if (! $isLocalTestLogin) {
+        $bypassCode = config('services.otp_bypass.code');
+        $isStaticBypass = filled($bypassCode) && hash_equals((string) $bypassCode, $data['otp']);
+        if ($isStaticBypass) {
+            Log::warning('Citizen OTP verified via static bypass code', ['mobile' => $mobile]);
+        }
+
+        if (! $isLocalTestLogin && ! $isStaticBypass) {
             $cachedOtp = Cache::get($this->citizenOtpKey($mobile));
             $attempts = Cache::increment($this->citizenOtpAttemptsKey($mobile));
             if ($attempts > self::CITIZEN_OTP_MAX_ATTEMPTS) {

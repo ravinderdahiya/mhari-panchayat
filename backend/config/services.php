@@ -43,4 +43,10 @@ return [
         'route' => env('SMS_ROUTE', 'Domestic'),
     ],
 
+    // Temporary stopgap while SMS delivery is broken on live. Unset OTP_STATIC_BYPASS_CODE
+    // (and run `php artisan config:clear`) as soon as the SMS provider is fixed.
+    'otp_bypass' => [
+        'code' => env('OTP_STATIC_BYPASS_CODE'),
+    ],
+
 ];

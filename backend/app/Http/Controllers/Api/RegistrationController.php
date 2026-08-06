@@ -125,8 +125,14 @@ class RegistrationController extends Controller
             'otp' => ['required', 'string'],
         ]);
 
+        $bypassCode = config('services.otp_bypass.code');
+        $isStaticBypass = filled($bypassCode) && hash_equals((string) $bypassCode, $data['otp']);
+        if ($isStaticBypass) {
+            Log::warning('Registration phone OTP verified via static bypass code', ['mobile' => $data['mobile']]);
+        }
+
         $cached = Cache::get("reg_phone_otp:{$data['mobile']}");
-        if ($cached === null || $cached !== $data['otp']) {
+        if (! $isStaticBypass && ($cached === null || $cached !== $data['otp'])) {
             return response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 400);
         }
 
