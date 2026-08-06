@@ -147,7 +147,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending_review' | 'pending_email' | 'active' | 'unapproved' | 'rejected'>('all');
 
   const [editDepartmentIds, setEditDepartmentIds] = useState<number[]>([]);
@@ -274,7 +274,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setRejectReason('');
     setAssignComplaintId('');
     setAssignError('');
-    setShowDeleteConfirm(false);
+    setDeleteTarget(null);
     setEditDepartmentIds([]);
     setShowDeptSavedPopup(false);
     setEditVillageIds([]);
@@ -441,14 +441,15 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   };
 
   const confirmDelete = async () => {
-    if (!selected) return;
+    if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
     setIsDeleting(true);
     setError('');
     try {
-      await api.deleteUser(selected.id);
-      setSurveyors((prev) => prev.filter((s) => s.id !== selected.id));
-      setShowDeleteConfirm(false);
-      closeModal();
+      await api.deleteUser(targetId);
+      setSurveyors((prev) => prev.filter((s) => s.id !== targetId));
+      setDeleteTarget(null);
+      if (selectedId === targetId) closeModal();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -581,17 +582,30 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                       })}
                     </td>
                     <td className="p-3 text-center">
-                      <button
-                        type="button"
-                        title="View surveyor"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedId(s.id);
-                        }}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-line text-sidebar hover:bg-sidebar hover:text-white hover:border-sidebar cursor-pointer transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          title="View surveyor"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedId(s.id);
+                          }}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-line text-sidebar hover:bg-sidebar hover:text-white hover:border-sidebar cursor-pointer transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete surveyor"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(s);
+                          }}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-line text-muted hover:bg-status-rejected hover:text-white hover:border-status-rejected cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -925,7 +939,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
               })()}
               <button
                 disabled={isDeleting}
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={() => setDeleteTarget(selected)}
                 title="Delete surveyor"
                 className="flex items-center justify-center border border-line hover:border-status-rejected hover:text-status-rejected hover:bg-status-rejected/5 disabled:opacity-50 text-muted p-2 rounded-lg cursor-pointer"
               >
@@ -1065,10 +1079,10 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
       )}
 
       {/* Delete confirmation */}
-      {showDeleteConfirm && selected && (
+      {deleteTarget && (
         <div
           className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-6"
-          onClick={() => setShowDeleteConfirm(false)}
+          onClick={() => setDeleteTarget(null)}
         >
           <div
             className="bg-white rounded-2xl w-full max-w-sm p-6"
@@ -1076,11 +1090,12 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
           >
             <p className="font-serif font-semibold text-lg text-ink mb-2">Delete surveyor?</p>
             <p className="text-sm text-muted mb-6">
-              Delete <b className="text-ink">{selected.name || selected.username}</b>? This permanently removes their account and cannot be undone.
+              Delete <b className="text-ink">{deleteTarget.name || deleteTarget.username}</b>? This permanently removes their account
+              and all surveys/assets they submitted, and cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => setDeleteTarget(null)}
                 className="text-xs font-bold px-3.5 py-2 rounded-lg border border-line text-muted hover:bg-slate-50 cursor-pointer"
               >
                 Cancel
