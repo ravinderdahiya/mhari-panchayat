@@ -34,6 +34,7 @@ class ComplaintController extends Controller
         $query = ComplaintCategory::query()
             ->with('defaultPriority:id,name,level')
             ->whereDoesntHave('children')
+            ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name');
 
@@ -81,6 +82,7 @@ class ComplaintController extends Controller
             ->whereDoesntHave('children')
             ->whereNull('asset_type_id')
             ->whereNull('department_id')
+            ->where('is_active', true)
             ->where(function ($query) use ($districtId) {
                 $query->whereNull('district_id');
                 if ($districtId) {
@@ -97,15 +99,16 @@ class ComplaintController extends Controller
             ]);
 
         $payload = [
-            'districts' => District::orderBy('name')->get(['id', 'name']),
+            'districts' => District::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'categories' => $categories,
-            'priorities' => ComplaintPriority::orderBy('level')->orderBy('name')->get(['id', 'name', 'level']),
+            'priorities' => ComplaintPriority::where('is_active', true)->orderBy('level')->orderBy('name')->get(['id', 'name', 'level']),
             'tehsils' => [],
             'villages' => [],
         ];
 
         if ($districtId) {
             $payload['tehsils'] = Tehsil::where('district_id', $districtId)
+                ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'district_id']);
         }
@@ -117,6 +120,7 @@ class ComplaintController extends Controller
                     'panchayat.block:id,name',
                 ])
                 ->where('tehsil_id', $tehsilId)
+                ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'panchayat_id'])
                 ->map(fn (Village $village) => [

@@ -9,6 +9,7 @@ import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
 import '../widgets/common_widgets.dart';
+import 'asset_details_screen.dart';
 import 'asset_survey_form_screen.dart';
 import 'surveyor_profile_screen.dart';
 
@@ -144,11 +145,18 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
     Navigator.of(context)
         .push(
           MaterialPageRoute<void>(
-            builder: (_) => AssetSurveyFormScreen(
-              departmentId: survey.departmentId,
-              assetTypeId: survey.assetTypeId,
-              assetTypeName: survey.assetTypeName ?? survey.assetTypeId,
-              existingSurvey: survey,
+            builder: (_) => AssetDetailsScreen(
+              assetId: survey.id,
+              onUpdateSurvey: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AssetSurveyFormScreen(
+                    departmentId: survey.departmentId,
+                    assetTypeId: survey.assetTypeId,
+                    assetTypeName: survey.assetTypeName ?? survey.assetTypeId,
+                    existingSurvey: survey,
+                  ),
+                ),
+              ),
             ),
           ),
         )

@@ -10,10 +10,12 @@ import type { MasterPagination } from '../services/api';
 interface FieldConfig {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select';
+  type: 'text' | 'number' | 'select' | 'boolean';
   optionsFrom?: string;
   required?: boolean;
 }
+
+const STATUS_FIELD: FieldConfig = { key: 'is_active', label: 'Status', type: 'boolean' };
 
 interface EntityConfig {
   key: string;
@@ -33,40 +35,48 @@ const GROUPS: EntityGroup[] = [
     { key: 'states', label: 'States', icon: Landmark, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
+      STATUS_FIELD,
     ] },
     { key: 'districts', label: 'Districts', icon: MapPin, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
       { key: 'state_id', label: 'State', type: 'select', optionsFrom: 'states', required: true },
+      STATUS_FIELD,
     ] },
     { key: 'tehsils', label: 'Tehsils / Sub-Tehsils', icon: MapPin, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
       { key: 'district_id', label: 'District', type: 'select', optionsFrom: 'districts', required: true },
+      STATUS_FIELD,
     ] },
     { key: 'blocks', label: 'Blocks', icon: LayoutGrid, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
       { key: 'district_id', label: 'District', type: 'select', optionsFrom: 'districts', required: true },
+      STATUS_FIELD,
     ] },
     { key: 'panchayats', label: 'Panchayats', icon: Building2, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
       { key: 'block_id', label: 'Block', type: 'select', optionsFrom: 'blocks', required: true },
+      STATUS_FIELD,
     ] },
     { key: 'villages', label: 'Villages', icon: Home, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
       { key: 'panchayat_id', label: 'Panchayat', type: 'select', optionsFrom: 'panchayats', required: true },
+      STATUS_FIELD,
     ] },
   ] },
   { label: 'Organization', entities: [
     { key: 'departments', label: 'Departments', icon: Briefcase, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'code', label: 'Code', type: 'text', required: true },
+      STATUS_FIELD,
     ] },
     { key: 'designations', label: 'Designations', icon: IdCard, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
+      STATUS_FIELD,
     ] },
   ] },
   { label: 'Complaint Setup', entities: [
@@ -76,10 +86,12 @@ const GROUPS: EntityGroup[] = [
       { key: 'sort_order', label: 'Sort Order', type: 'number' },
       { key: 'parent_id', label: 'Parent Category', type: 'select', optionsFrom: 'complaint-categories' },
       { key: 'district_id', label: 'District', type: 'select', optionsFrom: 'districts' },
+      STATUS_FIELD,
     ] },
     { key: 'complaint-priorities', label: 'Complaint Priorities', icon: SignalHigh, fields: [
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'level', label: 'Sort Level', type: 'number' },
+      STATUS_FIELD,
     ] },
   ] },
   { label: 'Reference (read-only)', entities: [
@@ -196,7 +208,9 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
 
   const openAdd = () => {
     setEditingId(null);
-    setForm({});
+    const defaults: Record<string, string> = {};
+    active.fields.filter((field) => field.type === 'boolean').forEach((field) => { defaults[field.key] = 'true'; });
+    setForm(defaults);
     setModalAlert(null);
     setModalOpen(true);
     void loadOptions(active);
@@ -240,6 +254,9 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
           delete data[field.key];
         }
       });
+    active.fields
+      .filter((field) => field.type === 'boolean')
+      .forEach((field) => { data[field.key] = data[field.key] === 'true'; });
 
     try {
       if (editingId) {
@@ -323,7 +340,15 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                         {(pagination.currentPage - 1) * pagination.perPage + index + 1}
                       </td>
                       {active.fields.map((field) => (
-                        <td key={field.key} className="p-3 text-slate-700">{displayValue(item, field)}</td>
+                        <td key={field.key} className="p-3 text-slate-700">
+                          {field.type === 'boolean' ? (
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                              item[field.key] ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {item[field.key] ? 'Active' : 'Inactive'}
+                            </span>
+                          ) : displayValue(item, field)}
+                        </td>
                       ))}
                       {!active.readOnly && (
                         <td className="p-3">
@@ -419,7 +444,7 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {active.fields.map((field) => (
+                  {active.fields.filter((field) => field.type !== 'boolean').map((field) => (
                     <label key={field.key} className="block">
                       <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
                         {field.label}{field.required && <span className="text-red-500"> *</span>}
@@ -441,6 +466,14 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                     </label>
                   ))}
                 </div>
+
+                {active.fields.some((field) => field.type === 'boolean') && (
+                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                    <input type="checkbox" checked={form.is_active === 'true'}
+                      onChange={(event) => updateField('is_active', event.target.checked ? 'true' : 'false')} />
+                    Active
+                  </label>
+                )}
               </div>
 
               <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">

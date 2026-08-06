@@ -54,9 +54,9 @@ class AssetTypeController extends Controller
             $ids = $this->assignedDepartmentIds($user);
             $departments = $ids === []
                 ? collect()
-                : Department::query()->whereIn('id', $ids)->orderBy('name')->get(['id', 'name', 'code']);
+                : Department::query()->whereIn('id', $ids)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']);
         } else {
-            $departments = Department::query()->orderBy('name')->get(['id', 'name', 'code']);
+            $departments = Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']);
         }
 
         return response()->json([

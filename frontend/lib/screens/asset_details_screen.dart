@@ -11,9 +11,14 @@ import '../widgets/common_widgets.dart';
 import '../widgets/photo_viewer.dart';
 
 class AssetDetailsScreen extends StatefulWidget {
-  const AssetDetailsScreen({super.key, required this.assetId});
+  const AssetDetailsScreen({super.key, required this.assetId, this.onUpdateSurvey});
 
   final String assetId;
+
+  /// Surveyor-only action: when provided, a bottom button lets the surveyor
+  /// jump into the survey form for this asset. Citizen callers (e.g. the
+  /// complaint map) simply omit this and get a read-only view.
+  final VoidCallback? onUpdateSurvey;
 
   @override
   State<AssetDetailsScreen> createState() => _AssetDetailsScreenState();
@@ -64,21 +69,42 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
   Widget build(BuildContext context) {
     final asset = _asset;
 
+    final content = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+        ? Center(
+            child: Text(
+              _error!,
+              style: GoogleFonts.poppins(color: AppColors.mutedText),
+            ),
+          )
+        : asset == null
+        ? const SizedBox.shrink()
+        : _buildBody(context, asset);
+
     return AppScaffold(
       title: asset?.assetName ?? 'Asset Details',
       subtitle: asset?.assetTypeName,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Text(
-                _error!,
-                style: GoogleFonts.poppins(color: AppColors.mutedText),
-              ),
-            )
-          : asset == null
-          ? const SizedBox.shrink()
-          : _buildBody(context, asset),
+      body: widget.onUpdateSurvey == null || asset == null
+          ? content
+          : Column(
+              children: [
+                Expanded(child: content),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screen,
+                    AppSpacing.gapSm,
+                    AppSpacing.screen,
+                    AppSpacing.screen,
+                  ),
+                  child: GradientButton(
+                    onPressed: widget.onUpdateSurvey,
+                    label: 'Update Survey',
+                    icon: Icons.edit_note_rounded,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 

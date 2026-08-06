@@ -32,7 +32,7 @@ class RegistrationController extends Controller
     {
         return response()->json([
             'success' => true,
-            'districts' => District::with('state')->orderBy('name')->get(),
+            'districts' => District::with('state')->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 

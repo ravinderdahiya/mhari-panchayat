@@ -146,7 +146,10 @@ class MasterDataController extends Controller
         $query = $config['model']::with($with)->orderBy($config['orderBy'] ?? 'name');
 
         if (! $paginated) {
-            return response()->json(['success' => true, 'items' => $query->get()]);
+            // Dropdown/filter consumers should only be offered active entries.
+            // The admin CRUD table (paginated) still needs every row so
+            // inactive ones can be seen and reactivated.
+            return response()->json(['success' => true, 'items' => $query->where('is_active', true)->get()]);
         }
 
         $perPage = max(5, min(100, $request->integer('per_page', 10)));
