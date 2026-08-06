@@ -62,20 +62,21 @@ class PhotoStamp {
 
     final picture = recorder.endRecording();
     final stamped = await picture.toImage(image.width, image.height);
-    final rawBytes = await stamped.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    );
 
-    // Re-encoded as JPEG rather than PNG — a lossless PNG of a full photo
-    // routinely blew past the 8MB upload limit, since dart:ui can only
-    // produce PNG/raw output directly.
-    final rgbaImage = img.Image.fromBytes(
-      width: stamped.width,
-      height: stamped.height,
-      bytes: rawBytes!.buffer,
-      numChannels: 4,
-      order: img.ChannelOrder.rgba,
-    );
+    // Read the canvas back via dart:ui's own PNG encoder rather than
+    // `rawRgba` + `img.Image.fromBytes`: the raw path assumes the GPU handed
+    // back tightly-packed rows (stride == width * 4), which doesn't hold on
+    // every renderer (reproduced on the Android emulator's SwiftShader
+    // backend) and silently produced a corrupt JPEG — valid enough to upload,
+    // undecodable by any client. PNG round-tripping lets Skia handle its own
+    // packing, so decodePng always gets well-formed pixel data.
+    final pngBytes = await stamped.toByteData(format: ui.ImageByteFormat.png);
+    final rgbaImage = img.decodePng(
+      pngBytes!.buffer.asUint8List(pngBytes.offsetInBytes, pngBytes.lengthInBytes),
+    )!;
+
+    // Still re-encoded as JPEG for upload size — a lossless PNG of a full
+    // photo routinely blew past the 8MB upload limit.
     final result = Uint8List.fromList(img.encodeJpg(rgbaImage, quality: 82));
 
     // Release native/GPU buffers immediately. Several photos may be retained

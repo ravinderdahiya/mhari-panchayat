@@ -175,8 +175,12 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       _showMessage('Please select department and asset');
       return;
     }
-    if (_categoryId == null || _priorityId == null) {
-      _showMessage('Please select category and priority');
+    if (_priorityId == null) {
+      _showMessage('Please select priority');
+      return;
+    }
+    if (_categories.isNotEmpty && _categoryId == null) {
+      _showMessage('Please select category');
       return;
     }
     final description = _descriptionController.text.trim();
@@ -201,7 +205,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         locationTehsil: _gpsTehsil,
         locationVillage: _gpsVillage,
         locationBlock: _gpsBlock,
-        categoryId: _categoryId!,
+        categoryId: _categoryId,
         priorityId: _priorityId!,
         description: description,
         latitude: _lastPosition?.latitude,
@@ -724,7 +728,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
             initialValue: _categoryId,
             isExpanded: true,
             decoration: InputDecoration(
-              labelText: 'Complaint Category *',
+              labelText: _assetTypeId != null && _categories.isEmpty && !_loadingCategories
+                  ? 'Complaint Category (not required for this asset)'
+                  : 'Complaint Category *',
               prefixIcon: const Icon(Icons.category_outlined),
               suffixIcon: _loadingCategories
                   ? const Padding(

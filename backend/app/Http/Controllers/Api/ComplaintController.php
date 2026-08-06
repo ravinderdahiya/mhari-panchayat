@@ -193,7 +193,7 @@ class ComplaintController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'category_id' => ['required', 'exists:complaint_categories,id'],
+            'category_id' => ['nullable', 'exists:complaint_categories,id'],
             'priority_id' => ['required', 'exists:complaint_priorities,id'],
             'department_id' => ['required', 'exists:departments,id'],
             'asset_type_id' => ['required', 'exists:asset_types,id'],
@@ -211,7 +211,6 @@ class ComplaintController extends Controller
             'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'voice_note' => ['nullable', 'file', 'max:15360'],
         ], [
-            'category_id.required' => 'categoryId is required',
             'category_id.exists' => 'Invalid categoryId',
             'priority_id.exists' => 'Invalid priorityId',
             'lat.between' => 'Invalid latitude',
@@ -236,25 +235,27 @@ class ComplaintController extends Controller
             }
         }
 
-        $categoryIsAllowed = ComplaintCategory::whereKey($data['category_id'])
-            ->whereDoesntHave('children')
-            ->where(function ($query) use ($data) {
-                $query->where(function ($global) {
-                    $global->whereNull('asset_type_id')->whereNull('department_id');
-                })->orWhere(function ($scoped) use ($data) {
-                    $scoped->where('asset_type_id', $data['asset_type_id'])
-                        ->where('department_id', $data['department_id']);
-                });
-            })
-            ->where(function ($query) use ($data) {
-                $query->whereNull('district_id');
-                if (! empty($data['district_id'])) {
-                    $query->orWhere('district_id', $data['district_id']);
-                }
-            })
-            ->exists();
-        if (! $categoryIsAllowed) {
-            return response()->json(['success' => false, 'message' => 'Selected category is not available for this district'], 422);
+        if (! empty($data['category_id'])) {
+            $categoryIsAllowed = ComplaintCategory::whereKey($data['category_id'])
+                ->whereDoesntHave('children')
+                ->where(function ($query) use ($data) {
+                    $query->where(function ($global) {
+                        $global->whereNull('asset_type_id')->whereNull('department_id');
+                    })->orWhere(function ($scoped) use ($data) {
+                        $scoped->where('asset_type_id', $data['asset_type_id'])
+                            ->where('department_id', $data['department_id']);
+                    });
+                })
+                ->where(function ($query) use ($data) {
+                    $query->whereNull('district_id');
+                    if (! empty($data['district_id'])) {
+                        $query->orWhere('district_id', $data['district_id']);
+                    }
+                })
+                ->exists();
+            if (! $categoryIsAllowed) {
+                return response()->json(['success' => false, 'message' => 'Selected category is not available for this district'], 422);
+            }
         }
 
         $assetTypeIsAllowed = AssetType::query()
@@ -282,7 +283,7 @@ class ComplaintController extends Controller
 
         $complaint = Complaint::create([
             'user_id' => $request->user()->id,
-            'category_id' => $data['category_id'],
+            'category_id' => $data['category_id'] ?? null,
             'priority_id' => $data['priority_id'],
             'department_id' => $data['department_id'],
             'asset_type_id' => $data['asset_type_id'],

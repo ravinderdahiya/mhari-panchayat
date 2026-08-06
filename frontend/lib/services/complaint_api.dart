@@ -64,7 +64,7 @@ class ComplaintApi {
     String? locationTehsil,
     String? locationVillage,
     String? locationBlock,
-    required int categoryId,
+    int? categoryId,
     required int priorityId,
     required String description,
     double? latitude,
@@ -96,7 +96,7 @@ class ComplaintApi {
             'location_village': locationVillage!.trim(),
           if (locationBlock?.trim().isNotEmpty ?? false)
             'location_block': locationBlock!.trim(),
-          'category_id': categoryId.toString(),
+          if (categoryId != null) 'category_id': categoryId.toString(),
           'priority_id': priorityId.toString(),
           'description': description,
           if (latitude != null) 'lat': latitude.toString(),
