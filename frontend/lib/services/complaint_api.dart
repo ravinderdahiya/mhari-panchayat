@@ -480,16 +480,25 @@ class ComplaintApi {
     );
   }
 
+  /// Stored photo URLs may have been baked in with the wrong host (an old
+  /// backend bug returned internal addresses like `127.0.0.1:8083`), so this
+  /// always re-points to the API currently in use. If the backend is
+  /// deployed under a sub-path (e.g. `/mhari-panchayat`) and already
+  /// generated a fully-correct absolute URL, [ApiConfig.baseUrl]'s own
+  /// sub-path is stripped from the extracted path first so it isn't doubled.
   static String _mobileUrl(String value) {
+    final base = Uri.parse(ApiConfig.baseUrl);
+    final basePath = base.path.isEmpty || base.path == '/' ? '' : base.path;
+
     final parsed = Uri.tryParse(value);
-    if (parsed != null && parsed.hasScheme) {
-      final path = parsed.hasQuery
-          ? '${parsed.path}?${parsed.query}'
-          : parsed.path;
-      return '${ApiConfig.baseUrl}$path';
+    var path = parsed != null && parsed.hasScheme
+        ? (parsed.hasQuery ? '${parsed.path}?${parsed.query}' : parsed.path)
+        : (value.startsWith('/') ? value : '/$value');
+
+    if (basePath.isNotEmpty && path.startsWith(basePath)) {
+      path = path.substring(basePath.length);
     }
-    return value.startsWith('/')
-        ? '${ApiConfig.baseUrl}$value'
-        : '${ApiConfig.baseUrl}/$value';
+
+    return '${base.scheme}://${base.authority}$basePath$path';
   }
 }
