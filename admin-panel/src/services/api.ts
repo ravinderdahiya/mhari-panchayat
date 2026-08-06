@@ -211,6 +211,11 @@ export const rejectRegistration = (id: number, reason: string) =>
 // sarpanch/secretary/etc too.
 export const getAssignableUsers = () => request<{ success: boolean; users: AssignableUser[] }>('/api/users/assignable');
 
+// HARSAC's Panchayat/district boundary MapServer, reverse-proxied by our own
+// backend (gis.harsac.in doesn't send CORS headers, so the browser can't hit
+// it directly, and the real GIS credentials stay server-side either way).
+export const gisPanchayatMapServerUrl = `${API_BASE_URL}/api/gis/panchayat`;
+
 // --- VILLAGE ASSETS (GIS infrastructure tracking) ---
 export const getAssetCategories = () =>
   request<{ success: boolean; categories: AssetCategoryDef[] }>('/api/master/asset-categories');

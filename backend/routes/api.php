@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AssetSurveyController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\CitizenController;
+use App\Http\Controllers\Api\GisController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -35,6 +36,12 @@ Route::post('/registrations/set-password', [RegistrationController::class, 'setP
 Route::post('/registrations/surveyor', [RegistrationController::class, 'registerSurveyor']);
 Route::post('/registrations/officer', [RegistrationController::class, 'registerOfficer']);
 Route::get('/registrations/{id}/status', [RegistrationController::class, 'status']);
+
+// Reverse proxy for HARSAC's Panchayat boundary MapServer - the ArcGIS JS SDK
+// calls this directly (no Authorization header), so it can't sit behind
+// auth:sanctum. It's not sensitive data (boundary polygons), and the real
+// GIS credentials stay server-side either way.
+Route::get('/gis/panchayat/{path?}', [GisController::class, 'proxyPanchayat'])->where('path', '.*');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/reverse', [LocationController::class, 'reverse']);

@@ -49,4 +49,14 @@ return [
         'code' => env('OTP_STATIC_BYPASS_CODE'),
     ],
 
+    // HARSAC's ArcGIS Enterprise portal - hosts the Panchayat boundary MapServer.
+    // Token-secured, so the admin panel can't call it directly with a username/password;
+    // it asks the backend for a short-lived, referer-locked token instead.
+    'harsac_gis' => [
+        'username' => env('GIS_HARSAC_USERNAME'),
+        'password' => env('GIS_HARSAC_PASSWORD'),
+        'token_url' => env('GIS_HARSAC_TOKEN_URL', 'https://gis.harsac.in/portal/sharing/rest/generateToken'),
+        'referer' => env('GIS_HARSAC_REFERER', 'https://hsac.in'),
+    ],
+
 ];

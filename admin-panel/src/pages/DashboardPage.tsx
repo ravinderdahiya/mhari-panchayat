@@ -4,6 +4,7 @@ import { Doughnut, Line } from 'react-chartjs-2';
 import type MapView from '@arcgis/core/views/MapView.js';
 import Graphic from '@arcgis/core/Graphic.js';
 import FeatureLayer from '@arcgis/core/layers/FeatureLayer.js';
+import MapImageLayer from '@arcgis/core/layers/MapImageLayer.js';
 import UniqueValueRenderer from '@arcgis/core/renderers/UniqueValueRenderer.js';
 import Extent from '@arcgis/core/geometry/Extent.js';
 import ArcGISMap from '../map/ArcGISMap';
@@ -111,6 +112,21 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     }
     view.map.basemap = mapLayer === 'streets' ? createStreetsBasemap() : createWorldImageryBasemap();
   }, [view, mapLayer]);
+
+  // Panchayat/district boundary layer from HARSAC's GIS portal - added once
+  // per view, at the bottom of the stack, so it sits under the complaint
+  // points layer (which re-adds itself on top on every filter change).
+  const boundaryLayerRef = useRef<MapImageLayer | null>(null);
+  useEffect(() => {
+    if (!view?.map) return undefined;
+    const layer = new MapImageLayer({ url: api.gisPanchayatMapServerUrl });
+    view.map.add(layer, 0);
+    boundaryLayerRef.current = layer;
+    return () => {
+      if (view.map) view.map.remove(layer);
+      boundaryLayerRef.current = null;
+    };
+  }, [view]);
 
   // Register the popup's "View Details" action handler once per view.
   useEffect(() => {
