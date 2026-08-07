@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Layers3, LoaderCircle,
-  Pencil, Plus, Trash2, X,
+  Pencil, Plus, RefreshCw, Trash2, X,
 } from 'lucide-react';
 import * as api from '../services/api';
 import type { MasterPagination } from '../services/api';
@@ -198,10 +198,16 @@ export default function AssetTypesPage() {
             Link each infrastructure asset to one or more departments for mobile surveys.
           </p>
         </div>
-        <button type="button" onClick={openCreate}
-          className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-bold px-4 py-2.5 rounded-lg cursor-pointer">
-          <Plus className="w-3.5 h-3.5" /> Add Asset Type
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setRefreshKey((current) => current + 1)} title="Refresh" disabled={loading}
+            className="inline-flex items-center gap-1.5 text-ink border border-line bg-white hover:bg-cream text-xs font-bold px-3.5 py-2.5 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+          <button type="button" onClick={openCreate}
+            className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-bold px-4 py-2.5 rounded-lg cursor-pointer">
+            <Plus className="w-3.5 h-3.5" /> Add Asset Type
+          </button>
+        </div>
       </div>
 
       {pageError && (

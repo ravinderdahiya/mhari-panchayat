@@ -89,16 +89,21 @@ export interface MasterPagination {
 }
 
 export const masterApi = (entity: string) => ({
-  list: (options: { paginated?: boolean; page?: number; perPage?: number } = {}) => {
+  list: (options: {
+    paginated?: boolean; page?: number; perPage?: number; search?: string; status?: 'active' | 'inactive';
+  } = {}) => {
     const params = new URLSearchParams();
     if (options.paginated) params.set('paginated', '1');
     if (options.page) params.set('page', String(options.page));
     if (options.perPage) params.set('per_page', String(options.perPage));
+    if (options.search) params.set('search', options.search);
+    if (options.status) params.set('status', options.status);
     const query = params.toString();
 
-    return request<{ success: boolean; items: any[]; pagination?: MasterPagination }>(
-      `/api/master/${entity}${query ? `?${query}` : ''}`,
-    );
+    return request<{
+      success: boolean; items: any[]; pagination?: MasterPagination;
+      counts?: { all: number; active: number; inactive: number };
+    }>(`/api/master/${entity}${query ? `?${query}` : ''}`);
   },
   create: (data: object) => jsonRequest<{ success: boolean; item: any }>(`/api/master/${entity}`, 'POST', data),
   update: (id: number, data: object) => jsonRequest<{ success: boolean; item: any }>(`/api/master/${entity}/${id}`, 'PUT', data),
