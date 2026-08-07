@@ -33,7 +33,7 @@ class ComplaintController extends Controller
     // than the table actually uses. Those load lazily via show() once a
     // complaint is actually opened.
     private const LIST_WITH = [
-        'user:id,name,username,mobile', 'assignedTo:id,name,username,designation', 'category', 'priority',
+        'user:id,name,username,mobile', 'assignedTo:id,name,username,mobile', 'category', 'priority',
         'department:id,name,code', 'assetType:id,name,icon_key',
         'district:id,name', 'tehsil:id,name', 'villageMaster:id,name,panchayat_id',
         'panchayatMaster:id,name',
