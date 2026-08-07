@@ -104,14 +104,25 @@ class ComplaintApi {
         });
 
       if (photos.isNotEmpty) {
+        // Legacy backends still require the singular `photo` field.
         request.files.add(
           http.MultipartFile.fromBytes(
             'photo',
             photos.first,
-            filename: 'complaint_photo.jpg',
+            filename: 'complaint_photo_0.jpg',
             contentType: MediaType('image', 'jpeg'),
           ),
         );
+        for (var i = 0; i < photos.length && i < 5; i++) {
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'photos[$i]',
+              photos[i],
+              filename: 'complaint_photo_$i.jpg',
+              contentType: MediaType('image', 'jpeg'),
+            ),
+          );
+        }
       }
 
       final streamed = await request.send().timeout(
@@ -425,21 +436,33 @@ class ComplaintApi {
     final assetType = json['asset_type'];
     final district = json['district'];
     final tehsil = json['tehsil'];
+    final issuePhotos = json['issue_photo_urls'] as List<dynamic>?;
     final rawPhotos = <dynamic>[
-      ...(json['photoUrls'] as List<dynamic>? ?? const []),
-      json['before_photo_url'],
-      json['during_photo_url'],
-      json['after_photo_url'],
+      if (issuePhotos != null && issuePhotos.isNotEmpty)
+        ...issuePhotos
+      else ...[
+        ...(json['photoUrls'] as List<dynamic>? ?? const []),
+        json['before_photo_url'],
+      ],
     ];
     final photoUrls = rawPhotos
         .where((value) => value != null && value.toString().isNotEmpty)
         .map((value) => _mobileUrl(value.toString()))
         .toSet()
         .toList();
-    final resolutionPhotoUrls =
-        (json['resolutionPhotoUrls'] as List<dynamic>? ?? const [])
-            .map((p) => '${ApiConfig.baseUrl}$p')
-            .toList();
+    final resolutionPhotoUrls = <String>{
+      ...(json['resolutionPhotoUrls'] as List<dynamic>? ?? const []).map(
+        (p) => p.toString().startsWith('http')
+            ? _mobileUrl(p.toString())
+            : '${ApiConfig.baseUrl}$p',
+      ),
+      if (json['during_photo_url'] != null &&
+          json['during_photo_url'].toString().isNotEmpty)
+        _mobileUrl(json['during_photo_url'].toString()),
+      if (json['after_photo_url'] != null &&
+          json['after_photo_url'].toString().isNotEmpty)
+        _mobileUrl(json['after_photo_url'].toString()),
+    }.toList();
 
     return Complaint(
       id: json['id']?.toString() ?? '',

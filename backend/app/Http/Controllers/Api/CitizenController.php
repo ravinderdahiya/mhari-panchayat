@@ -66,8 +66,13 @@ class CitizenController extends Controller
                     'status' => $complaint->status,
                     'description' => $complaint->description,
                     'beforePhotoUrl' => $complaint->before_photo_url,
+                    'issuePhotoUrls' => $complaint->issue_photo_urls ?? array_values(array_filter([
+                        $complaint->before_photo_url,
+                    ])),
                     'duringPhotoUrl' => $complaint->during_photo_url,
                     'afterPhotoUrl' => $complaint->after_photo_url,
+                    'lat' => $complaint->lat,
+                    'long' => $complaint->long,
                     'filedAt' => $complaint->created_at,
                 ])->values(),
             ]);

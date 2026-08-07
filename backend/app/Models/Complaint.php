@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
     'district_id', 'tehsil_id', 'village_id', 'panchayat_id',
     'location_state', 'location_district', 'location_tehsil', 'location_block',
     'department_id', 'asset_type_id',
-    'description', 'lat', 'long', 'before_photo_url', 'during_photo_url', 'after_photo_url',
+    'description', 'lat', 'long', 'before_photo_url', 'issue_photo_urls',
+    'during_photo_url', 'after_photo_url',
     'voice_note_url', 'status', 'citizen_rating', 'citizen_feedback', 'duplicate_of_id',
     'verified_at', 'verified_by_id',
 ])]
@@ -82,6 +83,7 @@ class Complaint extends Model
             'verified_by_id' => 'integer',
             'lat' => 'float',
             'long' => 'float',
+            'issue_photo_urls' => 'array',
             'citizen_rating' => 'integer',
             'verified_at' => 'datetime',
         ];

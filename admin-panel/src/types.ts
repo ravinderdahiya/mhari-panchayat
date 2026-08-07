@@ -95,6 +95,7 @@ export interface Complaint {
   lat: number | null;
   long: number | null;
   before_photo_url: string | null;
+  issue_photo_urls: string[] | null;
   during_photo_url: string | null;
   after_photo_url: string | null;
   voice_note_url: string | null;
@@ -192,8 +193,11 @@ export interface CitizenComplaintSummary {
   status: ComplaintStatus;
   description: string | null;
   beforePhotoUrl: string | null;
+  issuePhotoUrls?: string[] | null;
   duringPhotoUrl: string | null;
   afterPhotoUrl: string | null;
+  lat?: number | null;
+  long?: number | null;
   filedAt: string;
 }
 

@@ -42,7 +42,8 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
   int? _categoryId;
   int? _priorityId;
   final _descriptionController = TextEditingController();
-  Uint8List? _photo;
+  final List<Uint8List> _photos = [];
+  static const _maxPhotos = 5;
   bool _submitting = false;
   bool _loadingDepartments = true;
   bool _loadingAssets = false;
@@ -121,6 +122,10 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
   }
 
   Future<void> _takePhoto() async {
+    if (_photos.length >= _maxPhotos) {
+      _showMessage('Maximum $_maxPhotos issue photos allowed');
+      return;
+    }
     try {
       final captured = await InAppCamera.capture(context);
       if (captured == null) return;
@@ -137,7 +142,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         }
       }
       if (!mounted) return;
-      setState(() => _photo = bytes);
+      setState(() => _photos.add(bytes));
     } catch (_) {
       _showMessage(
         'Photo could not be captured. Please check camera permission.',
@@ -168,8 +173,8 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
       _showMessage('Please describe the issue in at least 10 characters');
       return;
     }
-    if (_photo == null) {
-      _showMessage('Please take a photo of the issue');
+    if (_photos.isEmpty) {
+      _showMessage('Please take at least one photo of the issue');
       return;
     }
 
@@ -186,7 +191,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         description: description,
         latitude: widget.latitude,
         longitude: widget.longitude,
-        photos: [_photo!],
+        photos: List<Uint8List>.from(_photos),
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -338,7 +343,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
                 ),
                 const SizedBox(height: AppSpacing.gap),
                 Text(
-                  'Issue photo *',
+                  'Issue photos * (up to $_maxPhotos)',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -346,9 +351,10 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
                 ),
                 const SizedBox(height: 8),
                 _PhotoInput(
-                  photo: _photo,
+                  photos: _photos,
+                  maxPhotos: _maxPhotos,
                   onTakePhoto: _takePhoto,
-                  onRemove: () => setState(() => _photo = null),
+                  onRemove: (index) => setState(() => _photos.removeAt(index)),
                 ),
               ],
             ),
@@ -530,62 +536,88 @@ class _SectionHeader extends StatelessWidget {
 
 class _PhotoInput extends StatelessWidget {
   const _PhotoInput({
-    required this.photo,
+    required this.photos,
+    required this.maxPhotos,
     required this.onTakePhoto,
     required this.onRemove,
   });
 
-  final Uint8List? photo;
+  final List<Uint8List> photos;
+  final int maxPhotos;
   final VoidCallback onTakePhoto;
-  final VoidCallback onRemove;
+  final ValueChanged<int> onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final bytes = photo;
-    if (bytes == null) {
-      return OutlinedButton.icon(
-        onPressed: onTakePhoto,
-        icon: const Icon(Icons.add_a_photo_rounded),
-        label: const Text('Open camera'),
-        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(96)),
-      );
-    }
-
-    return Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.button),
-          child: InkWell(
-            onTap: () => showPhotoViewer(context, bytes: bytes),
-            child: Image.memory(
-              bytes,
-              width: double.infinity,
-              height: 190,
-              fit: BoxFit.cover,
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < photos.length; i++)
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                    child: InkWell(
+                      onTap: () => showPhotoViewer(context, bytes: photos[i]),
+                      child: Image.memory(
+                        photos[i],
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: IconButton.filled(
+                      onPressed: () => onRemove(i),
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.rejectedText,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(28, 28),
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (photos.length < maxPhotos)
+              OutlinedButton(
+                onPressed: onTakePhoto,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(100, 100),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_a_photo_rounded),
+                    SizedBox(height: 4),
+                    Text('Add', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        if (photos.isEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'At least 1 photo required',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: AppColors.mutedText,
             ),
           ),
-        ),
-        Positioned(
-          right: 8,
-          top: 8,
-          child: IconButton.filled(
-            onPressed: onRemove,
-            icon: const Icon(Icons.delete_outline_rounded),
-            style: IconButton.styleFrom(
-              backgroundColor: AppColors.rejectedText,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-        Positioned(
-          left: 8,
-          bottom: 8,
-          child: FilledButton.icon(
-            onPressed: onTakePhoto,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Retake'),
-          ),
-        ),
+        ],
       ],
     );
   }

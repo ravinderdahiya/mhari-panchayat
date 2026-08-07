@@ -12,13 +12,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'citizen'");
+        // SQLite does not support ALTER COLUMN ... SET DEFAULT
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'citizen'");
+        }
+
         DB::table('users')->where('role', 'user')->update(['role' => 'citizen']);
         DB::table('users')->where('role', 'admin')->update(['role' => 'super_admin']);
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'");
+        }
     }
 };

@@ -6,9 +6,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 /// Opens a full-screen preview of a photo (already in memory, or fetched
-/// from the backend) with a download action, matching the viewer field
-/// staff see in other GPS photo apps. Pass exactly one of [bytes] or
+/// from the backend) with a download action. Pass exactly one of [bytes] or
 /// [imageUrl].
+///
+/// GPS / datetime already burned into the image by [PhotoStamp] are left as-is;
+/// this viewer does not draw a second metadata strip under the photo.
 Future<void> showPhotoViewer(
   BuildContext context, {
   Uint8List? bytes,

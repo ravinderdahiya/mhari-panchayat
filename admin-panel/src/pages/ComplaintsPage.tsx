@@ -446,20 +446,41 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
               </p>
             )}
 
-            {(selected.before_photo_url || selected.during_photo_url || selected.after_photo_url) && (
+            {((selected.issue_photo_urls && selected.issue_photo_urls.length > 0) ||
+              selected.before_photo_url ||
+              selected.during_photo_url ||
+              selected.after_photo_url) && (
               <div>
                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
                   <Camera className="w-3.5 h-3.5" />
                   Uploaded Photos
                 </h3>
                 <div className="grid grid-cols-3 gap-3">
-                  {([
-                    ['Before', selected.before_photo_url],
-                    ['During', selected.during_photo_url],
-                    ['After', selected.after_photo_url],
-                  ] as const).filter(([, url]) => url).map(([stage, url]) => (
-                    <PhotoThumbnail key={stage} url={api.mediaUrl(url!)} label={stage} onView={setLightboxUrl} />
-                  ))}
+                  {(selected.issue_photo_urls && selected.issue_photo_urls.length > 0
+                    ? selected.issue_photo_urls.map((url, index) => [
+                        `Issue ${index + 1}`,
+                        url,
+                      ] as const)
+                    : selected.before_photo_url
+                      ? [['Issue', selected.before_photo_url] as const]
+                      : []
+                  )
+                    .concat(
+                      (
+                        [
+                          ['During', selected.during_photo_url],
+                          ['After', selected.after_photo_url],
+                        ] as const
+                      ).filter(([, url]) => url),
+                    )
+                    .map(([stage, url]) => (
+                      <PhotoThumbnail
+                        key={`${stage}-${url}`}
+                        url={api.mediaUrl(url!)}
+                        label={stage}
+                        onView={setLightboxUrl}
+                      />
+                    ))}
                 </div>
               </div>
             )}

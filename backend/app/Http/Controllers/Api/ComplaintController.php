@@ -212,14 +212,49 @@ class ComplaintController extends Controller
             'description' => ['required', 'string', 'min:10', 'max:2000'],
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'long' => ['nullable', 'numeric', 'between:-180,180'],
-            'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
+            // Legacy single-file field still accepted for older clients.
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
+            'photos' => ['nullable', 'array', 'max:5'],
+            'photos.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'voice_note' => ['nullable', 'file', 'max:15360'],
         ], [
             'category_id.exists' => 'Invalid categoryId',
             'priority_id.exists' => 'Invalid priorityId',
             'lat.between' => 'Invalid latitude',
             'long.between' => 'Invalid longitude',
+            'photos.max' => 'A maximum of 5 issue photos is allowed',
         ]);
+
+        $photoFiles = [];
+        if ($request->hasFile('photos')) {
+            $uploaded = $request->file('photos');
+            $photoFiles = is_array($uploaded) ? array_values(array_filter($uploaded)) : [$uploaded];
+        }
+        // Also accept photos[0], photos[1], … if the array key didn't bind as `photos`.
+        if ($photoFiles === []) {
+            for ($i = 0; $i < 5; $i++) {
+                if ($request->hasFile("photos.$i")) {
+                    $photoFiles[] = $request->file("photos.$i");
+                }
+            }
+        }
+        // Legacy singular field — only when no `photos` were sent.
+        if ($photoFiles === [] && $request->hasFile('photo')) {
+            $photoFiles[] = $request->file('photo');
+        }
+        $photoFiles = array_values(array_filter($photoFiles));
+        if (count($photoFiles) === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'At least one issue photo is required',
+            ], 422);
+        }
+        if (count($photoFiles) > 5) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A maximum of 5 issue photos is allowed',
+            ], 422);
+        }
 
         $tehsil = null;
         $village = null;
@@ -271,7 +306,14 @@ class ComplaintController extends Controller
             return response()->json(['success' => false, 'message' => 'Selected asset is not available for this department'], 422);
         }
 
-        $beforePhotoUrl = $this->storeFile($request->file('photo'), 'photos');
+        $issuePhotoUrls = [];
+        foreach ($photoFiles as $file) {
+            $url = $this->storeFile($file, 'photos');
+            if ($url) {
+                $issuePhotoUrls[] = $url;
+            }
+        }
+        $beforePhotoUrl = $issuePhotoUrls[0] ?? null;
         $voiceNoteUrl = $this->storeFile($request->file('voice_note'), 'voice-notes');
 
         // Same category + same village, still open (not Resolved/Rejected/Closed) -
@@ -306,6 +348,7 @@ class ComplaintController extends Controller
             'long' => $data['long'] ?? null,
             'status' => 'Pending',
             'before_photo_url' => $beforePhotoUrl,
+            'issue_photo_urls' => $issuePhotoUrls,
             'voice_note_url' => $voiceNoteUrl,
             'duplicate_of_id' => $duplicateOfId,
         ]);

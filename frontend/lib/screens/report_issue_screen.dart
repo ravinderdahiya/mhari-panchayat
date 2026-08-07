@@ -17,6 +17,7 @@ import '../theme/app_theme.dart';
 import '../utils/photo_stamp.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/in_app_camera.dart';
+import '../widgets/photo_viewer.dart';
 import 'complaint_success_screen.dart';
 import 'login_screen.dart';
 
@@ -52,7 +53,8 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   bool _loadingAssets = false;
   bool _loadingCategories = false;
   bool _submitting = false;
-  Uint8List? _photo;
+  final List<Uint8List> _photos = [];
+  static const _maxPhotos = 5;
   final _descriptionController = TextEditingController();
 
   Future<void> _loadDistricts() async {
@@ -144,6 +146,10 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   }
 
   Future<void> _takePhoto() async {
+    if (_photos.length >= _maxPhotos) {
+      _showMessage('Maximum $_maxPhotos issue photos allowed');
+      return;
+    }
     try {
       final captured = await InAppCamera.capture(context);
       if (captured == null) return;
@@ -157,7 +163,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           );
         } catch (_) {}
       }
-      if (mounted) setState(() => _photo = bytes);
+      if (mounted) setState(() => _photos.add(bytes));
     } catch (_) {
       _showMessage('Photo could not be captured. Check camera permission.');
     }
@@ -188,8 +194,8 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       _showMessage('Please describe the issue in at least 10 characters');
       return;
     }
-    if (_photo == null) {
-      _showMessage('Please take a photo of the issue');
+    if (_photos.isEmpty) {
+      _showMessage('Please take at least one photo of the issue');
       return;
     }
     setState(() => _submitting = true);
@@ -210,7 +216,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         description: description,
         latitude: _lastPosition?.latitude,
         longitude: _lastPosition?.longitude,
-        photos: [_photo!],
+        photos: List<Uint8List>.from(_photos),
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -797,35 +803,69 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Issue Photo *',
+            'Issue Photos * (up to $_maxPhotos)',
             style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          if (_photo == null)
-            SizedBox(
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: _takePhoto,
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Take Photo'),
-              ),
-            )
-          else ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.memory(
-                _photo!,
-                height: 190,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => setState(() => _photo = null),
-              icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Remove Photo'),
-            ),
-          ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < _photos.length; i++)
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        onTap: () => showPhotoViewer(
+                          context,
+                          bytes: _photos[i],
+                        ),
+                        child: Image.memory(
+                          _photos[i],
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: IconButton.filled(
+                        onPressed: () => setState(() => _photos.removeAt(i)),
+                        icon: const Icon(Icons.close_rounded, size: 16),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.rejectedText,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(28, 28),
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              if (_photos.length < _maxPhotos)
+                OutlinedButton(
+                  onPressed: _takePhoto,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(100, 100),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.camera_alt_outlined),
+                      SizedBox(height: 4),
+                      Text('Add', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 20),
           SizedBox(
             height: 52,

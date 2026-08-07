@@ -81,7 +81,35 @@ class ComplaintSubmissionApiTest extends TestCase
             ->assertJsonPath('complaint.category.name', 'Road')
             ->assertJsonPath('complaint.priority.name', 'Medium');
         $response->assertJsonPath('complaint.department.name', 'School Education Department')
-            ->assertJsonPath('complaint.asset_type.name', 'Govt. Primary School');
+            ->assertJsonPath('complaint.asset_type.name', 'Govt. Primary School')
+            ->assertJsonCount(1, 'complaint.issue_photo_urls');
+
+        $multiPhoto = $this->actingAs($citizen, 'sanctum')->post('/api/complaints', [
+            'district_id' => $district->id,
+            'tehsil_id' => $tehsil->id,
+            'village_id' => $village->id,
+            'category_id' => $category->id,
+            'priority_id' => $priority->id,
+            'department_id' => $department->id,
+            'asset_type_id' => $assetType->id,
+            'description' => 'Multiple photos of the same pothole from different angles.',
+            'lat' => 29.1492,
+            'long' => 75.7217,
+            'photos' => [
+                UploadedFile::fake()->create('pothole1.jpg', 100, 'image/jpeg'),
+                UploadedFile::fake()->create('pothole2.jpg', 100, 'image/jpeg'),
+                UploadedFile::fake()->create('pothole3.jpg', 100, 'image/jpeg'),
+            ],
+        ]);
+
+        $multiPhoto->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(3, 'complaint.issue_photo_urls');
+        $this->assertNotNull($multiPhoto->json('complaint.before_photo_url'));
+        $this->assertSame(
+            $multiPhoto->json('complaint.before_photo_url'),
+            $multiPhoto->json('complaint.issue_photo_urls.0'),
+        );
 
         $this->assertDatabaseHas('complaints', [
             'user_id' => $citizen->id,

@@ -335,7 +335,11 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
             <div className="border-t border-slate-200 px-5 py-4 space-y-3">
               <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Complaints Filed</h3>
               {citizen.complaints.map((complaint) => (
-                <ComplaintSummaryCard key={complaint.id} complaint={complaint} onViewPhoto={setLightboxUrl} />
+                <ComplaintSummaryCard
+                  key={complaint.id}
+                  complaint={complaint}
+                  onViewPhoto={setLightboxUrl}
+                />
               ))}
             </div>
           )}
@@ -351,11 +355,20 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
 }
 
 function ComplaintSummaryCard({ complaint, onViewPhoto }: { complaint: CitizenComplaintSummary; onViewPhoto: (url: string) => void }) {
-  const photos = ([
-    ['Before', complaint.beforePhotoUrl],
-    ['During', complaint.duringPhotoUrl],
-    ['After', complaint.afterPhotoUrl],
-  ] as const).filter(([, url]) => url);
+  const issuePhotos = (complaint.issuePhotoUrls && complaint.issuePhotoUrls.length > 0
+    ? complaint.issuePhotoUrls
+    : complaint.beforePhotoUrl
+      ? [complaint.beforePhotoUrl]
+      : []
+  ).map((url, index) => [`Issue ${index + 1}`, url] as const);
+
+  const photos = [
+    ...issuePhotos,
+    ...([
+      ['During', complaint.duringPhotoUrl],
+      ['After', complaint.afterPhotoUrl],
+    ] as const).filter(([, url]) => url),
+  ];
 
   return (
     <div className="rounded-xl border border-slate-200 p-3.5 space-y-2.5">
@@ -375,7 +388,7 @@ function ComplaintSummaryCard({ complaint, onViewPhoto }: { complaint: CitizenCo
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {photos.map(([stage, url]) => (
-            <PhotoThumbnail key={stage} url={api.mediaUrl(url!)} label={stage} onView={onViewPhoto} />
+            <PhotoThumbnail key={`${stage}-${url}`} url={api.mediaUrl(url!)} label={stage} onView={onViewPhoto} />
           ))}
         </div>
       )}
