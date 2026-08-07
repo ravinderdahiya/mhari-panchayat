@@ -196,6 +196,16 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
   const isTerminal = !!selected && (selected.status === 'Rejected' || (selected.status === 'Closed' && !canReopen));
   const hasAnyAction = canAcknowledge || canSurvey || canResolve || canRate || canTransfer || canReopen || isTerminal;
 
+  // Newer complaints carry every citizen-submitted issue photo in
+  // issue_photo_urls (up to 5); before_photo_url is kept as just the first
+  // one for backward compatibility with complaints filed before that field
+  // existed, so fall back to it when issue_photo_urls is empty.
+  const issuePhotos = selected
+    ? (selected.issue_photo_urls && selected.issue_photo_urls.length > 0
+        ? selected.issue_photo_urls
+        : selected.before_photo_url ? [selected.before_photo_url] : [])
+    : [];
+
   return (
     <div className="space-y-4">
       {/* Toolbar: search, category filter, repeated toggle, export */}
@@ -446,41 +456,34 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
               </p>
             )}
 
-            {((selected.issue_photo_urls && selected.issue_photo_urls.length > 0) ||
-              selected.before_photo_url ||
-              selected.during_photo_url ||
-              selected.after_photo_url) && (
+            {(issuePhotos.length > 0 || selected.during_photo_url || selected.after_photo_url) && (
               <div>
                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
                   <Camera className="w-3.5 h-3.5" />
                   Uploaded Photos
                 </h3>
                 <div className="grid grid-cols-3 gap-3">
-                  {(selected.issue_photo_urls && selected.issue_photo_urls.length > 0
-                    ? selected.issue_photo_urls.map((url, index) => [
-                        `Issue ${index + 1}`,
+                  {(
+                    [
+                      ...issuePhotos.map((url, index): [string, string] => [
+                        issuePhotos.length > 1 ? `Issue ${index + 1}` : 'Issue',
                         url,
-                      ] as const)
-                    : selected.before_photo_url
-                      ? [['Issue', selected.before_photo_url] as const]
-                      : []
-                  )
-                    .concat(
-                      (
+                      ]),
+                      ...(
                         [
                           ['During', selected.during_photo_url],
                           ['After', selected.after_photo_url],
-                        ] as const
-                      ).filter(([, url]) => url),
-                    )
-                    .map(([stage, url]) => (
-                      <PhotoThumbnail
-                        key={`${stage}-${url}`}
-                        url={api.mediaUrl(url!)}
-                        label={stage}
-                        onView={setLightboxUrl}
-                      />
-                    ))}
+                        ] as [string, string | null][]
+                      ).filter((pair): pair is [string, string] => !!pair[1]),
+                    ]
+                  ).map(([stage, url]) => (
+                    <PhotoThumbnail
+                      key={`${stage}-${url}`}
+                      url={api.mediaUrl(url)}
+                      label={stage}
+                      onView={setLightboxUrl}
+                    />
+                  ))}
                 </div>
               </div>
             )}
