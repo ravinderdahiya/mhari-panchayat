@@ -56,5 +56,6 @@ class DatabaseSeeder extends Seeder
 
         $this->call(InfrastructureAssetSeeder::class);
         $this->call(ComplaintMasterSeeder::class);
+        $this->call(PanchayatiRajAssetSeeder::class);
     }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   AlertCircle, Briefcase, Building2, CheckCircle2, ChevronLeft, ChevronRight,
   Home, IdCard, Inbox, Landmark, LayoutGrid, ListChecks, LoaderCircle, MapPin,
-  Pencil, Plus, ShieldCheck, SignalHigh, Tags, Trash2, X,
+  Pencil, Plus, RefreshCw, Search, ShieldCheck, SignalHigh, Tags, Trash2, X,
 } from 'lucide-react';
 import { masterApi } from '../services/api';
 import type { MasterPagination } from '../services/api';
@@ -108,6 +108,9 @@ const ENTITIES = GROUPS.flatMap((group) => group.entities);
 const EMPTY_PAGINATION: MasterPagination = {
   currentPage: 1, lastPage: 1, perPage: 10, total: 0, from: null, to: null,
 };
+const EMPTY_COUNTS = { all: 0, active: 0, inactive: 0 };
+const STATUS_TABS = ['All', 'Active', 'Inactive'] as const;
+type StatusTab = (typeof STATUS_TABS)[number];
 
 function getVisiblePages(currentPage: number, lastPage: number) {
   const count = Math.min(5, lastPage);
@@ -127,14 +130,19 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
   );
   const active = ENTITIES.find((entity) => entity.key === activeKey)!;
   const ActiveIcon = active.icon;
+  const hasStatus = active.fields.some((field) => field.type === 'boolean');
 
   const [items, setItems] = useState<any[]>([]);
   const [pagination, setPagination] = useState<MasterPagination>(EMPTY_PAGINATION);
+  const [counts, setCounts] = useState(EMPTY_COUNTS);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [pageError, setPageError] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusTab, setStatusTab] = useState<StatusTab>('All');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -149,15 +157,31 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
       setActiveKey(initialEntityKey);
       setPage(1);
       setModalOpen(false);
+      setSearchInput('');
+      setSearch('');
+      setStatusTab('All');
     }
   }, [initialEntityKey]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => { setPage(1); }, [active.key, search, statusTab]);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setPageError('');
 
-    masterApi(active.key).list({ paginated: true, page, perPage })
+    masterApi(active.key).list({
+      paginated: true,
+      page,
+      perPage,
+      search: search || undefined,
+      status: hasStatus && statusTab !== 'All' ? (statusTab.toLowerCase() as 'active' | 'inactive') : undefined,
+    })
       .then((response) => {
         if (cancelled) return;
         const nextPagination = response.pagination ?? {
@@ -167,6 +191,7 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
           from: response.items.length ? 1 : null,
           to: response.items.length || null,
         };
+        setCounts(response.counts ?? EMPTY_COUNTS);
         if (page > nextPagination.lastPage) {
           setPage(nextPagination.lastPage);
           return;
@@ -182,7 +207,7 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
       });
 
     return () => { cancelled = true; };
-  }, [active, page, perPage, refreshKey]);
+  }, [active, page, perPage, refreshKey, search, statusTab, hasStatus]);
 
   const loadOptions = async (entity: EntityConfig) => {
     const parentKeys = [...new Set(entity.fields
@@ -303,13 +328,48 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
             <h2 className="text-sm font-bold text-slate-800">{active.label}</h2>
             <span className="text-xs text-slate-400 tabular-nums">({pagination.total})</span>
           </div>
-          {!active.readOnly && (
-            <button type="button" onClick={openAdd}
-              className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
-              <Plus className="w-3.5 h-3.5" /> Add
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setRefreshKey((current) => current + 1)} title="Refresh" disabled={isLoading}
+              className="inline-flex items-center gap-1.5 text-slate-600 border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold px-3 py-2 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
             </button>
-          )}
+            {!active.readOnly && (
+              <button type="button" onClick={openAdd}
+                className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-dark text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
+            )}
+          </div>
         </div>
+
+        {!active.readOnly && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder={`Search ${active.label.toLowerCase()}…`}
+                className="w-full text-xs border border-slate-300 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            {hasStatus && (
+              <div className="flex gap-1.5">
+                {STATUS_TABS.map((tab) => (
+                  <button key={tab} type="button" onClick={() => setStatusTab(tab)}
+                    className={`text-[11px] font-bold px-2.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                      statusTab === tab ? 'bg-accent text-white border-accent' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    }`}>
+                    {tab}
+                    <span className={`ml-1.5 ${statusTab === tab ? 'text-white' : 'text-slate-400'}`}>
+                      {tab === 'All' ? counts.all : tab === 'Active' ? counts.active : counts.inactive}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {pageError && <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{pageError}</p>}
 

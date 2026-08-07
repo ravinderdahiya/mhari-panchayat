@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AssetType;
 use App\Models\Block;
 use App\Models\ComplaintCategory;
 use App\Models\ComplaintPriority;
@@ -152,6 +153,16 @@ class MasterDataController extends Controller
             return response()->json(['success' => true, 'items' => $query->where('is_active', true)->get()]);
         }
 
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $query->where('name', 'ilike', '%'.$search.'%');
+        }
+
+        $status = $request->query('status');
+        if (in_array($status, ['active', 'inactive'], true)) {
+            $query->where('is_active', $status === 'active');
+        }
+
         $perPage = max(5, min(100, $request->integer('per_page', 10)));
         $paginator = $query->paginate($perPage);
 
@@ -165,6 +176,11 @@ class MasterDataController extends Controller
                 'total' => $paginator->total(),
                 'from' => $paginator->firstItem(),
                 'to' => $paginator->lastItem(),
+            ],
+            'counts' => [
+                'all' => $config['model']::count(),
+                'active' => $config['model']::where('is_active', true)->count(),
+                'inactive' => $config['model']::where('is_active', false)->count(),
             ],
         ]);
     }
@@ -195,7 +211,27 @@ class MasterDataController extends Controller
             return response()->json(['success' => false, 'message' => 'Could not update', 'error' => $e->getMessage()], 400);
         }
 
+        if ($entity === 'departments') {
+            $this->syncAssetTypeStatus($item);
+        }
+
         return response()->json(['success' => true, 'item' => $item]);
+    }
+
+    // An asset type stays active as long as at least one of its linked
+    // departments is active. Deactivating a department can therefore push a
+    // now-orphaned-of-active-departments asset type to inactive too, and
+    // reactivating one can bring it back - without overriding an asset type
+    // that an admin deliberately deactivated while it still has another
+    // active department.
+    private function syncAssetTypeStatus(Department $department): void
+    {
+        $department->assetTypes->each(function (AssetType $assetType) {
+            $shouldBeActive = $assetType->departments()->where('is_active', true)->exists();
+            if ($assetType->is_active !== $shouldBeActive) {
+                $assetType->update(['is_active' => $shouldBeActive]);
+            }
+        });
     }
 
     public function destroy(string $entity, int $id)
