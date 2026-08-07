@@ -124,6 +124,19 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
     api.getAssignableUsers().then(({ users }) => setAssignableUsers(users)).catch(() => {});
   }, []);
 
+  // The list endpoint omits timeline/transfers for speed, so opening a
+  // complaint fetches the full record (which has them) before showing the
+  // detail panel, rather than relying on what's already in `complaints`.
+  const openComplaint = async (c: Complaint) => {
+    setSelected(c);
+    try {
+      const { complaint } = await api.getComplaint(c.id);
+      setSelected(complaint);
+    } catch (err) {
+      setActionError((err as Error).message);
+    }
+  };
+
   const removeComplaint = async (complaint: Complaint) => {
     if (!window.confirm(`Delete complaint ${complaint.code ?? `CMP-${complaint.id}`}? This cannot be undone.`)) return;
     try {
@@ -139,7 +152,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
     if (!appliedInitialId.current && initialComplaintId && complaints.length > 0) {
       const match = complaints.find((c) => c.id === initialComplaintId);
       if (match) {
-        setSelected(match);
+        openComplaint(match);
         appliedInitialId.current = true;
       }
     }
@@ -306,7 +319,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                 return (
                 <tr
                   key={c.id}
-                  onClick={() => setSelected(c)}
+                  onClick={() => openComplaint(c)}
                   className={`border-t border-slate-100 cursor-pointer transition-colors hover:bg-accent/5 ${
                     isSelected ? 'bg-accent/10' : idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
                   }`}
@@ -511,7 +524,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
             <div>
               <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Audit Timeline</h3>
               <ol className="relative space-y-4 before:absolute before:left-[9px] before:top-1.5 before:bottom-1.5 before:w-px before:bg-slate-200">
-                {selected.timeline.map((t) => {
+                {(selected.timeline ?? []).map((t) => {
                   const Icon = TIMELINE_ICONS[t.status] || FileText;
                   return (
                     <li key={t.id} className="relative pl-7 text-xs">
@@ -529,7 +542,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
               </ol>
             </div>
 
-            {selected.transfers.length > 0 && (
+            {(selected.transfers ?? []).length > 0 && (
               <div>
                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Transfer History</h3>
                 <ul className="space-y-2">
