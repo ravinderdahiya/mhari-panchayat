@@ -152,6 +152,9 @@ export const transferComplaint = (id: number, to_user_id: number, reason?: strin
 export const reopenComplaint = (id: number, reason: string) =>
   jsonRequest<{ success: boolean; complaint: Complaint }>(`/api/complaints/${id}/reopen`, 'PATCH', { reason });
 
+export const deleteComplaint = (id: number) =>
+  jsonRequest<{ success: boolean }>(`/api/complaints/${id}`, 'DELETE');
+
 // --- ROLES & PERMISSIONS ---
 export const getRolePermissions = () =>
   request<{ success: boolean } & RolePermissionMatrix>('/api/roles/permissions');

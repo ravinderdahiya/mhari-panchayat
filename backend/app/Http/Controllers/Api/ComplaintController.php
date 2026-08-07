@@ -27,6 +27,19 @@ class ComplaintController extends Controller
         'duplicateOf.category',
     ];
 
+    // The list endpoint renders a summary table - it never needs the audit
+    // timeline or transfer history (each with their own nested user eager
+    // loads), which were making every complaint list fetch do far more work
+    // than the table actually uses. Those load lazily via show() once a
+    // complaint is actually opened.
+    private const LIST_WITH = [
+        'user:id,name,username,mobile', 'assignedTo:id,name,username,designation', 'category', 'priority',
+        'department:id,name,code', 'assetType:id,name,icon_key',
+        'district:id,name', 'tehsil:id,name', 'villageMaster:id,name,panchayat_id',
+        'panchayatMaster:id,name',
+        'duplicateOf.category',
+    ];
+
     public function categories(Request $request)
     {
         $assetTypeId = $request->integer('asset_type_id') ?: null;
@@ -379,7 +392,7 @@ class ComplaintController extends Controller
 
     public function index(Request $request)
     {
-        $query = Complaint::with(self::WITH)->orderByDesc('created_at');
+        $query = Complaint::with(self::LIST_WITH)->orderByDesc('created_at');
         if ($request->user()->role === 'citizen') {
             $query->where('user_id', $request->user()->id);
         }
@@ -398,6 +411,14 @@ class ComplaintController extends Controller
         }
 
         return response()->json(['success' => true, 'complaint' => $complaint]);
+    }
+
+    public function destroy(int $id)
+    {
+        $complaint = Complaint::findOrFail($id);
+        $complaint->delete();
+
+        return response()->json(['success' => true, 'message' => 'Complaint deleted']);
     }
 
     public function acknowledge(Request $request, int $id)

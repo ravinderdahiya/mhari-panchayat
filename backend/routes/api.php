@@ -129,6 +129,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:complaints.transfer');
     Route::patch('/complaints/{id}/reopen', [ComplaintController::class, 'reopen'])
         ->middleware('permission:complaints.reopen');
+    Route::delete('/complaints/{id}', [ComplaintController::class, 'destroy'])
+        ->middleware('role:super_admin');
 
     // Village Assets (GIS infrastructure tracking) - internal to staff roles,
     // not citizen-facing.

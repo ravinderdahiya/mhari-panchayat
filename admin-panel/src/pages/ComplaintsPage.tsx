@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Inbox, MapPin, User, UserCheck, Flag, FileText, Search, Wrench, CheckCircle2, Star, XCircle,
   RotateCcw, ArrowLeftRight, Repeat, Download, X, ChevronLeft, ChevronRight, CalendarClock,
-  Navigation, Camera, ExternalLink, UserX, Building2, Landmark,
+  Navigation, Camera, ExternalLink, UserX, Building2, Landmark, Trash2,
 } from 'lucide-react';
 import * as api from '../services/api';
 import { masterApi } from '../services/api';
@@ -123,6 +123,17 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
     masterApi('complaint-categories').list().then(({ items }) => setCategories(items)).catch(() => {});
     api.getAssignableUsers().then(({ users }) => setAssignableUsers(users)).catch(() => {});
   }, []);
+
+  const removeComplaint = async (complaint: Complaint) => {
+    if (!window.confirm(`Delete complaint ${complaint.code ?? `CMP-${complaint.id}`}? This cannot be undone.`)) return;
+    try {
+      await api.deleteComplaint(complaint.id);
+      setComplaints((prev) => prev.filter((c) => c.id !== complaint.id));
+      if (selected?.id === complaint.id) setSelected(null);
+    } catch (err) {
+      window.alert((err as Error).message || 'Could not delete this complaint.');
+    }
+  };
 
   useEffect(() => {
     if (!appliedInitialId.current && initialComplaintId && complaints.length > 0) {
@@ -285,6 +296,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                 <th className="text-left p-3 font-bold">Assigned To</th>
                 <th className="text-left p-3 font-bold">Filed</th>
                 <th className="text-left p-3 font-bold">Flags</th>
+                {currentUser.role === 'super_admin' && <th className="text-right p-3 font-bold w-16">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -346,6 +358,14 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                       </span>
                     )}
                   </td>
+                  {currentUser.role === 'super_admin' && (
+                    <td className="p-3 text-right">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); removeComplaint(c); }} title="Delete"
+                        className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
                 );
               })}
