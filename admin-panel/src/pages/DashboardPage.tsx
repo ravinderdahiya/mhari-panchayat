@@ -116,6 +116,16 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   // Panchayat/district boundary layer from HARSAC's GIS portal - added once
   // per view, at the bottom of the stack, so it sits under the complaint
   // points layer (which re-adds itself on top on every filter change).
+  //
+  // NOTE: HARSAC also publishes this same boundary data as a hosted vector
+  // tile service (api.gisPanchayatVectorTileUrl) with sharper rendering, but
+  // that service's tiling grid is UTM Zone 43N (wkid 32643), not Web Mercator
+  // — the ArcGIS JS API can't reproject vector tiles on the fly (unlike this
+  // raster MapImageLayer), so it can't be overlaid on this Web Mercator
+  // satellite/streets basemap. Forcing the whole view into 32643 to match it
+  // was tried and reverted: it broke the geometry engine's WASM module load
+  // under this project's Vite base-path setup. Switch back to the vector
+  // layer only if HARSAC republishes it in Web Mercator.
   const boundaryLayerRef = useRef<MapImageLayer | null>(null);
   useEffect(() => {
     if (!view?.map) return undefined;
@@ -213,7 +223,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         <>
           <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[36rem]">
             <div className="absolute inset-0">
-              <ArcGISMap center={mapCenter} zoom={8} scrollWheelZoom={false} onViewReady={setView} />
+              <ArcGISMap center={mapCenter} zoom={8} onViewReady={setView} />
             </div>
 
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2.5">

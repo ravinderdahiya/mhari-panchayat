@@ -224,6 +224,10 @@ export const getAssignableUsers = () => request<{ success: boolean; users: Assig
 // it directly, and the real GIS credentials stay server-side either way).
 export const gisPanchayatMapServerUrl = `${API_BASE_URL}/api/gis/panchayat`;
 
+// Same reasoning, for HARSAC's hosted Panchayat/district boundary vector tile
+// service (sharper at high zoom than the MapServer above).
+export const gisPanchayatVectorTileUrl = `${API_BASE_URL}/api/gis/panchayat-vector`;
+
 // --- VILLAGE ASSETS (GIS infrastructure tracking) ---
 export const getAssetCategories = () =>
   request<{ success: boolean; categories: AssetCategoryDef[] }>('/api/master/asset-categories');

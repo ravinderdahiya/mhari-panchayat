@@ -61,6 +61,10 @@ export default function ArcGISMap({ className, center, zoom, scrollWheelZoom, on
       popup: new Popup({ dockEnabled: false }),
     });
     view.navigation.actionMap.mouseWheel = scrollWheelZoom === false ? 'none' : 'zoom';
+    // Default position (top-left) sits under the dashboard's hero stat cards,
+    // making the zoom buttons invisible/unclickable there. Bottom-right is
+    // free on every map that uses this component.
+    view.ui.move('zoom', 'bottom-right');
     lastView = view;
 
     void ensureArcgisReady().then(() => view.when()).then(() => {

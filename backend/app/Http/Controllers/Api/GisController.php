@@ -11,25 +11,47 @@ use Illuminate\Support\Facades\Log;
 
 class GisController extends Controller
 {
-    private const TOKEN_TTL_MINUTES = 60;
+    private const DEFAULT_TOKEN_TTL_MINUTES = 60;
 
-    private const PANCHAYAT_MAPSERVER_URL = 'https://gis.harsac.in/server/rest/services/Panchayat/Panchayat/MapServer';
+    // Test/candidate replacement for the Panchayat boundary layer, on a separate
+    // ArcGIS Enterprise portal (hsac.org.in) from the one below - see the
+    // 'hsac_eodb' service config for its own account and token endpoint.
+    private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
+
+    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Hosted/Panchayatadmin/VectorTileServer';
 
     /**
-     * Reverse proxy for HARSAC's token-secured Panchayat/district boundary
-     * MapServer. The ArcGIS JS SDK talks to this endpoint (same-origin, so
-     * no CORS problem — gis.harsac.in doesn't send CORS headers, which
-     * blocks the browser calling it directly) and we forward each request
-     * server-side with an injected token. Credentials never reach the browser.
+     * Reverse proxy for the (currently EODB_HR24, test) boundary MapServer.
+     * The ArcGIS JS SDK talks to this endpoint (same-origin, so no CORS
+     * problem — neither portal sends CORS headers, which blocks the browser
+     * calling it directly) and we forward each request server-side with an
+     * injected token. Credentials never reach the browser.
      */
     public function proxyPanchayat(Request $request, string $path = ''): Response
     {
-        $token = $this->resolveToken();
+        return $this->proxy($request, self::PANCHAYAT_MAPSERVER_URL, 'hsac_eodb', $path);
+    }
+
+    /**
+     * Same reverse-proxy scheme as proxyPanchayat(), for HARSAC's hosted
+     * Panchayat/district boundary VectorTileServer. The style.json this
+     * service returns uses paths relative to its own service root (for
+     * tiles, sprites, fonts), so proxying just this one wildcard route
+     * carries every sub-resource through too.
+     */
+    public function proxyPanchayatVectorTile(Request $request, string $path = ''): Response
+    {
+        return $this->proxy($request, self::PANCHAYAT_VECTORTILE_URL, 'harsac_gis', $path);
+    }
+
+    private function proxy(Request $request, string $baseUrl, string $serviceKey, string $path): Response
+    {
+        $token = $this->resolveToken($serviceKey);
         if (! $token) {
             return response('GIS service is not configured or unreachable', 503);
         }
 
-        $url = self::PANCHAYAT_MAPSERVER_URL.($path !== '' ? "/{$path}" : '');
+        $url = $baseUrl.($path !== '' ? "/{$path}" : '');
         $query = array_merge($request->query(), ['token' => $token]);
 
         try {
@@ -39,7 +61,7 @@ class GisController extends Controller
             }
             $upstream = $http->get($url, $query);
         } catch (\Throwable $exception) {
-            Log::warning('HARSAC GIS proxy request failed', ['path' => $path, 'reason' => $exception->getMessage()]);
+            Log::warning('GIS proxy request failed', ['service' => $serviceKey, 'path' => $path, 'reason' => $exception->getMessage()]);
 
             return response('Could not reach the GIS service', 502);
         }
@@ -48,45 +70,48 @@ class GisController extends Controller
             ->header('Content-Type', $upstream->header('Content-Type') ?: 'application/json');
     }
 
-    private function resolveToken(): ?string
+    private function resolveToken(string $serviceKey): ?string
     {
-        $username = config('services.harsac_gis.username');
-        $password = config('services.harsac_gis.password');
+        $username = config("services.{$serviceKey}.username");
+        $password = config("services.{$serviceKey}.password");
         if (! $username || ! $password) {
             return null;
         }
 
-        $cached = Cache::get('harsac_gis_token');
+        $cacheKey = "gis_token:{$serviceKey}";
+        $cached = Cache::get($cacheKey);
         if ($cached) {
             return $cached['token'];
         }
+
+        $ttlMinutes = config("services.{$serviceKey}.token_ttl_minutes", self::DEFAULT_TOKEN_TTL_MINUTES);
 
         try {
             $http = Http::asForm()->timeout(10);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
-            $response = $http->post(config('services.harsac_gis.token_url'), [
+            $response = $http->post(config("services.{$serviceKey}.token_url"), [
                 'username' => $username,
                 'password' => $password,
                 'client' => 'referer',
-                'referer' => config('services.harsac_gis.referer'),
-                'expiration' => self::TOKEN_TTL_MINUTES,
+                'referer' => config("services.{$serviceKey}.referer"),
+                'expiration' => $ttlMinutes,
                 'f' => 'json',
             ]);
 
             $data = $response->json();
             if (! $response->successful() || empty($data['token'])) {
-                Log::warning('HARSAC GIS token request failed', ['status' => $response->status(), 'body' => $data]);
+                Log::warning('GIS token request failed', ['service' => $serviceKey, 'status' => $response->status(), 'body' => $data]);
 
                 return null;
             }
 
-            Cache::put('harsac_gis_token', $data, now()->addMinutes(self::TOKEN_TTL_MINUTES - 5));
+            Cache::put($cacheKey, $data, now()->addMinutes($ttlMinutes - 5));
 
             return $data['token'];
         } catch (\Throwable $exception) {
-            Log::warning('HARSAC GIS token request error', ['reason' => $exception->getMessage()]);
+            Log::warning('GIS token request error', ['service' => $serviceKey, 'reason' => $exception->getMessage()]);
 
             return null;
         }
