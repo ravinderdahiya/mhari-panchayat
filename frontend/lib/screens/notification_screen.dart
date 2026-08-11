@@ -76,7 +76,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     try {
       final complaint = await ComplaintApi.getById(item.complaintId);
       if (!mounted) return;
-      await push(context, ComplaintDetailsScreen(complaint: complaint));
+      push(context, ComplaintDetailsScreen(complaint: complaint));
     } on ComplaintApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
