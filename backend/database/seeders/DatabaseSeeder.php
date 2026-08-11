@@ -57,5 +57,15 @@ class DatabaseSeeder extends Seeder
         $this->call(InfrastructureAssetSeeder::class);
         $this->call(ComplaintMasterSeeder::class);
         $this->call(PanchayatiRajAssetSeeder::class);
+
+        // Match production: New Complaint shows only Panchayati Raj.
+        // Seeders create many demo departments; keep them in DB but inactive.
+        $prIds = Department::query()
+            ->where('code', 'PR')
+            ->orWhere('name', 'Panchayati Raj')
+            ->pluck('id');
+
+        Department::query()->whereNotIn('id', $prIds)->update(['is_active' => false]);
+        Department::query()->whereIn('id', $prIds)->update(['is_active' => true]);
     }
 }

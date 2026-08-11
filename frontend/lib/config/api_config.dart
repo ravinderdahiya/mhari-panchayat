@@ -9,7 +9,7 @@ class ApiConfig {
   static const String _fromEnvironment = String.fromEnvironment('API_BASE_URL');
 
   /// Phone + PC same Wi‑Fi. Change this IP if your LAN address changes.
-  static const String localBaseUrl = 'http://172.16.1.43:8081';
+  static const String localBaseUrl = 'http://172.16.1.222:8081';
 
   static const String liveBaseUrl = 'https://hsac.in/mhari-panchayat';
 

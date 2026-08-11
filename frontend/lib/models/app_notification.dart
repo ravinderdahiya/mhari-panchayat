@@ -37,13 +37,32 @@ class AppNotification {
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
-      id: json['id'] as String? ?? '',
-      complaintId: json['complaintId'] as String? ?? '',
+      id: _asString(json['id']),
+      complaintId: _asString(json['complaintId'] ?? json['complaint_id']),
       kind: NotificationKindWire.fromWireValue(json['type'] as String?),
       title: json['title'] as String? ?? '',
       message: json['message'] as String? ?? '',
-      isRead: json['isRead'] as bool? ?? false,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+      isRead: json['isRead'] as bool? ?? json['is_read'] as bool? ?? false,
+      createdAt: DateTime.tryParse(
+        (json['createdAt'] ?? json['created_at'] ?? '') as String? ?? '',
+      ),
+    );
+  }
+
+  static String _asString(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  AppNotification copyWith({bool? isRead}) {
+    return AppNotification(
+      id: id,
+      complaintId: complaintId,
+      kind: kind,
+      title: title,
+      message: message,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt,
     );
   }
 }
