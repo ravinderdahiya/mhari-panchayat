@@ -42,6 +42,7 @@ Route::get('/registrations/{id}/status', [RegistrationController::class, 'status
 // auth:sanctum. It's not sensitive data (boundary polygons), and the real
 // GIS credentials stay server-side either way.
 Route::get('/gis/panchayat/{path?}', [GisController::class, 'proxyPanchayat'])->where('path', '.*');
+Route::get('/gis/panchayat-vector/{path?}', [GisController::class, 'proxyPanchayatVectorTile'])->where('path', '.*');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/reverse', [LocationController::class, 'reverse']);

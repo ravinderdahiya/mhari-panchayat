@@ -59,4 +59,15 @@ return [
         'referer' => env('GIS_HARSAC_REFERER', 'https://hsac.in'),
     ],
 
+    // Separate ArcGIS Enterprise portal (hsac.org.in, not gis.harsac.in) - hosts the
+    // EODB_HR24 MapServer being tried as a test/replacement boundary source. Its own
+    // portal means its own account and token, not interchangeable with harsac_gis above.
+    'hsac_eodb' => [
+        'username' => env('HSAC_USERNAME'),
+        'password' => env('HSAC_PASSWORD'),
+        'token_url' => env('HSAC_TOKEN_GENERATE_URL', 'https://hsac.org.in/portal/sharing/rest/generateToken'),
+        'referer' => env('HSAC_TOKEN_REFERER', 'https://hsac.in'),
+        'token_ttl_minutes' => (int) env('HSAC_TOKEN_EXPIRATION_MINUTES', 60),
+    ],
+
 ];
