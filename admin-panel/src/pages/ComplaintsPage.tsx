@@ -57,7 +57,7 @@ function downloadCsv(rows: Complaint[]) {
     lines.push([
       idx + 1,
       c.code ?? `CMP-${c.id}`,
-      c.category.name,
+      c.category?.name ?? 'Uncategorised',
       c.status,
       c.priority.name,
       c.department?.name ?? '',
@@ -169,7 +169,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
       .filter((c) => {
         if (!q) return true;
         const haystack = [
-          String(c.id), c.category.name, c.description, c.village, c.panchayat,
+          String(c.id), c.category?.name, c.description, c.village, c.panchayat,
           c.tehsil?.name, c.district?.name,
           c.department?.name, c.asset_type?.name,
           c.user?.name, c.user?.username, c.assigned_to?.name, c.assigned_to?.username,
@@ -334,8 +334,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                   </td>
                   <td className="p-3">
                     <span className="flex items-center gap-2 font-semibold text-slate-800">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(c.category.name) }} />
-                      {c.category.name}
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(c.category?.name ?? 'Uncategorised') }} />
+                      {c.category?.name ?? 'Uncategorised'}
                     </span>
                   </td>
                   <td className="p-3 max-w-[190px]">
@@ -421,7 +421,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
           <div className="p-5 space-y-5">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="font-bold text-lg text-slate-900">{selected.category.name}</h2>
+                <h2 className="font-bold text-lg text-slate-900">{selected.category?.name ?? 'Uncategorised'}</h2>
                 <p className="text-xs text-slate-400 font-mono mt-0.5">{selected.code ?? `CMP-${selected.id}`}</p>
               </div>
               <div className="flex items-center gap-2">
@@ -436,7 +436,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
               <p className="flex items-center gap-1.5 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 <Repeat className="w-3.5 h-3.5 shrink-0" />
                 Possible repeat of complaint {selected.duplicate_of?.code ?? `CMP-${selected.duplicate_of_id}`}
-                {selected.duplicate_of && ` (${selected.duplicate_of.category.name})`}
+                {selected.duplicate_of && ` (${selected.duplicate_of.category?.name ?? 'Uncategorised'})`}
               </p>
             )}
 

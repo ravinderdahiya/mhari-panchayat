@@ -115,8 +115,8 @@ export default function MySurveysPage({ currentUser, onNavigateToComplaint }: My
                     {c.code ?? `CMP-${c.id}`}
                   </span>
                   <span className="flex items-center gap-2 font-semibold text-ink text-sm shrink-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(c.category.name) }} />
-                    {c.category.name}
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(c.category?.name ?? 'Uncategorised') }} />
+                    {c.category?.name ?? 'Uncategorised'}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-muted truncate flex-1 min-w-[120px]">
                     <MapPin className="w-3 h-3 shrink-0" />

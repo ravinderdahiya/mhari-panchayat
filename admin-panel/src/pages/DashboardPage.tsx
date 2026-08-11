@@ -78,12 +78,12 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
 
   const mapPoints = complaints.filter((c) => c.lat !== null && c.long !== null);
   const mapCategories = useMemo(
-    () => Array.from(new Set(mapPoints.map((c) => c.category.name))).sort(),
+    () => Array.from(new Set(mapPoints.map((c) => c.category?.name ?? 'Uncategorised'))).sort(),
     [mapPoints],
   );
   const groupOf = (status: string) => MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
   const filteredMapPoints = mapPoints.filter(
-    (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category.name),
+    (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category?.name ?? 'Uncategorised'),
   );
   const toggleSetMember = (set: Set<string>, setSet: (s: Set<string>) => void, value: string) => {
     const next = new Set(set);
@@ -160,7 +160,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         id: c.id,
         code: c.code ?? `CMP-${c.id}`,
         legendGroup: groupOf(c.status),
-        category: c.category.name,
+        category: c.category?.name ?? 'Uncategorised',
         statusLabel: c.status.replace('_', ' '),
       },
     }));
