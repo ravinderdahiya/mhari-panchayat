@@ -333,7 +333,7 @@ class ComplaintController extends Controller
         // a same-location/same-issue-type signal, not a geo-radius calculation.
         $duplicateOfId = null;
         if ($village?->name) {
-            $duplicateOfId = Complaint::where('category_id', $data['category_id'])
+            $duplicateOfId = Complaint::where('category_id', $data['category_id'] ?? null)
                 ->where('village_id', $village->id)
                 ->whereNotIn('status', ['Resolved', 'Rejected', 'Closed'])
                 ->orderByDesc('created_at')
