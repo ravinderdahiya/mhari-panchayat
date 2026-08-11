@@ -414,9 +414,18 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
         )}
       </div>
 
-      {/* Detail panel */}
+      {/* Detail popup */}
       {selected && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-40 flex items-start justify-center bg-black/50 p-4 sm:p-8 overflow-y-auto"
+          onClick={() => setSelected(null)}
+        >
+        <div
+          className="bg-white border border-slate-200 rounded-2xl overflow-hidden w-full max-w-3xl my-auto"
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className={`h-1 ${statusAccent(selected.status)}`} />
           <div className="p-5 space-y-5">
             <div className="flex items-start justify-between">
@@ -707,6 +716,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
               )}
             </div>
           </div>
+        </div>
         </div>
       )}
 

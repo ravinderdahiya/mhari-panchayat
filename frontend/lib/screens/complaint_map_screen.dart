@@ -229,11 +229,11 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           child: _MapLegend(selected: _statusFilter, onSelect: _toggleFilter),
         ),
         if (_loading)
-          const Positioned(
-            top: 70,
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 68,
             left: 0,
             right: 0,
-            child: Center(
+            child: const Center(
               child: SizedBox(
                 width: 22,
                 height: 22,
@@ -258,34 +258,56 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
   Widget _buildSearchBar(BuildContext context) {
     return Positioned(
-      top: MediaQuery.paddingOf(context).top + 12,
+      top: MediaQuery.paddingOf(context).top + 10,
       left: AppSpacing.screen,
       right: AppSpacing.screen,
       child: Material(
-        elevation: 4,
-        borderRadius: BorderRadius.circular(30),
+        color: AppColors.background,
+        elevation: 3,
         shadowColor: Colors.black26,
+        borderRadius: BorderRadius.circular(28),
+        clipBehavior: Clip.antiAlias,
         child: Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.85)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Icon(Icons.search_rounded, color: Color(0xFF616161)),
-              const SizedBox(width: 12),
+              const Icon(
+                Icons.search_rounded,
+                size: 22,
+                color: AppColors.mutedText,
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: TextField(
-                  style: GoogleFonts.poppins(fontSize: 14),
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 14,
+                    color: const Color(0xFF22281F),
+                    height: 1.2,
+                  ),
+                  cursorColor: AppColors.primary,
+                  textAlignVertical: TextAlignVertical.center,
                   decoration: InputDecoration(
-                    isCollapsed: true,
+                    isDense: true,
+                    filled: false,
+                    fillColor: Colors.transparent,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
                     hintText: 'Search location or complaint',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: GoogleFonts.ibmPlexSans(
                       fontSize: 14,
-                      color: const Color(0xFF9E9E9E),
+                      color: AppColors.navInactive,
+                      height: 1.2,
                     ),
                   ),
                 ),

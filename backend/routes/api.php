@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CitizenController;
 use App\Http\Controllers\Api\GisController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\UserController;
@@ -103,6 +104,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/registrations/{id}/unapprove', [RegistrationController::class, 'unapprove']);
         Route::patch('/registrations/{id}/reject', [RegistrationController::class, 'reject']);
     });
+
+    // In-app notifications (citizen + staff inbox)
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
     // Complaints
     Route::post('/complaints', [ComplaintController::class, 'store'])

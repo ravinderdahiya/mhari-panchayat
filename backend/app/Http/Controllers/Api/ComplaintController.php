@@ -13,6 +13,7 @@ use App\Models\District;
 use App\Models\Tehsil;
 use App\Models\User;
 use App\Models\Village;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -383,6 +384,8 @@ class ComplaintController extends Controller
             ]);
         }
 
+        app(NotificationService::class)->complaintSubmitted($complaint);
+
         return response()->json([
             'success' => true,
             'message' => 'Complaint submitted successfully',
@@ -438,7 +441,10 @@ class ComplaintController extends Controller
             'performed_by_id' => $request->user()->id,
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Complaint acknowledged', 'complaint' => $complaint->fresh(self::WITH)]);
+        $fresh = $complaint->fresh(self::WITH);
+        app(NotificationService::class)->complaintAssigned($fresh);
+
+        return response()->json(['success' => true, 'message' => 'Complaint acknowledged', 'complaint' => $fresh]);
     }
 
     public function survey(Request $request, int $id)
@@ -498,7 +504,10 @@ class ComplaintController extends Controller
             'performed_by_id' => $request->user()->id,
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Complaint marked resolved', 'complaint' => $complaint->fresh(self::WITH)]);
+        $fresh = $complaint->fresh(self::WITH);
+        app(NotificationService::class)->complaintResolved($fresh);
+
+        return response()->json(['success' => true, 'message' => 'Complaint marked resolved', 'complaint' => $fresh]);
     }
 
     public function verify(Request $request, int $id)
@@ -588,7 +597,10 @@ class ComplaintController extends Controller
             'performed_by_id' => $request->user()->id,
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Complaint transferred', 'complaint' => $complaint->fresh(self::WITH)]);
+        $fresh = $complaint->fresh(self::WITH);
+        app(NotificationService::class)->complaintTransferred($fresh, $toUser->id);
+
+        return response()->json(['success' => true, 'message' => 'Complaint transferred', 'complaint' => $fresh]);
     }
 
     public function reopen(Request $request, int $id)
