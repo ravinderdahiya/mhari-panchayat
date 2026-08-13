@@ -367,6 +367,9 @@ class ComplaintController extends Controller
             'duplicate_of_id' => $duplicateOfId,
         ]);
 
+        $complaint->refreshSlaDueAt();
+        $complaint->save();
+
         $this->addTimelineEvent($complaint, [
             'status' => 'Pending',
             'title' => 'Complaint Filed',
@@ -432,7 +435,12 @@ class ComplaintController extends Controller
         }
 
         $assignedToId = $request->input('assigned_to_id');
-        $complaint->update(['status' => 'Acknowledged', 'assigned_to_id' => $assignedToId ?: $complaint->assigned_to_id]);
+        $complaint->refreshSlaDueAt();
+        $complaint->update([
+            'status' => 'Acknowledged',
+            'assigned_to_id' => $assignedToId ?: $complaint->assigned_to_id,
+            'sla_due_at' => $complaint->sla_due_at,
+        ]);
 
         $this->addTimelineEvent($complaint, [
             'status' => 'Acknowledged',
@@ -475,6 +483,8 @@ class ComplaintController extends Controller
             }
         }
 
+        $complaint->refreshSlaDueAt();
+        $updates['sla_due_at'] = $complaint->sla_due_at;
         $complaint->update($updates);
 
         $this->addTimelineEvent($complaint, [
@@ -495,7 +505,9 @@ class ComplaintController extends Controller
             return response()->json(['success' => false, 'message' => "Cannot resolve a complaint in {$complaint->status} status"], 400);
         }
 
-        $complaint->update(['status' => 'Resolved']);
+        // No SLA clock past resolution - the citizen-response window is tracked
+        // separately by resolved_at (see complaints:auto-close-resolved).
+        $complaint->update(['status' => 'Resolved', 'sla_due_at' => null, 'resolved_at' => now()]);
 
         $this->addTimelineEvent($complaint, [
             'status' => 'Resolved',
@@ -588,7 +600,8 @@ class ComplaintController extends Controller
             'created_at' => now(),
         ]);
 
-        $complaint->update(['assigned_to_id' => $toUser->id]);
+        $complaint->refreshSlaDueAt();
+        $complaint->update(['assigned_to_id' => $toUser->id, 'sla_due_at' => $complaint->sla_due_at]);
 
         $this->addTimelineEvent($complaint, [
             'status' => $complaint->status,
@@ -615,7 +628,8 @@ class ComplaintController extends Controller
 
         $data = $request->validate(['reason' => ['required', 'string']]);
 
-        $complaint->update(['status' => 'Reopened']);
+        $complaint->refreshSlaDueAt();
+        $complaint->update(['status' => 'Reopened', 'resolved_at' => null, 'sla_due_at' => $complaint->sla_due_at]);
 
         $this->addTimelineEvent($complaint, [
             'status' => 'Reopened',
@@ -624,7 +638,35 @@ class ComplaintController extends Controller
             'performed_by_id' => $request->user()->id,
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Complaint reopened', 'complaint' => $complaint->fresh(self::WITH)]);
+        $fresh = $complaint->fresh(self::WITH);
+        app(NotificationService::class)->complaintReopened($fresh);
+
+        return response()->json(['success' => true, 'message' => 'Complaint reopened', 'complaint' => $fresh]);
+    }
+
+    public function reject(Request $request, int $id)
+    {
+        $complaint = Complaint::findOrFail($id);
+        if (in_array($complaint->status, ['Closed', 'Rejected'], true)) {
+            return response()->json(['success' => false, 'message' => "Cannot reject a complaint in {$complaint->status} status"], 400);
+        }
+
+        $data = $request->validate(['reason' => ['required', 'string']]);
+
+        // Terminal status - no further SLA tracking needed.
+        $complaint->update(['status' => 'Rejected', 'sla_due_at' => null]);
+
+        $this->addTimelineEvent($complaint, [
+            'status' => 'Rejected',
+            'title' => 'Complaint Rejected',
+            'description' => $data['reason'],
+            'performed_by_id' => $request->user()->id,
+        ]);
+
+        $fresh = $complaint->fresh(self::WITH);
+        app(NotificationService::class)->complaintRejected($fresh, $data['reason']);
+
+        return response()->json(['success' => true, 'message' => 'Complaint rejected', 'complaint' => $fresh]);
     }
 
     public function reports()

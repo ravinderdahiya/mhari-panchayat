@@ -135,6 +135,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:complaints.transfer');
     Route::patch('/complaints/{id}/reopen', [ComplaintController::class, 'reopen'])
         ->middleware('permission:complaints.reopen');
+    Route::patch('/complaints/{id}/reject', [ComplaintController::class, 'reject'])
+        ->middleware('permission:complaints.reject');
     Route::delete('/complaints/{id}', [ComplaintController::class, 'destroy'])
         ->middleware('role:super_admin');
 

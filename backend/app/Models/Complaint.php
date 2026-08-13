@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
     'during_photo_url', 'after_photo_url',
     'voice_note_url', 'status', 'citizen_rating', 'citizen_feedback', 'duplicate_of_id',
     'verified_at', 'verified_by_id',
+    'sla_due_at', 'escalation_level', 'escalated_at', 'resolved_at',
 ])]
 class Complaint extends Model
 {
@@ -86,7 +87,19 @@ class Complaint extends Model
             'issue_photo_urls' => 'array',
             'citizen_rating' => 'integer',
             'verified_at' => 'datetime',
+            'sla_due_at' => 'datetime',
+            'escalation_level' => 'integer',
+            'escalated_at' => 'datetime',
+            'resolved_at' => 'datetime',
         ];
+    }
+
+    // Called by every status-changing controller action so the SLA clock
+    // always reflects "time since last action", not just time since filing.
+    public function refreshSlaDueAt(): void
+    {
+        $hours = $this->priority?->sla_hours;
+        $this->sla_due_at = $hours ? now()->addHours($hours) : null;
     }
 
     public function user(): BelongsTo

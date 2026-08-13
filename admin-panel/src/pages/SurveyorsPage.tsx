@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, ExternalLink, ShieldCheck, Check, X, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Search, Plus, ExternalLink, ShieldCheck, Check, X, Trash2, ChevronLeft, ChevronRight, Eye, RefreshCw } from 'lucide-react';
 import * as api from '../services/api';
 import type { AdminUser, Complaint, ComplaintStatus, Department, District, Tehsil, Village } from '../types';
 
@@ -466,14 +466,26 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     <div className="h-full flex flex-col">
       {error && <p className="text-xs text-status-new bg-status-new/10 border border-status-new/20 rounded-lg p-2 mb-3">{error}</p>}
 
-      <div className="relative mb-3 max-w-sm">
-        <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search surveyor or department…"
-          className="w-full text-xs border border-line rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-        />
+      <div className="flex items-center gap-2 mb-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search surveyor or department…"
+            className="w-full text-xs border border-line rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          title="Refresh"
+          disabled={isLoading}
+          className="inline-flex items-center gap-1.5 text-ink border border-line bg-white hover:bg-cream text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-3">

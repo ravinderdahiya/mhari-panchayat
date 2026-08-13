@@ -19,7 +19,7 @@ class GisController extends Controller
     //private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
     private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
 
-    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Hosted/Panchayatadmin/VectorTileServer';
+    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Waterlog/waterlogapp/FeatureServer';
 
     /**
      * Reverse proxy for the (currently EODB_HR24, test) boundary MapServer.
