@@ -4,7 +4,7 @@ import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenP
 // first, and the dev server only listens on IPv4, so every request pays a
 // ~200ms IPv6-then-IPv4 fallback penalty before falling back to the working
 // address. Connecting to 127.0.0.1 directly skips that entirely.
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8081';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8083';
 const TOKEN_KEY = 'mhari_panchayat_token';
 
 // Uploaded media URLs may have been persisted with an older host/port.

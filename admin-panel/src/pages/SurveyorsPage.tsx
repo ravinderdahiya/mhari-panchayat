@@ -986,7 +986,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                       const inAssignedVillage = c.village_id !== null && assignedVillageIds.has(c.village_id);
                       return (
                         <option key={c.id} value={c.id}>
-                          {inAssignedVillage ? '★ ' : ''}{c.code ?? `CMP-${c.id}`} · {c.category.name} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
+                          {inAssignedVillage ? '★ ' : ''}{c.code ?? `CMP-${c.id}`} · {c.category?.name ?? 'Uncategorised'} · {[c.village, c.panchayat].filter(Boolean).join(', ') || 'No location'} · {c.status.replace('_', ' ')}
                           {inAssignedVillage ? ' (assigned area)' : ''}
                         </option>
                       );
@@ -1016,7 +1016,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                     <div key={c.id} className="border border-line rounded-xl overflow-hidden">
                       <div className="flex justify-between items-center px-4 py-3.5 border-b border-line">
                         <div>
-                          <p className="text-[13.5px] font-semibold text-ink">{c.category.name}{c.village ? ` — ${c.village}` : ''}</p>
+                          <p className="text-[13.5px] font-semibold text-ink">{c.category?.name ?? 'Uncategorised'}{c.village ? ` — ${c.village}` : ''}</p>
                           <p className="text-[11.5px] text-muted mt-0.5">{[c.village, c.panchayat].filter(Boolean).join(' · ') || 'No location'}</p>
                         </div>
                         <span className="font-mono text-[10.5px] text-muted border border-line px-2 py-1 rounded">{c.code ?? `CMP-${c.id}`}</span>
@@ -1058,7 +1058,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
                   <div key={c.id} className="border border-line rounded-xl overflow-hidden">
                     <div className="flex justify-between items-center px-4 py-3.5 border-b border-line">
                       <div>
-                        <p className="text-[13.5px] font-semibold text-ink">{c.category.name}{c.village ? ` — ${c.village}` : ''}</p>
+                        <p className="text-[13.5px] font-semibold text-ink">{c.category?.name ?? 'Uncategorised'}{c.village ? ` — ${c.village}` : ''}</p>
                         <p className="text-[11.5px] text-muted mt-0.5">{[c.village, c.panchayat].filter(Boolean).join(' · ') || 'No location'}</p>
                       </div>
                       <span className="font-mono text-[10.5px] text-muted border border-line px-2 py-1 rounded">CMP-{c.id}</span>
