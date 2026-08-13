@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Complaint;
+use App\Models\User;
 use App\Models\UserNotification;
 
 class NotificationService
@@ -14,6 +15,8 @@ class NotificationService
     public const TYPE_RESOLVED = 'COMPLAINT_RESOLVED';
 
     public const TYPE_REJECTED = 'COMPLAINT_REJECTED';
+
+    public const TYPE_ESCALATED = 'COMPLAINT_ESCALATED';
 
     public function notify(
         int $userId,
@@ -115,6 +118,46 @@ class NotificationService
                 self::TYPE_ASSIGNED,
                 'Complaint assigned to you',
                 "Complaint {$code} has been transferred to you.",
+                $complaint->id,
+            );
+        }
+    }
+
+    // Staff-facing only - an internal priority bump isn't citizen-relevant.
+    public function complaintEscalated(Complaint $complaint, array $recipientUserIds): void
+    {
+        $code = $complaint->code ?? "#{$complaint->id}";
+        $priorityName = $complaint->priority?->name ?? 'higher priority';
+
+        foreach (array_unique(array_filter($recipientUserIds)) as $userId) {
+            $this->notify(
+                $userId,
+                self::TYPE_ESCALATED,
+                'Complaint SLA breached',
+                "Complaint {$code} missed its SLA and was escalated to {$priorityName} priority.",
+                $complaint->id,
+            );
+        }
+    }
+
+    // Notifies whoever should act next now that the complaint is back open -
+    // the previous assignee, or a department_head fallback if it was never assigned.
+    public function complaintReopened(Complaint $complaint): void
+    {
+        $code = $complaint->code ?? "#{$complaint->id}";
+        $recipientIds = $complaint->assigned_to_id
+            ? [$complaint->assigned_to_id]
+            : User::where('department_id', $complaint->department_id)
+                ->where('role', 'department_head')
+                ->pluck('id')
+                ->all();
+
+        foreach (array_unique(array_filter($recipientIds)) as $userId) {
+            $this->notify(
+                $userId,
+                self::TYPE_ASSIGNED,
+                'Complaint reopened',
+                "Complaint {$code} was reopened by the citizen and needs your attention again.",
                 $complaint->id,
             );
         }

@@ -28,6 +28,7 @@ class PermissionSeeder extends Seeder
         ['key' => 'complaints.rate', 'label' => 'Rate & close complaints', 'group' => 'Complaints', 'roles' => ['citizen']],
         ['key' => 'complaints.transfer', 'label' => 'Transfer complaints', 'group' => 'Complaints', 'roles' => ['sarpanch', 'secretary', 'block_admin', 'department_head', 'department_officer', 'super_admin']],
         ['key' => 'complaints.reopen', 'label' => 'Reopen complaints', 'group' => 'Complaints', 'roles' => ['citizen']],
+        ['key' => 'complaints.reject', 'label' => 'Reject complaints', 'group' => 'Complaints', 'roles' => ['sarpanch', 'secretary', 'block_admin', 'department_head', 'department_officer', 'super_admin']],
         ['key' => 'master_data.view', 'label' => 'View master data', 'group' => 'Master Data', 'roles' => self::ALL_ROLES],
         ['key' => 'master_data.manage', 'label' => 'Create/edit/delete master data', 'group' => 'Master Data', 'roles' => ['super_admin']],
         ['key' => 'village_assets.view', 'label' => 'View village assets', 'group' => 'Village Assets', 'roles' => ['super_admin', 'state_admin', 'district_admin', 'block_admin', 'department_head', 'department_officer', 'engineer', 'sarpanch', 'secretary']],

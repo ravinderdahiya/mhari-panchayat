@@ -253,67 +253,86 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
       </div>
 
       {selected && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-slate-900">{selected.name || selected.username}</h2>
-              <p className="text-xs text-slate-400">@{selected.username} {selected.email && `· ${selected.email}`}</p>
-            </div>
-            {isSelf && (
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
-                <Lock className="w-3 h-3" />
-                This is your own account
-              </span>
-            )}
-          </div>
-
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>}
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Role</label>
-              <select
-                value={editRole}
-                onChange={(e) => setEditRole(e.target.value)}
-                disabled={isSelf}
-                className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 disabled:bg-slate-50 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                {ALL_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Department</label>
-              <select
-                value={editDepartment}
-                onChange={(e) => setEditDepartment(e.target.value)}
-                className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="">— none —</option>
-                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Status</label>
-              <label className={`flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 border rounded-lg ${isSelf ? 'text-slate-400 bg-slate-50' : 'text-slate-700'}`}>
-                <input
-                  type="checkbox"
-                  checked={editActive}
-                  disabled={isSelf}
-                  onChange={(e) => setEditActive(e.target.checked)}
-                  className="accent-accent"
-                />
-                Active
-              </label>
-            </div>
-          </div>
-
-          <button
-            disabled={isSubmitting}
-            onClick={save}
-            className="bg-accent hover:bg-accent-dark disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg"
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-5 overflow-y-auto"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="w-full max-w-2xl my-auto bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
           >
-            {isSubmitting ? 'Saving…' : 'Save Changes'}
-          </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-900">{selected.name || selected.username}</h2>
+                <p className="text-xs text-slate-400">@{selected.username} {selected.email && `· ${selected.email}`}</p>
+              </div>
+              {isSelf && (
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
+                  <Lock className="w-3 h-3" />
+                  This is your own account
+                </span>
+              )}
+            </div>
+
+            {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Role</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  disabled={isSelf}
+                  className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 disabled:bg-slate-50 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {ALL_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Department</label>
+                <select
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">— none —</option>
+                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Status</label>
+                <label className={`flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 border rounded-lg ${isSelf ? 'text-slate-400 bg-slate-50' : 'text-slate-700'}`}>
+                  <input
+                    type="checkbox"
+                    checked={editActive}
+                    disabled={isSelf}
+                    onChange={(e) => setEditActive(e.target.checked)}
+                    className="accent-accent"
+                  />
+                  Active
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                disabled={isSubmitting}
+                onClick={save}
+                className="bg-accent hover:bg-accent-dark disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg"
+              >
+                {isSubmitting ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

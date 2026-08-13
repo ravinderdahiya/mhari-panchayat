@@ -16,9 +16,10 @@ class GisController extends Controller
     // Test/candidate replacement for the Panchayat boundary layer, on a separate
     // ArcGIS Enterprise portal (hsac.org.in) from the one below - see the
     // 'hsac_eodb' service config for its own account and token endpoint.
+    //private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
     private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
 
-    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Hosted/Panchayatadmin/VectorTileServer';
+    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Waterlog/waterlogapp/FeatureServer';
 
     /**
      * Reverse proxy for the (currently EODB_HR24, test) boundary MapServer.

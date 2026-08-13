@@ -46,8 +46,13 @@ class DatabaseSeeder extends Seeder
             Department::create($dept);
         }
 
-        foreach (['Low' => 1, 'Medium' => 2, 'High' => 3, 'Critical' => 4] as $name => $level) {
-            ComplaintPriority::create(['name' => $name, 'level' => $level]);
+        foreach ([
+            'Low' => ['level' => 1, 'sla_hours' => 120],
+            'Medium' => ['level' => 2, 'sla_hours' => 72],
+            'High' => ['level' => 3, 'sla_hours' => 24],
+            'Critical' => ['level' => 4, 'sla_hours' => 8],
+        ] as $name => $attributes) {
+            ComplaintPriority::create(['name' => $name, ...$attributes]);
         }
 
         foreach (['Pond', 'Road', 'Sanitation', 'Water_Supply', 'Building', 'Other'] as $name) {
