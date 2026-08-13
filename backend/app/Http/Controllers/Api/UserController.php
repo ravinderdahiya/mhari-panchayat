@@ -57,6 +57,7 @@ class UserController extends Controller
             'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
             'department_ids' => ['sometimes', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
+            'district_id' => ['sometimes', 'nullable', 'exists:districts,id'],
             'village_ids' => ['sometimes', 'array'],
             'village_ids.*' => ['integer', 'exists:villages,id'],
             'is_active' => ['sometimes', 'boolean'],

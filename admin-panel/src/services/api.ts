@@ -194,6 +194,7 @@ export const updateUser = (
     role?: string;
     department_id?: number | null;
     department_ids?: number[];
+    district_id?: number | null;
     village_ids?: number[];
     is_active?: boolean;
   },

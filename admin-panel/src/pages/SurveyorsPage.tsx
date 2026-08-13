@@ -297,7 +297,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
           : [];
     setEditDepartmentIds(ids);
     setEditVillageIds((selected.villages || []).map((v) => v.id));
-    setVillageDistrictFilter('');
+    setVillageDistrictFilter(selected.district_id ?? '');
     setVillageTehsilFilter('');
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -329,7 +329,10 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setIsSavingVillages(true);
     setError('');
     try {
-      const { user } = await api.updateUser(selected.id, { village_ids: editVillageIds });
+      const { user } = await api.updateUser(selected.id, {
+        village_ids: editVillageIds,
+        district_id: villageDistrictFilter || null,
+      });
       setSurveyors((prev) => prev.map((s) => (s.id === selected.id ? { ...s, ...user } : s)));
       setShowVillageSavedPopup(true);
     } catch (err) {
