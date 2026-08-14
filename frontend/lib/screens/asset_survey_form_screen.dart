@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/survey.dart';
 import '../services/auth_service.dart';
+import '../services/fake_location_detector.dart';
 import '../services/location_api.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
@@ -156,6 +157,13 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
           timeLimit: Duration(seconds: 15),
         ),
       );
+
+      if (await FakeLocationDetector.isFakeLocation()) {
+        _showMessage(
+          'फर्जी (मॉक) लोकेशन का पता चला। कृपया लोकेशन स्पूफिंग ऐप बंद करें और वास्तविक GPS लोकेशन का उपयोग करें।',
+        );
+        return;
+      }
 
       String? detectedVillage;
       String? detectedPanchayat;

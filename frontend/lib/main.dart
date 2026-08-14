@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app.dart';
+import 'screens/developer_mode_blocked_screen.dart';
+import 'services/device_security_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (await DeviceSecurityService.isDeveloperModeEnabled()) {
+    runApp(const DeveloperModeBlockedScreen());
+    return;
+  }
 
   // Warm fonts off the critical path so first GoogleFonts.* calls
   // don't block the UI thread (common ANR cause on Android).

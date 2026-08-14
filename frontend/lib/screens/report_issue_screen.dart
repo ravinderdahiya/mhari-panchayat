@@ -12,6 +12,7 @@ import '../models/survey_department.dart';
 import '../services/asset_type_api.dart';
 import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
+import '../services/fake_location_detector.dart';
 import '../services/location_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/photo_stamp.dart';
@@ -329,6 +330,13 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           timeLimit: Duration(seconds: 20),
         ),
       );
+
+      if (await FakeLocationDetector.isFakeLocation()) {
+        throw const _LocationFailure(
+          'Fake/mock location detected. Turn off any location-spoofing app and use your real GPS location to file a complaint.',
+        );
+      }
+
       _lastPosition = position;
       if (!mounted) return;
 

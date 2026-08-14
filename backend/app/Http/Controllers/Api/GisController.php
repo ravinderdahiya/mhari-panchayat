@@ -17,9 +17,9 @@ class GisController extends Controller
     // ArcGIS Enterprise portal (hsac.org.in) from the one below - see the
     // 'hsac_eodb' service config for its own account and token endpoint.
     //private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
-    private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
+    private const PANCHAYAT_MAPSERVER_URL = 'https://gis.harsac.in/server/rest/services/Panchayat/MapServer';
 
-    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Waterlog/waterlogapp/FeatureServer';
+    private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Panchayat/MapServer';
 
     /**
      * Reverse proxy for the (currently EODB_HR24, test) boundary MapServer.
@@ -30,7 +30,7 @@ class GisController extends Controller
      */
     public function proxyPanchayat(Request $request, string $path = ''): Response
     {
-        return $this->proxy($request, self::PANCHAYAT_MAPSERVER_URL, 'hsac_eodb', $path);
+        return $this->proxy($request, self::PANCHAYAT_MAPSERVER_URL, 'harsac_gis', $path);
     }
 
     /**
