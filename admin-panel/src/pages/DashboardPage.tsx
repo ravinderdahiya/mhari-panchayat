@@ -12,7 +12,7 @@ import { dotSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Clock, Wrench } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench } from 'lucide-react';
 import * as api from '../services/api';
 import type { Complaint, ComplaintReports, ComplaintStatus } from '../types';
 
@@ -66,7 +66,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
 
   const heroStats = reports ? [
     { label: 'Total Complaints', value: reports.total, icon: ListChecks, filter: 'All' as const },
-    { label: 'Pending', value: reports.pending, icon: Clock, filter: 'Pending' as const },
+    { label: 'Pending', value: reports.pending, icon: Hourglass, filter: 'Pending' as const },
     { label: 'In Progress', value: reports.inProgress, icon: Wrench, filter: 'In_Progress' as const },
   ] : [];
 
@@ -126,6 +126,10 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   // was tried and reverted: it broke the geometry engine's WASM module load
   // under this project's Vite base-path setup. Switch back to the vector
   // layer only if HARSAC republishes it in Web Mercator.
+  // This service only has 2 layers - dist_bn (district boundary, id 0) and
+  // panchayat_bnd (panchayat boundary, id 1) - both wanted, so no sublayers
+  // filter needed. Each already has its own minScale set server-side, so
+  // they fade in/out correctly as you zoom without client-side scale logic.
   const boundaryLayerRef = useRef<MapImageLayer | null>(null);
   useEffect(() => {
     if (!view?.map) return undefined;
