@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'asset_code', 'surveyor_id', 'department_id', 'asset_type_id', 'asset_name',
     'district', 'panchayat', 'village', 'latitude', 'longitude', 'condition',
     'description', 'survey_date', 'photo_paths',
+    'review_status', 'reviewed_by_id', 'reviewed_at', 'rejection_reason',
 ])]
 class AssetSurvey extends Model
 {
@@ -20,6 +21,7 @@ class AssetSurvey extends Model
             'longitude' => 'float',
             'survey_date' => 'datetime',
             'photo_paths' => 'array',
+            'reviewed_at' => 'datetime',
         ];
     }
 
@@ -36,5 +38,10 @@ class AssetSurvey extends Model
     public function assetType(): BelongsTo
     {
         return $this->belongsTo(AssetType::class);
+    }
+
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_id');
     }
 }

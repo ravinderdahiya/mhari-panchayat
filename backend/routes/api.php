@@ -62,6 +62,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/surveys', [AssetSurveyController::class, 'store']);
     Route::get('/surveys/{id}', [AssetSurveyController::class, 'show']);
     Route::put('/surveys/{id}', [AssetSurveyController::class, 'update']);
+    Route::post('/surveys/{id}/approve', [AssetSurveyController::class, 'approve']);
+    Route::post('/surveys/{id}/reject', [AssetSurveyController::class, 'reject']);
 
     // Master data - read is gated by the master_data.view permission (every
     // role has it by default - dropdowns need it everywhere), write by
