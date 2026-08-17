@@ -110,7 +110,10 @@ export interface Complaint {
   updated_at: string;
   user: { id: number; name: string | null; username: string } | null;
   assigned_to: { id: number; name: string | null; username: string; role: string } | null;
-  timeline: TimelineEntry[];
+  // Only present from GET /api/complaints/:id (ComplaintController::WITH) -
+  // the list endpoint (LIST_WITH) omits it for performance, so callers using
+  // api.getComplaints() must treat this as absent, not an empty array.
+  timeline?: TimelineEntry[];
   transfers: TransferEntry[];
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, ExternalLink, ShieldCheck, Check, X, Trash2, ChevronLeft, ChevronRight, Eye, RefreshCw } from 'lucide-react';
 import * as api from '../services/api';
-import type { AdminUser, Complaint, ComplaintStatus, Department, District, Tehsil, Village } from '../types';
+import type { AdminUser, Complaint, ComplaintStatus, Department, District, Tehsil, TimelineEntry, Village } from '../types';
 
 const REGISTRATION_BADGE: Record<string, string> = {
   pending_email: 'bg-accent/10 text-accent-dark border-accent/25',
@@ -70,9 +70,12 @@ function hoursBetween(a: string, b: string): number {
 
 // Average turnaround = hours from the complaint's first "Acknowledged" event
 // to its first "Resolved" event, averaged across a surveyor's resolved work.
-function turnaroundHours(c: Complaint): number | null {
-  const ack = c.timeline.find((t) => t.status === 'Acknowledged' && t.created_at);
-  const resolved = c.timeline.find((t) => t.status === 'Resolved' && t.created_at);
+// Takes the resolved timeline array directly (not the complaint) because the
+// list endpoint this page's `complaints` come from omits `timeline` for
+// performance - callers must resolve it via `timelineFor` first.
+function turnaroundHours(timeline: TimelineEntry[]): number | null {
+  const ack = timeline.find((t) => t.status === 'Acknowledged' && t.created_at);
+  const resolved = timeline.find((t) => t.status === 'Resolved' && t.created_at);
   if (!ack?.created_at || !resolved?.created_at) return null;
   const h = hoursBetween(ack.created_at, resolved.created_at);
   return h >= 0 ? h : null;
@@ -165,6 +168,11 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   const [villageMasterLoaded, setVillageMasterLoaded] = useState(false);
   const [isLoadingVillageMaster, setIsLoadingVillageMaster] = useState(false);
 
+  // The list endpoint `complaints` comes from omits `timeline` for
+  // performance (see ComplaintController::LIST_WITH) - backfilled per
+  // complaint, on demand, only for whichever surveyor's modal is open.
+  const [timelineByComplaintId, setTimelineByComplaintId] = useState<Record<number, TimelineEntry[]>>({});
+
   const load = async () => {
     setIsLoading(true);
     try {
@@ -215,6 +223,28 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
 
   const tasksFor = (surveyorId: number) => complaints.filter((c) => c.assigned_to_id === surveyorId);
 
+  const timelineFor = (c: Complaint): TimelineEntry[] => c.timeline ?? timelineByComplaintId[c.id] ?? [];
+
+  // Fetch full detail (with timeline) for whichever surveyor's modal is open,
+  // for just their tasks - not the whole complaints list, which is what made
+  // the list endpoint drop `timeline` in the first place.
+  useEffect(() => {
+    if (!selectedId) return;
+    const missingIds = tasksFor(selectedId)
+      .filter((c) => c.timeline === undefined && timelineByComplaintId[c.id] === undefined)
+      .map((c) => c.id);
+    if (missingIds.length === 0) return;
+
+    Promise.all(missingIds.map((id) => api.getComplaint(id).then(({ complaint }) => [id, complaint.timeline ?? []] as const)))
+      .then((entries) => {
+        setTimelineByComplaintId((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      })
+      .catch(() => {
+        // Best-effort - turnaround/timestamps just stay blank for these tasks
+        // rather than blocking the rest of the modal.
+      });
+  }, [selectedId, complaints]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filteredSurveyors = useMemo(() => {
     const q = search.trim().toLowerCase();
     return surveyors.filter((s) => {
@@ -251,7 +281,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   const completedTasks = selectedTasks
     .filter((c) => !!c.verified_at)
     .sort((a, b) => new Date(b.verified_at!).getTime() - new Date(a.verified_at!).getTime());
-  const turnarounds = resolvedTasks.map(turnaroundHours).filter((h): h is number => h !== null);
+  const turnarounds = resolvedTasks.map((c) => turnaroundHours(timelineFor(c))).filter((h): h is number => h !== null);
   const avgTurnaround = turnarounds.length ? Math.round(turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length) : null;
 
   // Open complaints not already assigned to the selected surveyor - candidates
@@ -1022,8 +1052,8 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
               <div className="space-y-3.5 mb-6">
                 {assignedTasks.map((c) => {
                   const s = stepStates(c);
-                  const ack = c.timeline.find((t) => t.status === 'Acknowledged')?.created_at;
-                  const resolvedAt = c.timeline.find((t) => t.status === 'Resolved')?.created_at;
+                  const ack = timelineFor(c).find((t) => t.status === 'Acknowledged')?.created_at;
+                  const resolvedAt = timelineFor(c).find((t) => t.status === 'Resolved')?.created_at;
                   return (
                     <div key={c.id} className="border border-line rounded-xl overflow-hidden">
                       <div className="flex justify-between items-center px-4 py-3.5 border-b border-line">
