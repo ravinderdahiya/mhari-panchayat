@@ -287,6 +287,10 @@ export interface AssetSurvey {
   } | null;
   department: { id: number; name: string; code: string | null } | null;
   assetType: { id: number; name: string; iconKey: string | null } | null;
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -304,4 +308,5 @@ export interface AssetSurveyStats {
   totalSurveys: number;
   activeSurveyors: number;
   poorDamaged: number;
+  statusCounts: { pending: number; approved: number; rejected: number };
 }

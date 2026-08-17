@@ -33,6 +33,7 @@ export default function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(!!api.getToken());
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [masterEntityKey, setMasterEntityKey] = useState('states');
+  const [assetSurveyChildId, setAssetSurveyChildId] = useState('pending-review');
   const [preAuthView, setPreAuthView] = useState<PreAuthView>('login');
   const [complaintsFilter, setComplaintsFilter] = useState<ComplaintStatus | 'All' | null>(null);
   const [complaintsInitialId, setComplaintsInitialId] = useState<number | null>(null);
@@ -44,6 +45,9 @@ export default function App() {
     }
     if (view === 'master' && childId) {
       setMasterEntityKey(childId);
+    }
+    if (view === 'asset-surveys' && childId) {
+      setAssetSurveyChildId(childId);
     }
     setActiveView(view);
   };
@@ -97,14 +101,14 @@ export default function App() {
 
   return (
     <Layout currentUser={currentUser} activeView={activeView}
-      activeChildId={activeView === 'master' ? masterEntityKey : null}
+      activeChildId={activeView === 'master' ? masterEntityKey : activeView === 'asset-surveys' ? assetSurveyChildId : null}
       onNavigate={handleNavigate} onLogout={handleLogout}>
       {activeView === 'dashboard' && <DashboardPage onNavigateToComplaints={goToComplaints} onNavigateToComplaint={goToComplaint} />}
       {activeView === 'master' && <MasterDataPage initialEntityKey={masterEntityKey} />}
       {activeView === 'complaints' && <ComplaintsPage currentUser={currentUser} initialStatus={complaintsFilter} initialComplaintId={complaintsInitialId} />}
       {activeView === 'my-surveys' && <MySurveysPage currentUser={currentUser} onNavigateToComplaint={goToComplaint} />}
       {activeView === 'surveyors' && <SurveyorsPage onNavigateToComplaint={goToComplaint} />}
-      {activeView === 'asset-surveys' && <AssetSurveysPage />}
+      {activeView === 'asset-surveys' && <AssetSurveysPage childId={assetSurveyChildId} />}
       {activeView === 'asset-types' && <AssetTypesPage />}
       {activeView === 'village-assets' && <VillageAssetsPage />}
       {activeView === 'roles' && <RolesPage />}

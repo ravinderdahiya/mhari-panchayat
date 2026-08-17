@@ -17,7 +17,10 @@ class AssetSurveyController extends Controller
         'surveyor:id,name,username,email,mobile,employee_id,role',
         'department:id,name,code',
         'assetType:id,name,icon_key',
+        'reviewedBy:id,name,username',
     ];
+
+    private const REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
 
     public function options(): JsonResponse
     {
@@ -143,6 +146,10 @@ class AssetSurveyController extends Controller
                 'name' => $survey->assetType->name,
                 'iconKey' => $survey->assetType->icon_key,
             ] : null,
+            'reviewStatus' => $survey->review_status,
+            'reviewedByName' => $survey->reviewedBy?->name ?: $survey->reviewedBy?->username,
+            'reviewedAt' => $survey->reviewed_at?->toISOString(),
+            'rejectionReason' => $survey->rejection_reason,
             'createdAt' => $survey->created_at?->toISOString(),
             'updatedAt' => $survey->updated_at?->toISOString(),
         ];
@@ -178,6 +185,13 @@ class AssetSurveyController extends Controller
             'totalSurveys' => (clone $statsQuery)->count(),
             'activeSurveyors' => (clone $statsQuery)->distinct()->count('surveyor_id'),
             'poorDamaged' => (clone $statsQuery)->whereIn('condition', ['POOR', 'DAMAGED'])->count(),
+            // Unfiltered by review_status so all three tab counts show
+            // simultaneously, regardless of which tab is currently open.
+            'statusCounts' => [
+                'pending' => (clone $statsQuery)->where('review_status', 'pending')->count(),
+                'approved' => (clone $statsQuery)->where('review_status', 'approved')->count(),
+                'rejected' => (clone $statsQuery)->where('review_status', 'rejected')->count(),
+            ],
         ];
 
         $search = trim((string) $request->query('q', ''));
@@ -202,6 +216,11 @@ class AssetSurveyController extends Controller
         $condition = strtoupper((string) $request->query('condition', ''));
         if (in_array($condition, ['GOOD', 'FAIR', 'POOR', 'DAMAGED'], true)) {
             $query->where('condition', $condition);
+        }
+
+        $reviewStatus = strtolower((string) $request->query('review_status', ''));
+        if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
+            $query->where('review_status', $reviewStatus);
         }
 
         $perPage = max(5, min(100, $request->integer('per_page', 10)));
@@ -312,5 +331,53 @@ class AssetSurveyController extends Controller
             'message' => 'Survey updated successfully.',
             'survey' => $this->mapSurvey($request, $survey->fresh()),
         ]);
+    }
+
+    public function approve(Request $request, int $id): JsonResponse
+    {
+        $this->ensureReviewer($request);
+        $survey = AssetSurvey::findOrFail($id);
+
+        $survey->update([
+            'review_status' => 'approved',
+            'reviewed_by_id' => $request->user()->id,
+            'reviewed_at' => now(),
+            'rejection_reason' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey approved.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    public function reject(Request $request, int $id): JsonResponse
+    {
+        $this->ensureReviewer($request);
+        $survey = AssetSurvey::findOrFail($id);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
+
+        $survey->update([
+            'review_status' => 'rejected',
+            'reviewed_by_id' => $request->user()->id,
+            'reviewed_at' => now(),
+            'rejection_reason' => $data['reason'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey rejected.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // Reviewing is a super_admin-only action, mirroring the sidebar's own
+    // adminOnly gate on the Asset Surveys page (Layout.tsx ADMIN_ROLES).
+    private function ensureReviewer(Request $request): void
+    {
+        if ($request->user()->role !== 'super_admin') {
+            abort(403, 'Only admins can review asset surveys.');
+        }
     }
 }

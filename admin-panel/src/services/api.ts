@@ -299,6 +299,7 @@ export const getAssetSurveys = (options: {
   perPage?: number;
   query?: string;
   condition?: string;
+  reviewStatus?: 'pending' | 'approved' | 'rejected';
 } = {}) => {
   const params = new URLSearchParams({
     paginated: '1',
@@ -307,6 +308,7 @@ export const getAssetSurveys = (options: {
   });
   if (options.query?.trim()) params.set('q', options.query.trim());
   if (options.condition && options.condition !== 'ALL') params.set('condition', options.condition);
+  if (options.reviewStatus) params.set('review_status', options.reviewStatus);
 
   return request<{
     success: boolean;
@@ -315,6 +317,12 @@ export const getAssetSurveys = (options: {
     stats: import('../types').AssetSurveyStats;
   }>(`/api/surveys?${params.toString()}`);
 };
+
+export const approveAssetSurvey = (id: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/approve`, 'POST');
+
+export const rejectAssetSurvey = (id: string, reason: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/reject`, 'POST', { reason });
 
 export const getAssetSurvey = (id: string) =>
   request<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}`);
