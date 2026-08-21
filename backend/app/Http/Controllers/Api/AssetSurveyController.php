@@ -372,6 +372,19 @@ class AssetSurveyController extends Controller
         ]);
     }
 
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $this->ensureReviewer($request);
+        $survey = AssetSurvey::findOrFail($id);
+
+        foreach ($survey->photo_paths ?? [] as $path) {
+            Storage::disk('public')->delete($path);
+        }
+        $survey->delete();
+
+        return response()->json(['success' => true, 'message' => 'Survey deleted.']);
+    }
+
     // Reviewing is a super_admin-only action, mirroring the sidebar's own
     // adminOnly gate on the Asset Surveys page (Layout.tsx ADMIN_ROLES).
     private function ensureReviewer(Request $request): void

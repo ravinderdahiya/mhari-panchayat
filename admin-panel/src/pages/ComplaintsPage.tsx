@@ -667,7 +667,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     className="w-48 text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     <option value="">Transfer to…</option>
-                    {assignableUsers.map((u) => (
+                    {assignableUsers.filter((u) => u.role !== 'super_admin').map((u) => (
                       <option key={u.id} value={u.id}>{u.name || u.username} · {u.role.replace(/_/g, ' ')}</option>
                     ))}
                   </select>
