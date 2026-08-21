@@ -326,3 +326,6 @@ export const rejectAssetSurvey = (id: string, reason: string) =>
 
 export const getAssetSurvey = (id: string) =>
   request<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}`);
+
+export const deleteAssetSurvey = (id: string) =>
+  jsonRequest<{ success: boolean }>(`/api/surveys/${id}`, 'DELETE');

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, MapPin, Search, ShieldAlert, UserRound, X } from 'lucide-react';
+import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, MapPin, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
 import * as api from '../services/api';
 import type { AssetSurvey, AssetSurveyPagination, AssetSurveyStats } from '../types';
 
@@ -132,6 +132,22 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
     }
   };
 
+  const handleDelete = async (survey: AssetSurvey) => {
+    if (!confirm(`Delete survey for "${survey.assetName}"? This cannot be undone.`)) return;
+    setActioningId(survey.id);
+    setActionError('');
+    try {
+      await api.deleteAssetSurvey(survey.id);
+      setSurveys((prev) => prev.filter((s) => s.id !== survey.id));
+      setSelected(null);
+      setRefreshTick((t) => t + 1);
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   const handleReject = async (survey: AssetSurvey, reason: string) => {
     if (!reason.trim()) return;
     setActioningId(survey.id);
@@ -223,6 +239,10 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
                         </button>
                       </>
                     )}
+                    <button disabled={actioningId === survey.id} onClick={() => handleDelete(survey)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline disabled:opacity-50 cursor-pointer">
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -283,6 +303,7 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
           onClose={() => setSelected(null)}
           onApprove={() => handleApprove(selected)}
           onReject={(reason) => handleReject(selected, reason)}
+          onDelete={() => handleDelete(selected)}
           isActioning={actioningId === selected.id}
         />
       )}
@@ -297,11 +318,12 @@ function Stat({ label, value, icon }: { label: string; value: number; icon: Reac
   </div>;
 }
 
-function SurveyDetails({ survey, onClose, onApprove, onReject, isActioning }: {
+function SurveyDetails({ survey, onClose, onApprove, onReject, onDelete, isActioning }: {
   survey: AssetSurvey;
   onClose: () => void;
   onApprove: () => void;
   onReject: (reason: string) => void;
+  onDelete: () => void;
   isActioning: boolean;
 }) {
   const [showReject, setShowReject] = useState(false);
@@ -317,7 +339,13 @@ function SurveyDetails({ survey, onClose, onApprove, onReject, isActioning }: {
           </div>
           <p className="font-mono text-[10px] text-muted">{survey.assetId}</p>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-cream cursor-pointer"><X className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1.5">
+          <button disabled={isActioning} onClick={onDelete}
+            className="flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline disabled:opacity-50 cursor-pointer px-1.5">
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-cream cursor-pointer"><X className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="p-5 space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
