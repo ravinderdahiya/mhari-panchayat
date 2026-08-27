@@ -21,7 +21,7 @@ export interface AssignableUser {
 export const ALL_ROLES = [
   'super_admin', 'state_admin', 'district_admin', 'block_admin',
   'department_head', 'department_officer', 'engineer', 'sarpanch',
-  'secretary', 'citizen', 'contractor', 'vendor',
+  'secretary', 'citizen', 'contractor', 'vendor', 'deputy_commissioner',
 ] as const;
 
 export type ComplaintStatus =
@@ -48,6 +48,7 @@ export interface ComplaintCategory extends NamedEntity {
   parent?: ComplaintCategory | null;
   district_id?: number | null;
   district?: District | null;
+  resolver_role?: string | null;
 }
 export interface ComplaintPriority extends NamedEntity { level: number }
 
@@ -175,7 +176,13 @@ export interface AdminUser {
   villages?: Village[];
   district_id: number | null;
   district: District | null;
+  block_id: number | null;
+  block: NamedEntity | null;
+  panchayat_id: number | null;
+  panchayat: NamedEntity | null;
   employee_id: string | null;
+  member_id: string | null;
+  family_id: string | null;
   mobile: string | null;
   created_at: string;
   registration_status:

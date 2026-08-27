@@ -40,6 +40,7 @@ class MasterDataController extends Controller
     private const ROLES = [
         'super_admin', 'state_admin', 'district_admin', 'block_admin', 'department_head',
         'department_officer', 'engineer', 'sarpanch', 'secretary', 'citizen', 'contractor', 'vendor',
+        'deputy_commissioner',
     ];
 
     private const COMPLAINT_STATUSES = [

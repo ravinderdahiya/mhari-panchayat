@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'name', 'name_hi', 'code', 'sort_order', 'parent_id', 'district_id',
     'department_id', 'asset_type_id', 'default_priority_id', 'is_active',
+    'resolver_role',
 ])]
 class ComplaintCategory extends Model
 {

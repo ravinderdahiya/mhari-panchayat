@@ -16,7 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
     'username', 'name', 'email', 'password', 'role', 'is_active', 'department_id',
-    'district_id', 'employee_id', 'mobile', 'registration_status',
+    'district_id', 'block_id', 'panchayat_id', 'employee_id', 'member_id', 'family_id', 'mobile', 'registration_status',
     'email_verified_at', 'phone_verified_at',
     'email_verification_token', 'email_verification_expires_at',
     'set_password_token', 'set_password_token_expires_at',
@@ -81,6 +81,22 @@ class User extends Authenticatable
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);
+    }
+
+    public function block(): BelongsTo
+    {
+        return $this->belongsTo(Block::class);
+    }
+
+    /** Multi-block coverage (a BDPO holding "additional charge" of other blocks). */
+    public function blocks(): BelongsToMany
+    {
+        return $this->belongsToMany(Block::class, 'user_blocks')->withTimestamps();
+    }
+
+    public function panchayat(): BelongsTo
+    {
+        return $this->belongsTo(Panchayat::class);
     }
 
     public function reviewedBy(): BelongsTo

@@ -11,6 +11,26 @@ use Illuminate\Support\Str;
 
 class ComplaintMasterSeeder extends Seeder
 {
+    // Which role resolves a Panchayati Raj (PR) category, mirroring the
+    // Gram Panchayat -> Panchayat Samiti -> technical-wing escalation tiers:
+    // secretary = Gram Sachiv, block_admin = EOP (Panchayat Samiti),
+    // engineer = Executive Engineer. Every non-PR department routes to
+    // deputy_commissioner instead (see resolverRoleFor()).
+    private const PR_RESOLVER_ROLES = [
+        'Drainage Blocked / Overflow' => 'secretary',
+        'Drainage Not Constructed' => 'block_admin',
+        'Building Maintenance' => 'engineer',
+        'Encroachment' => 'block_admin',
+        'Ground Maintenance' => 'secretary',
+    ];
+
+    private function resolverRoleFor(string $departmentCode, string $categoryName): string
+    {
+        return $departmentCode === 'PR'
+            ? (self::PR_RESOLVER_ROLES[$categoryName] ?? 'block_admin')
+            : 'deputy_commissioner';
+    }
+
     public function run(): void
     {
         $priorities = collect([
@@ -95,6 +115,7 @@ class ComplaintMasterSeeder extends Seeder
                         'parent_id' => null,
                         'district_id' => null,
                         'default_priority_id' => $priorities[$priorityKey]->id,
+                        'resolver_role' => $this->resolverRoleFor($code, $categoryName),
                     ])->save();
                 }
             }

@@ -208,6 +208,57 @@ class ComplaintController extends Controller
         ComplaintTimelineEvent::create(['complaint_id' => $complaint->id, 'created_at' => now(), ...$data]);
     }
 
+    // Mirrors the CEO-triage flowchart: a category's resolver_role already
+    // encodes which Panchayati Raj tier (or deputy_commissioner, for every
+    // other department) handles it - this finds an active user holding that
+    // role, narrowing by jurisdiction as tightly as the data allows: exact
+    // panchayat (CPLO/Gram Sachiv, from database/data/haryana_officials.json)
+    // or block (BDPO) match first, then the user_villages coverage list,
+    // then district, then any match of that role at all.
+    private function findResolver(?string $role, ?int $districtId, ?int $blockId, ?int $panchayatId, ?int $villageId): ?User
+    {
+        if (! $role) {
+            return null;
+        }
+
+        $query = User::where('role', $role)->where('is_active', true);
+
+        if ($panchayatId && in_array($role, ['secretary', 'sarpanch'], true)) {
+            $panchayatMatch = (clone $query)->where('panchayat_id', $panchayatId)->first();
+            if ($panchayatMatch) {
+                return $panchayatMatch;
+            }
+        }
+
+        if ($blockId && $role === 'block_admin') {
+            $blockMatch = (clone $query)
+                ->where(function ($q) use ($blockId) {
+                    $q->where('block_id', $blockId)
+                        ->orWhereHas('blocks', fn ($bq) => $bq->where('blocks.id', $blockId));
+                })
+                ->first();
+            if ($blockMatch) {
+                return $blockMatch;
+            }
+        }
+
+        if ($villageId && in_array($role, ['secretary', 'sarpanch'], true)) {
+            $villageMatch = (clone $query)->whereHas('villages', fn ($q) => $q->where('villages.id', $villageId))->first();
+            if ($villageMatch) {
+                return $villageMatch;
+            }
+        }
+
+        if ($districtId) {
+            $districtMatch = (clone $query)->where('district_id', $districtId)->first();
+            if ($districtMatch) {
+                return $districtMatch;
+            }
+        }
+
+        return $query->first();
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -341,12 +392,24 @@ class ComplaintController extends Controller
                 ->value('id');
         }
 
+        $resolverRole = ! empty($data['category_id'])
+            ? ComplaintCategory::find($data['category_id'])?->resolver_role
+            : null;
+        $autoAssignee = $this->findResolver(
+            $resolverRole,
+            $data['district_id'] ?? null,
+            $village?->panchayat?->block_id,
+            $village?->panchayat_id,
+            $village?->id,
+        );
+
         $complaint = Complaint::create([
             'user_id' => $request->user()->id,
             'category_id' => $data['category_id'] ?? null,
             'priority_id' => $data['priority_id'],
             'department_id' => $data['department_id'],
             'asset_type_id' => $data['asset_type_id'],
+            'assigned_to_id' => $autoAssignee?->id,
             'district_id' => $data['district_id'] ?? null,
             'tehsil_id' => $tehsil?->id,
             'village_id' => $village?->id,
@@ -383,6 +446,15 @@ class ComplaintController extends Controller
                 'status' => 'Pending',
                 'title' => 'Flagged as a Possible Repeat',
                 'description' => "Flagged as a possible repeat of complaint #{$duplicateOfId}",
+                'performed_by_id' => $request->user()->id,
+            ]);
+        }
+
+        if ($autoAssignee) {
+            $this->addTimelineEvent($complaint, [
+                'status' => 'Pending',
+                'title' => 'Auto-routed',
+                'description' => "Automatically routed to {$autoAssignee->username} ({$autoAssignee->role})",
                 'performed_by_id' => $request->user()->id,
             ]);
         }
