@@ -4,20 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\RolePermission;
 use Illuminate\Http\Request;
 
 class RolePermissionController extends Controller
 {
-    private const ALL_ROLES = [
-        'super_admin', 'state_admin', 'district_admin', 'block_admin', 'department_head',
-        'department_officer', 'engineer', 'sarpanch', 'secretary', 'citizen', 'contractor', 'vendor',
-        'deputy_commissioner',
-    ];
-
     public function index()
     {
         $permissions = Permission::orderBy('group')->orderBy('label')->get(['key', 'label', 'group']);
+        $roles = Role::names();
 
         $matrix = RolePermission::with('permission:id,key')
             ->get()
@@ -25,7 +21,7 @@ class RolePermissionController extends Controller
             ->map(fn ($rows) => $rows->pluck('permission.key')->values());
 
         // Every role appears in the matrix even with zero permissions granted.
-        foreach (self::ALL_ROLES as $role) {
+        foreach ($roles as $role) {
             if (! isset($matrix[$role])) {
                 $matrix[$role] = collect();
             }
@@ -33,7 +29,7 @@ class RolePermissionController extends Controller
 
         return response()->json([
             'success' => true,
-            'roles' => self::ALL_ROLES,
+            'roles' => $roles,
             'permissions' => $permissions,
             'matrix' => $matrix,
         ]);
@@ -41,7 +37,7 @@ class RolePermissionController extends Controller
 
     public function update(Request $request, string $role)
     {
-        if (! in_array($role, self::ALL_ROLES, true)) {
+        if (! in_array($role, Role::names(), true)) {
             return response()->json(['success' => false, 'message' => "Unknown role \"{$role}\""], 400);
         }
 

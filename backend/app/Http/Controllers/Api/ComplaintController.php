@@ -153,7 +153,7 @@ class ComplaintController extends Controller
     public function mobileReports(Request $request)
     {
         $query = Complaint::query()->with(['category:id,name', 'timeline']);
-        if (! in_array($request->user()->role, ['super_admin', 'state_admin', 'district_admin'], true)) {
+        if (! $request->user()->isSuperAdmin() && ! in_array($request->user()->role, ['state_admin', 'ddpo'], true)) {
             $query->where('assigned_to_id', $request->user()->id);
         }
         $complaints = $query->get();
@@ -230,7 +230,7 @@ class ComplaintController extends Controller
             }
         }
 
-        if ($blockId && $role === 'block_admin') {
+        if ($blockId && $role === 'bdpo') {
             $blockMatch = (clone $query)
                 ->where(function ($q) use ($blockId) {
                     $q->where('block_id', $blockId)

@@ -37,7 +37,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Registered successfully',
             'token' => $token,
-            'user' => $user,
+            'user' => $user->toAuthArray(),
         ], 201);
     }
 
@@ -273,7 +273,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'OTP verified. Login successful.',
             'token' => $token,
-            'user' => $user,
+            'user' => $user->toAuthArray(),
         ]);
     }
 
@@ -317,7 +317,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login successful',
             'token' => $token,
-            'user' => $user,
+            'user' => $user->toAuthArray(),
         ]);
     }
 
@@ -325,7 +325,7 @@ class AuthController extends Controller
     {
         $user = $request->user()->load(['department', 'departments', 'district']);
 
-        return response()->json(['success' => true, 'user' => $user]);
+        return response()->json(['success' => true, 'user' => $user->toAuthArray()]);
     }
 
     public function changePassword(Request $request)

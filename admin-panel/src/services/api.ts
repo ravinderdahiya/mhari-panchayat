@@ -163,7 +163,30 @@ export const updateRolePermissions = (role: string, permissions: string[]) =>
   jsonRequest<{ success: boolean; message: string; permissions: string[] }>(`/api/roles/${role}/permissions`, 'PUT', { permissions });
 
 // --- USERS (admin management) ---
-export const getUsers = () => request<{ success: boolean; users: AdminUser[] }>('/api/users');
+// With no options, returns the full non-citizen user list (used by pages
+// like Surveyors that need everything client-side). Pass `page` to switch
+// to server-side pagination + filtering (used by the Users page).
+export const getUsers = (options: {
+  page?: number;
+  perPage?: number;
+  q?: string;
+  role?: string;
+  districtId?: number;
+  status?: 'all' | 'active' | 'inactive';
+} = {}) => {
+  const params = new URLSearchParams();
+  if (options.page) params.set('page', String(options.page));
+  if (options.perPage) params.set('per_page', String(options.perPage));
+  if (options.q?.trim()) params.set('q', options.q.trim());
+  if (options.role && options.role !== 'All') params.set('role', options.role);
+  if (options.districtId) params.set('district_id', String(options.districtId));
+  if (options.status && options.status !== 'all') params.set('status', options.status);
+  const qs = params.toString();
+
+  return request<{ success: boolean; users: AdminUser[]; pagination?: MasterPagination }>(
+    `/api/users${qs ? `?${qs}` : ''}`,
+  );
+};
 export const getCitizens = (options: {
   page?: number;
   perPage?: number;
@@ -195,6 +218,7 @@ export const updateUser = (
     department_id?: number | null;
     department_ids?: number[];
     district_id?: number | null;
+    panchayat_id?: number | null;
     village_ids?: number[];
     is_active?: boolean;
   },
@@ -216,7 +240,7 @@ export const rejectRegistration = (id: number, reason: string) =>
   jsonRequest<{ success: boolean; message: string }>(`/api/registrations/${id}/reject`, 'PATCH', { reason });
 
 // Lighter-weight than getUsers() - open to any non-citizen staff role, not
-// just super_admin, so pickers like "assign to" / "transfer to" work for
+// just admin, so pickers like "assign to" / "transfer to" work for
 // sarpanch/secretary/etc too.
 export const getAssignableUsers = () => request<{ success: boolean; users: AssignableUser[] }>('/api/users/assignable');
 

@@ -54,6 +54,9 @@ class Survey {
     this.surveyedById,
     this.surveyedByName,
     required this.createdAt,
+    this.reviewStatus,
+    this.panchayatId,
+    this.rejectionReason,
   });
 
   final String id;
@@ -76,6 +79,9 @@ class Survey {
   final String? surveyedById;
   final String? surveyedByName;
   final DateTime createdAt;
+  final String? reviewStatus;
+  final int? panchayatId;
+  final String? rejectionReason;
 
   factory Survey.fromJson(Map<String, dynamic> json) {
     final photos = json['photoUrls'] as List<dynamic>? ?? const [];
@@ -106,6 +112,9 @@ class Survey {
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
+      reviewStatus: json['reviewStatus'] as String?,
+      panchayatId: (json['panchayatId'] as num?)?.toInt(),
+      rejectionReason: json['rejectionReason'] as String?,
     );
   }
 }

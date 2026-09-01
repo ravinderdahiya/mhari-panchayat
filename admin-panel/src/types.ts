@@ -7,6 +7,8 @@ export interface User {
   email: string | null;
   role: string;
   is_active: boolean;
+  is_super_admin?: boolean;
+  permissions?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -17,12 +19,6 @@ export interface AssignableUser {
   username: string;
   role: string;
 }
-
-export const ALL_ROLES = [
-  'super_admin', 'state_admin', 'district_admin', 'block_admin',
-  'department_head', 'department_officer', 'engineer', 'sarpanch',
-  'secretary', 'citizen', 'contractor', 'vendor', 'deputy_commissioner',
-] as const;
 
 export type ComplaintStatus =
   | 'Pending' | 'Acknowledged' | 'Surveyed' | 'In_Progress' | 'Resolved' | 'Rejected' | 'Closed' | 'Reopened';

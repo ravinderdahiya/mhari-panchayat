@@ -161,10 +161,13 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final result = await AuthApi.staffLogin(staffId, password);
       final roleKey = result.role.toLowerCase();
-      final serverRole = (roleKey == 'engineer' || roleKey == 'surveyor')
+      final serverRole =
+          (roleKey == 'engineer' || roleKey == 'surveyor')
           ? UserRole.survey
           : roleKey == 'citizen'
           ? UserRole.citizen
+          : roleKey == 'gram_sachiv'
+          ? UserRole.gramSachiv
           : UserRole.officer;
       await AuthService.saveLogin(
         role: serverRole,

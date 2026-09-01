@@ -103,4 +103,41 @@ class User extends Authenticatable
     {
         return $this->belongsTo(User::class, 'reviewed_by_id');
     }
+
+    public function isSuperAdmin(): bool
+    {
+        return Role::isSuperAdmin($this->role);
+    }
+
+    /** @return list<string> */
+    public function permissionKeys(): array
+    {
+        if ($this->isSuperAdmin()) {
+            return Permission::orderBy('key')->pluck('key')->all();
+        }
+
+        return RolePermission::query()
+            ->where('role', $this->role)
+            ->with('permission:id,key')
+            ->get()
+            ->pluck('permission.key')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        return $this->isSuperAdmin() || in_array($key, $this->permissionKeys(), true);
+    }
+
+    /** @return array<string, mixed> */
+    public function toAuthArray(): array
+    {
+        $data = $this->toArray();
+        $data['is_super_admin'] = $this->isSuperAdmin();
+        $data['permissions'] = $this->permissionKeys();
+
+        return $data;
+    }
 }

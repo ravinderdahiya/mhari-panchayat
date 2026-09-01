@@ -22,7 +22,7 @@ class AssetTypeController extends Controller
 
     private function isScopedRole(string $role): bool
     {
-        return in_array($role, ['engineer', 'department_officer', 'department_head'], true);
+        return in_array($role, ['surveyor', 'department_officer', 'department_head'], true);
     }
 
     private function mapAssetType(AssetType $type): array

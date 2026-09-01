@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'asset_code', 'surveyor_id', 'department_id', 'asset_type_id', 'asset_name',
+    'asset_code', 'surveyor_id', 'panchayat_id', 'department_id', 'asset_type_id', 'asset_name',
     'district', 'panchayat', 'village', 'latitude', 'longitude', 'condition',
     'description', 'survey_date', 'photo_paths',
     'review_status', 'reviewed_by_id', 'reviewed_at', 'rejection_reason',
@@ -33,6 +33,11 @@ class AssetSurvey extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function panchayat(): BelongsTo
+    {
+        return $this->belongsTo(Panchayat::class);
     }
 
     public function assetType(): BelongsTo

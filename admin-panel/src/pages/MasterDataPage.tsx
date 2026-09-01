@@ -10,9 +10,12 @@ import type { MasterPagination } from '../services/api';
 interface FieldConfig {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'select' | 'boolean' | 'textarea';
   optionsFrom?: string;
   required?: boolean;
+  wide?: boolean;
+  trueLabel?: string;
+  falseLabel?: string;
 }
 
 const STATUS_FIELD: FieldConfig = { key: 'is_active', label: 'Status', type: 'boolean' };
@@ -78,6 +81,13 @@ const GROUPS: EntityGroup[] = [
       { key: 'name', label: 'Name', type: 'text', required: true },
       STATUS_FIELD,
     ] },
+    { key: 'roles', label: 'Roles', icon: ShieldCheck, fields: [
+      { key: 'name', label: 'Role', type: 'text', required: true },
+      { key: 'full_name', label: 'Full Name', type: 'text', required: true, wide: true },
+      { key: 'main_responsibility', label: 'Main Responsibility', type: 'textarea', required: true, wide: true },
+      { key: 'is_super_admin', label: 'Super Admin', type: 'boolean', trueLabel: 'Yes', falseLabel: 'No' },
+      STATUS_FIELD,
+    ] },
   ] },
   { label: 'Complaint Setup', entities: [
     { key: 'complaint-categories', label: 'Complaint Categories', icon: Tags, fields: [
@@ -95,9 +105,6 @@ const GROUPS: EntityGroup[] = [
     ] },
   ] },
   { label: 'Reference (read-only)', entities: [
-    { key: 'roles', label: 'Roles', icon: ShieldCheck, readOnly: true, fields: [
-      { key: 'name', label: 'Name', type: 'text' },
-    ] },
     { key: 'complaint-statuses', label: 'Complaint Statuses', icon: ListChecks, readOnly: true, fields: [
       { key: 'name', label: 'Name', type: 'text' },
     ] },
@@ -130,7 +137,7 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
   );
   const active = ENTITIES.find((entity) => entity.key === activeKey)!;
   const ActiveIcon = active.icon;
-  const hasStatus = active.fields.some((field) => field.type === 'boolean');
+  const hasStatus = active.fields.some((field) => field.key === 'is_active');
 
   const [items, setItems] = useState<any[]>([]);
   const [pagination, setPagination] = useState<MasterPagination>(EMPTY_PAGINATION);
@@ -148,15 +155,21 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
   const [form, setForm] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
   const [modalAlert, setModalAlert] = useState<ModalAlert>(null);
+  const [pageAlert, setPageAlert] = useState<ModalAlert>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionSets, setOptionSets] = useState<Record<string, any[]>>({});
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     if (initialEntityKey && ENTITIES.some((entity) => entity.key === initialEntityKey)) {
       setActiveKey(initialEntityKey);
       setPage(1);
       setModalOpen(false);
+      setDeleteTarget(null);
+      setPageAlert(null);
       setSearchInput('');
       setSearch('');
       setStatusTab('All');
@@ -169,6 +182,12 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
   }, [searchInput]);
 
   useEffect(() => { setPage(1); }, [active.key, search, statusTab]);
+
+  useEffect(() => {
+    if (!pageAlert) return;
+    const timer = window.setTimeout(() => setPageAlert(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [pageAlert]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,7 +253,9 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
   const openAdd = () => {
     setEditingId(null);
     const defaults: Record<string, string> = {};
-    active.fields.filter((field) => field.type === 'boolean').forEach((field) => { defaults[field.key] = 'true'; });
+    active.fields.filter((field) => field.type === 'boolean').forEach((field) => {
+      defaults[field.key] = field.key === 'is_active' ? 'true' : 'false';
+    });
     setForm(defaults);
     setModalAlert(null);
     setModalOpen(true);
@@ -286,11 +307,15 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
     try {
       if (editingId) {
         await masterApi(active.key).update(editingId, data);
-        setModalAlert({ type: 'success', message: 'Entry updated successfully.' });
+        setModalOpen(false);
+        setForm({});
+        setEditingId(null);
+        setPageAlert({ type: 'success', message: `${form.name || 'Entry'} updated successfully.` });
       } else {
         await masterApi(active.key).create(data);
+        setModalOpen(false);
         setForm({});
-        setModalAlert({ type: 'success', message: 'Entry added successfully.' });
+        setPageAlert({ type: 'success', message: `${form.name || 'Entry'} added successfully.` });
       }
       setRefreshKey((current) => current + 1);
     } catch (error) {
@@ -300,15 +325,33 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
     }
   };
 
-  const remove = async (id: number) => {
-    if (!window.confirm('Delete this entry?')) return;
+  const openDelete = (item: any) => {
+    setDeleteTarget(item);
+    setDeleteError('');
     setPageError('');
+  };
+
+  const closeDelete = () => {
+    if (isDeleting) return;
+    setDeleteTarget(null);
+    setDeleteError('');
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget?.id) return;
+    setIsDeleting(true);
+    setDeleteError('');
     try {
-      await masterApi(active.key).remove(id);
+      await masterApi(active.key).remove(deleteTarget.id);
+      const deletedName = deleteTarget.name || 'Entry';
+      setDeleteTarget(null);
+      setPageAlert({ type: 'success', message: `${deletedName} deleted successfully.` });
       if (items.length === 1 && page > 1) setPage((current) => current - 1);
       else setRefreshKey((current) => current + 1);
     } catch (error) {
-      setPageError((error as Error).message);
+      setDeleteError((error as Error).message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -317,11 +360,31 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
       const parentField = field.key.replace(/_id$/, '');
       return item[parentField]?.name ?? item[field.key] ?? '—';
     }
-    return item[field.key] ?? '—';
+    const value = item[field.key];
+    if (value === null || value === undefined || value === '') return '—';
+    return value;
   };
 
   return (
     <div className="space-y-4">
+        {pageAlert && (
+          <div
+            role="alert"
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[90] w-[min(28rem,calc(100%-2rem))] flex items-start gap-2 rounded-xl border px-4 py-3 text-sm shadow-lg ${
+              pageAlert.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}
+          >
+            {pageAlert.type === 'success'
+              ? <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+              : <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />}
+            <span className="flex-1 font-semibold">{pageAlert.message}</span>
+            <button type="button" onClick={() => setPageAlert(null)} className="p-0.5 rounded text-current/70 hover:bg-black/5 cursor-pointer" aria-label="Dismiss">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <ActiveIcon className="w-4 h-4 text-accent-dark" />
@@ -389,7 +452,9 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
                     <th className="text-left p-3 w-16">S.No.</th>
-                    {active.fields.map((field) => <th key={field.key} className="text-left p-3">{field.label}</th>)}
+                    {active.fields.map((field) => (
+                      <th key={field.key} className={`text-left p-3 ${field.type === 'textarea' ? 'min-w-56' : ''}`}>{field.label}</th>
+                    ))}
                     {!active.readOnly && <th className="p-3 w-24 text-right">Actions</th>}
                   </tr>
                 </thead>
@@ -400,12 +465,15 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                         {(pagination.currentPage - 1) * pagination.perPage + index + 1}
                       </td>
                       {active.fields.map((field) => (
-                        <td key={field.key} className="p-3 text-slate-700">
+                        <td key={field.key} className={`p-3 text-slate-700 ${
+                          field.type === 'textarea' ? 'max-w-xs whitespace-normal leading-5' : ''
+                        } ${field.key === 'name' && active.key === 'roles' ? 'font-mono font-semibold whitespace-nowrap' : ''}
+                        ${field.key === 'full_name' ? 'min-w-48 whitespace-normal leading-5' : ''}`}>
                           {field.type === 'boolean' ? (
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
                               item[field.key] ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
                             }`}>
-                              {item[field.key] ? 'Active' : 'Inactive'}
+                              {item[field.key] ? (field.trueLabel ?? 'Active') : (field.falseLabel ?? 'Inactive')}
                             </span>
                           ) : displayValue(item, field)}
                         </td>
@@ -417,7 +485,7 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                               className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 cursor-pointer">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            <button type="button" onClick={() => remove(item.id)} title="Delete"
+                            <button type="button" onClick={() => openDelete(item)} title="Delete"
                               className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 cursor-pointer">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -505,7 +573,7 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {active.fields.filter((field) => field.type !== 'boolean').map((field) => (
-                    <label key={field.key} className="block">
+                    <label key={field.key} className={`block ${field.wide ? 'sm:col-span-2' : ''}`}>
                       <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
                         {field.label}{field.required && <span className="text-red-500"> *</span>}
                       </span>
@@ -518,6 +586,10 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                             <option key={option.id} value={option.id}>{option.name}</option>
                           ))}
                         </select>
+                      ) : field.type === 'textarea' ? (
+                        <textarea value={form[field.key] || ''} required={field.required} rows={3}
+                          onChange={(event) => updateField(field.key, event.target.value)}
+                          className="w-full text-xs border border-slate-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y" />
                       ) : (
                         <input type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''}
                           required={field.required} onChange={(event) => updateField(field.key, event.target.value)}
@@ -527,13 +599,13 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                   ))}
                 </div>
 
-                {active.fields.some((field) => field.type === 'boolean') && (
-                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                    <input type="checkbox" checked={form.is_active === 'true'}
-                      onChange={(event) => updateField('is_active', event.target.checked ? 'true' : 'false')} />
-                    Active
+                {active.fields.filter((field) => field.type === 'boolean').map((field) => (
+                  <label key={field.key} className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer mr-4">
+                    <input type="checkbox" checked={form[field.key] === 'true'}
+                      onChange={(event) => updateField(field.key, event.target.checked ? 'true' : 'false')} />
+                    {field.label}
                   </label>
-                )}
+                ))}
               </div>
 
               <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
@@ -548,6 +620,54 @@ export default function MasterDataPage({ initialEntityKey }: MasterDataPageProps
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[85] flex items-center justify-center bg-black/45 p-5"
+          onMouseDown={closeDelete}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-master-title"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <h2 id="delete-master-title" className="text-lg font-bold text-slate-900">Delete this entry?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              <b className="text-slate-800">{deleteTarget.name || 'This entry'}</b> permanently delete हो जाएगा। यह action undo नहीं हो सकता।
+            </p>
+            {deleteError && (
+              <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={closeDelete}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => void confirmDelete()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer"
+              >
+                {isDeleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {isDeleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

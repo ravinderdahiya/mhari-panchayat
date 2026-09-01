@@ -9,6 +9,7 @@ import MasterDataPage from './pages/MasterDataPage';
 import ComplaintsPage from './pages/ComplaintsPage';
 import MySurveysPage from './pages/MySurveysPage';
 import SurveyorsPage from './pages/SurveyorsPage';
+import CploManagementPage from './pages/CploManagementPage';
 import RolesPage from './pages/RolesPage';
 import UsersPage from './pages/UsersPage';
 import CitizensPage from './pages/CitizensPage';
@@ -108,6 +109,7 @@ export default function App() {
       {activeView === 'complaints' && <ComplaintsPage currentUser={currentUser} initialStatus={complaintsFilter} initialComplaintId={complaintsInitialId} />}
       {activeView === 'my-surveys' && <MySurveysPage currentUser={currentUser} onNavigateToComplaint={goToComplaint} />}
       {activeView === 'surveyors' && <SurveyorsPage onNavigateToComplaint={goToComplaint} />}
+      {activeView === 'cplo-management' && <CploManagementPage />}
       {activeView === 'asset-surveys' && <AssetSurveysPage childId={assetSurveyChildId} />}
       {activeView === 'asset-types' && <AssetTypesPage />}
       {activeView === 'village-assets' && <VillageAssetsPage />}

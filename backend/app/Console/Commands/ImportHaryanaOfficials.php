@@ -16,9 +16,9 @@ use Illuminate\Support\Str;
  * Imports real Panchayati Raj officials from LGD-code-matched JSON, wiring
  * each one to the routing tier ComplaintController::findResolver() looks up:
  *
- *   BDPO (Block Development & Panchayat Officer) -> role block_admin, block_id
- *   DDPO (District Development & Panchayat Officer) -> role district_admin, district_id
- *   XEN  (Executive Engineer, Panchayati Raj)      -> role engineer, district_id
+ *   BDPO (Block Development & Panchayat Officer) -> role bdpo, block_id
+ *   DDPO (District Development & Panchayat Officer) -> role ddpo, district_id
+ *   XEN  (Executive Engineer, Panchayati Raj)      -> role xen_pr, district_id
  *   CPLO (village-level functionary, one per Gram Panchayat) -> role secretary, panchayat_id
  *
  * Source file: database/data/haryana_officials.json (built by matching
@@ -69,7 +69,7 @@ class ImportHaryanaOfficials extends Command
                 // stays whichever block they were first seen with (their
                 // primary post), and every block they cover goes into the
                 // user_blocks pivot so findResolver() can match on any of them.
-                $user = $this->upsertOfficial($row, 'block_admin', [
+                $user = $this->upsertOfficial($row, 'bdpo', [
                     'block_id' => $blockId,
                     'district_id' => Block::find($blockId)?->district_id,
                     'department_id' => $prDepartmentId,
@@ -83,7 +83,7 @@ class ImportHaryanaOfficials extends Command
                     $stats['skipped']++;
                     continue;
                 }
-                $this->upsertOfficial($row, 'district_admin', [
+                $this->upsertOfficial($row, 'ddpo', [
                     'district_id' => $districtId,
                     'department_id' => $prDepartmentId,
                 ], $stats);
@@ -95,7 +95,7 @@ class ImportHaryanaOfficials extends Command
                     $stats['skipped']++;
                     continue;
                 }
-                $this->upsertOfficial($row, 'engineer', [
+                $this->upsertOfficial($row, 'xen_pr', [
                     'district_id' => $districtId,
                     'department_id' => $prDepartmentId,
                 ], $stats);

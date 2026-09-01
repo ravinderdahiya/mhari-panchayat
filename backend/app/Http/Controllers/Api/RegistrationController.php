@@ -464,7 +464,7 @@ HTML;
             'email' => $data['email'],
             'mobile' => $data['mobile'],
             'district_id' => $data['district_id'],
-            'employee_id' => $role === 'engineer' ? null : ($data['employee_id'] ?? null),
+            'employee_id' => $role === 'surveyor' ? null : ($data['employee_id'] ?? null),
             'role' => $role,
             'is_active' => false,
             'registration_status' => 'pending_email',
@@ -475,7 +475,7 @@ HTML;
         ]);
 
         // Auto emp code for surveyors: SUR-{DISTRICT_CODE}-{USER_ID}
-        if ($role === 'engineer') {
+        if ($role === 'surveyor') {
             $district = District::find($data['district_id']);
             $distCode = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($district?->code ?: 'GEN')) ?: 'GEN');
             $user->update([
@@ -504,7 +504,7 @@ HTML;
 
     public function registerSurveyor(Request $request)
     {
-        return $this->startRegistration($request, 'engineer');
+        return $this->startRegistration($request, 'surveyor');
     }
 
     public function registerOfficer(Request $request)
@@ -533,8 +533,8 @@ HTML;
         $reviewer = $request->user();
         $query = User::with('district')->where('registration_status', 'pending_review');
 
-        if ($reviewer->role === 'district_admin') {
-            $query->where('role', 'engineer')->where('district_id', $reviewer->district_id);
+        if ($reviewer->role === 'ddpo') {
+            $query->where('role', 'surveyor')->where('district_id', $reviewer->district_id);
         } elseif ($reviewer->role === 'state_admin') {
             $query->where('role', 'department_officer');
         }
@@ -552,10 +552,9 @@ HTML;
         }
 
         $allowed = match ($reviewer->role) {
-            'district_admin' => $user->role === 'engineer' && $user->district_id === $reviewer->district_id,
+            'ddpo' => $user->role === 'surveyor' && $user->district_id === $reviewer->district_id,
             'state_admin' => $user->role === 'department_officer',
-            'super_admin' => true,
-            default => false,
+            default => $reviewer->isSuperAdmin(),
         };
 
         if (! $allowed) {

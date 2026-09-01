@@ -181,7 +181,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
         api.getComplaints(),
         api.masterApi('departments').list(),
       ]);
-      const engineers = users.filter((u) => u.role === 'engineer');
+      const engineers = users.filter((u) => u.role === 'surveyor');
       setSurveyors(engineers);
       setComplaints(complaints);
       setDepartments(deptRes.items || []);

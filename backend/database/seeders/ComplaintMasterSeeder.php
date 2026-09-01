@@ -13,21 +13,21 @@ class ComplaintMasterSeeder extends Seeder
 {
     // Which role resolves a Panchayati Raj (PR) category, mirroring the
     // Gram Panchayat -> Panchayat Samiti -> technical-wing escalation tiers:
-    // secretary = Gram Sachiv, block_admin = EOP (Panchayat Samiti),
-    // engineer = Executive Engineer. Every non-PR department routes to
+    // secretary = Gram Sachiv, bdpo = EOP (Panchayat Samiti),
+    // xen_pr = Executive Engineer. Every non-PR department routes to
     // deputy_commissioner instead (see resolverRoleFor()).
     private const PR_RESOLVER_ROLES = [
         'Drainage Blocked / Overflow' => 'secretary',
-        'Drainage Not Constructed' => 'block_admin',
-        'Building Maintenance' => 'engineer',
-        'Encroachment' => 'block_admin',
+        'Drainage Not Constructed' => 'bdpo',
+        'Building Maintenance' => 'xen_pr',
+        'Encroachment' => 'bdpo',
         'Ground Maintenance' => 'secretary',
     ];
 
     private function resolverRoleFor(string $departmentCode, string $categoryName): string
     {
         return $departmentCode === 'PR'
-            ? (self::PR_RESOLVER_ROLES[$categoryName] ?? 'block_admin')
+            ? (self::PR_RESOLVER_ROLES[$categoryName] ?? 'bdpo')
             : 'deputy_commissioner';
     }
 

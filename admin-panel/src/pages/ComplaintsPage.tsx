@@ -20,9 +20,6 @@ const TABS: (ComplaintStatus | 'All')[] = [
   'All', 'Pending', 'Acknowledged', 'Surveyed', 'In_Progress', 'Resolved', 'Rejected', 'Closed', 'Reopened',
 ];
 
-const ACKNOWLEDGE_ROLES = ['sarpanch', 'secretary', 'block_admin'];
-const RESOLVE_ROLES = ['department_officer', 'department_head', 'super_admin'];
-const TRANSFER_ROLES = ['sarpanch', 'secretary', 'block_admin', 'department_head', 'department_officer', 'super_admin'];
 const PAGE_SIZE = 10;
 
 const TIMELINE_ICONS: Record<string, typeof FileText> = {
@@ -211,12 +208,15 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
     return null;
   };
 
-  const canAcknowledge = !!selected && (selected.status === 'Pending' || selected.status === 'Reopened') && ACKNOWLEDGE_ROLES.includes(currentUser.role);
-  const canSurvey = !!selected && currentUser.role === 'engineer' && !!nextSurveyStage(selected.status);
-  const canResolve = !!selected && (selected.status === 'Surveyed' || selected.status === 'In_Progress') && RESOLVE_ROLES.includes(currentUser.role);
-  const canRate = !!selected && selected.status === 'Resolved' && currentUser.role === 'citizen' && selected.user_id === currentUser.id;
-  const canTransfer = !!selected && !['Closed', 'Rejected'].includes(selected.status) && TRANSFER_ROLES.includes(currentUser.role);
-  const canReopen = !!selected && selected.status === 'Closed' && currentUser.role === 'citizen' && selected.user_id === currentUser.id;
+  const hasPermission = (key: string) =>
+    !!currentUser.is_super_admin || (currentUser.permissions ?? []).includes(key);
+
+  const canAcknowledge = !!selected && (selected.status === 'Pending' || selected.status === 'Reopened') && hasPermission('complaints.acknowledge');
+  const canSurvey = !!selected && hasPermission('complaints.survey') && !!nextSurveyStage(selected.status);
+  const canResolve = !!selected && (selected.status === 'Surveyed' || selected.status === 'In_Progress') && hasPermission('complaints.resolve');
+  const canRate = !!selected && selected.status === 'Resolved' && hasPermission('complaints.rate') && selected.user_id === currentUser.id;
+  const canTransfer = !!selected && !['Closed', 'Rejected'].includes(selected.status) && hasPermission('complaints.transfer');
+  const canReopen = !!selected && selected.status === 'Closed' && hasPermission('complaints.reopen') && selected.user_id === currentUser.id;
   const isTerminal = !!selected && (selected.status === 'Rejected' || (selected.status === 'Closed' && !canReopen));
   const hasAnyAction = canAcknowledge || canSurvey || canResolve || canRate || canTransfer || canReopen || isTerminal;
 
@@ -309,7 +309,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                 <th className="text-left p-3 font-bold">Assigned To</th>
                 <th className="text-left p-3 font-bold">Filed</th>
                 <th className="text-left p-3 font-bold">Flags</th>
-                {currentUser.role === 'super_admin' && <th className="text-right p-3 font-bold w-16">Actions</th>}
+                {currentUser.is_super_admin && <th className="text-right p-3 font-bold w-16">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -371,7 +371,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                       </span>
                     )}
                   </td>
-                  {currentUser.role === 'super_admin' && (
+                  {currentUser.is_super_admin && (
                     <td className="p-3 text-right">
                       <button type="button" onClick={(e) => { e.stopPropagation(); removeComplaint(c); }} title="Delete"
                         className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer">
@@ -667,7 +667,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     className="w-48 text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     <option value="">Transfer to…</option>
-                    {assignableUsers.filter((u) => u.role !== 'super_admin').map((u) => (
+                    {assignableUsers.map((u) => (
                       <option key={u.id} value={u.id}>{u.name || u.username} · {u.role.replace(/_/g, ' ')}</option>
                     ))}
                   </select>

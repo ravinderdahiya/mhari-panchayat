@@ -34,7 +34,7 @@ class AssetSurveyController extends Controller
 
     private function isSurveyorRole(string $role): bool
     {
-        return in_array($role, ['engineer', 'department_officer', 'department_head'], true);
+        return in_array($role, ['surveyor', 'department_officer', 'department_head'], true);
     }
 
     private function ensureSurveyScope(Request $request, int $departmentId, int $assetTypeId): void
@@ -116,6 +116,7 @@ class AssetSurveyController extends Controller
             'assetName' => $survey->asset_name,
             'district' => $survey->district,
             'panchayat' => $survey->panchayat,
+            'panchayatId' => $survey->panchayat_id,
             'village' => $survey->village,
             'latitude' => $survey->latitude,
             'longitude' => $survey->longitude,
@@ -157,9 +158,11 @@ class AssetSurveyController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $query = AssetSurvey::query();
-        if ($this->isSurveyorRole($request->user()->role)) {
-            $query->where('surveyor_id', $request->user()->id);
+        if ($this->isSurveyorRole($user->role)) {
+            $query->where('surveyor_id', $user->id);
         } elseif ($request->filled('surveyor_id')) {
             $query->where('surveyor_id', $request->integer('surveyor_id'));
         }
@@ -170,7 +173,18 @@ class AssetSurveyController extends Controller
             $query->where('asset_type_id', $request->integer('asset_type_id'));
         }
 
+        // Gram Sachiv only ever sees surveys from their own panchayat - no
+        // panchayat assigned means nothing to verify yet, not everything.
+        if ($user->role === 'gram_sachiv') {
+            $query->where('panchayat_id', $user->panchayat_id ?: 0);
+        }
+
         if (! $request->boolean('paginated')) {
+            $reviewStatus = strtolower((string) $request->query('review_status', ''));
+            if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
+                $query->where('review_status', $reviewStatus);
+            }
+
             $surveys = $query->with(self::WITH)
                 ->latest('survey_date')
                 ->latest('id')
@@ -249,9 +263,14 @@ class AssetSurveyController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::with(self::WITH)->findOrFail($id);
-        if ($this->isSurveyorRole($request->user()->role)
-            && $survey->surveyor_id !== $request->user()->id) {
+        $user = $request->user();
+
+        if ($this->isSurveyorRole($user->role) && $survey->surveyor_id !== $user->id) {
             abort(403, 'You can only view your own surveys.');
+        }
+
+        if ($user->role === 'gram_sachiv' && $survey->panchayat_id !== $user->panchayat_id) {
+            abort(403, 'You can only view surveys from your own panchayat.');
         }
 
         return response()->json(['success' => true, 'survey' => $this->mapSurvey($request, $survey)]);
@@ -266,6 +285,7 @@ class AssetSurveyController extends Controller
         $survey = DB::transaction(function () use ($request, $data, $photoPaths) {
             $survey = AssetSurvey::create([
                 'surveyor_id' => $request->user()->id,
+                'panchayat_id' => $request->user()->panchayat_id,
                 'department_id' => $data['departmentId'],
                 'asset_type_id' => $data['assetTypeId'],
                 'asset_name' => $data['assetName'],
@@ -296,7 +316,7 @@ class AssetSurveyController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
-        if ($survey->surveyor_id !== $request->user()->id && $request->user()->role !== 'super_admin') {
+        if ($survey->surveyor_id !== $request->user()->id && ! $request->user()->isSuperAdmin()) {
             abort(403, 'You can only update your own surveys.');
         }
 
@@ -335,8 +355,8 @@ class AssetSurveyController extends Controller
 
     public function approve(Request $request, int $id): JsonResponse
     {
-        $this->ensureReviewer($request);
         $survey = AssetSurvey::findOrFail($id);
+        $this->ensureCanVerify($request, $survey);
 
         $survey->update([
             'review_status' => 'approved',
@@ -354,8 +374,8 @@ class AssetSurveyController extends Controller
 
     public function reject(Request $request, int $id): JsonResponse
     {
-        $this->ensureReviewer($request);
         $survey = AssetSurvey::findOrFail($id);
+        $this->ensureCanVerify($request, $survey);
         $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
 
         $survey->update([
@@ -385,12 +405,30 @@ class AssetSurveyController extends Controller
         return response()->json(['success' => true, 'message' => 'Survey deleted.']);
     }
 
-    // Reviewing is a super_admin-only action, mirroring the sidebar's own
-    // adminOnly gate on the Asset Surveys page (Layout.tsx ADMIN_ROLES).
+    // Deleting a survey outright stays an admin-only action, mirroring
+    // the sidebar's own adminOnly gate on the Asset Surveys page
+    // (Layout.tsx ADMIN_ROLES).
     private function ensureReviewer(Request $request): void
     {
-        if ($request->user()->role !== 'super_admin') {
-            abort(403, 'Only admins can review asset surveys.');
+        if (! $request->user()->isSuperAdmin()) {
+            abort(403, 'Only Super Admins can review all asset surveys.');
         }
+    }
+
+    // Approve/reject: admin can verify anything; a gram_sachiv can
+    // only verify surveys from their own assigned panchayat (per the memo's
+    // "CPLO submits, concerned Gram Sachiv verifies" requirement).
+    private function ensureCanVerify(Request $request, AssetSurvey $survey): void
+    {
+        $user = $request->user();
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        if ($user->role === 'gram_sachiv' && $user->panchayat_id && $survey->panchayat_id === $user->panchayat_id) {
+            return;
+        }
+
+        abort(403, 'Only admins or the concerned Gram Sachiv can review asset surveys.');
     }
 }

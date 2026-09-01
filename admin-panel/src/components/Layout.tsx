@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
-  Users, UserRound, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, MapPinned,
+  Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, MapPinned,
   ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log';
+  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log';
 
 interface LayoutProps {
   currentUser: User;
@@ -18,8 +18,6 @@ interface LayoutProps {
   onLogout: () => void;
   children: React.ReactNode;
 }
-
-const ADMIN_ROLES = ['super_admin'];
 
 interface NavChild {
   id: string;
@@ -57,21 +55,22 @@ const NAV_ITEMS: NavItem[] = [
     { id: 'organization', label: 'Organization', children: [
       { id: 'departments', label: 'Departments' },
       { id: 'designations', label: 'Designations' },
+      { id: 'roles', label: 'Roles' },
     ] },
     { id: 'complaint-setup', label: 'Complaint Setup', children: [
       { id: 'complaint-categories', label: 'Complaint Categories' },
       { id: 'complaint-priorities', label: 'Complaint Priorities' },
     ] },
     { id: 'reference', label: 'Reference (read-only)', children: [
-      { id: 'roles', label: 'Roles' },
       { id: 'complaint-statuses', label: 'Complaint Statuses' },
     ] },
   ] },
   { id: 'reports', label: 'Reports', icon: FileBarChart },
   { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, section: 'operations' },
-  { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['engineer'], section: 'operations' },
+  { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['surveyor'], section: 'operations' },
   { id: 'village-assets', label: 'Village Assets', icon: MapPinned, section: 'operations' },
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
+  { id: 'cplo-management', label: 'Surveyor (CPLO) / Gram Sachiv', icon: UserCheck, adminOnly: true, section: 'operations' },
   { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, adminOnly: true, section: 'operations', children: [
     { id: 'pending-review', label: 'Pending review' },
     { id: 'approved', label: 'Approved' },
@@ -94,6 +93,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   'my-surveys': 'Your assigned field surveys',
   'village-assets': 'GIS infrastructure tracking',
   surveyors: 'Assign departments so surveyors can pick department → assets in the app',
+  'cplo-management': 'Give a Surveyor (acting as CPLO) and a Gram Sachiv (verify) a panchayat',
   'asset-surveys': 'Review field asset surveys submitted from the mobile app',
   'asset-types': 'Map infrastructure assets to departments for mobile surveys',
   users: 'Manage admin users and access',
@@ -114,7 +114,7 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [activeChildren, setActiveChildren] = useState<Partial<Record<View, string>>>({});
   const visibleNavItems = NAV_ITEMS.filter((item) =>
-    (!item.adminOnly || ADMIN_ROLES.includes(currentUser.role)) &&
+    (!item.adminOnly || !!currentUser.is_super_admin) &&
     (!item.roles || item.roles.includes(currentUser.role)));
   const activeLabel = NAV_ITEMS.find((item) => item.id === activeView)?.label ?? '';
   const displayName = currentUser.name || currentUser.username;
@@ -295,7 +295,7 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
             </div>
             <div className={`transition-opacity duration-150 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
               <p className="text-[13px] text-white font-medium leading-tight">{displayName}</p>
-              <p className="text-[10px] tracking-wide uppercase text-accent leading-tight">{currentUser.role.replace('_', ' ')}</p>
+              <p className="text-[10px] tracking-wide uppercase text-accent leading-tight">{currentUser.role.replaceAll('_', ' ')}</p>
             </div>
           </div>
           <button
@@ -317,7 +317,7 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
             <p className="text-[12.5px] text-muted mt-0.5">{PAGE_SUBTITLES[activeView]}</p>
           </div>
           <div className="font-mono text-[10.5px] text-muted border border-line bg-paper px-2.5 py-1.5 rounded">
-            {currentUser.role.replace('_', ' ').toUpperCase()}
+            {currentUser.role.replaceAll('_', ' ').toUpperCase()}
           </div>
         </header>
         <main className="flex-1 p-6 overflow-y-auto overflow-x-auto">{children}</main>

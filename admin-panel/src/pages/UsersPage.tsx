@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Users as UsersIcon, Inbox, ChevronLeft, ChevronRight, Lock, Trash2, Eye, Pencil } from 'lucide-react';
 import * as api from '../services/api';
 import { masterApi } from '../services/api';
-import { ALL_ROLES } from '../types';
+import type { MasterPagination } from '../services/api';
 import type { AdminUser, Department, District, User } from '../types';
 
 interface UsersPageProps {
@@ -11,20 +11,32 @@ interface UsersPageProps {
 
 const PAGE_SIZE = 10;
 
+const EMPTY_PAGINATION: MasterPagination = {
+  currentPage: 1,
+  lastPage: 1,
+  perPage: PAGE_SIZE,
+  total: 0,
+  from: null,
+  to: null,
+};
+
 function roleLabel(role: string) {
   return role.replace(/_/g, ' ');
 }
 
 export default function UsersPage({ currentUser }: UsersPageProps) {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [pagination, setPagination] = useState<MasterPagination>(EMPTY_PAGINATION);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [districtFilter, setDistrictFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
   const [page, setPage] = useState(1);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [viewTarget, setViewTarget] = useState<AdminUser | null>(null);
   const [error, setError] = useState('');
@@ -37,54 +49,46 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const [editDepartment, setEditDepartment] = useState('');
   const [editActive, setEditActive] = useState(true);
 
-  const load = async () => {
+  useEffect(() => {
+    let cancelled = false;
     setIsLoading(true);
-    try {
-      const { users } = await api.getUsers();
-      setUsers(users);
-      if (selected) {
-        const fresh = users.find((u) => u.id === selected.id) || null;
-        setSelected(fresh);
-        if (fresh) {
-          setEditRole(fresh.role);
-          setEditDepartment(fresh.department_id ? String(fresh.department_id) : '');
-          setEditActive(fresh.is_active);
-        }
-      }
-      if (viewTarget) {
-        setViewTarget(users.find((u) => u.id === viewTarget.id) || null);
-      }
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+    const timer = window.setTimeout(() => {
+      api.getUsers({
+        page,
+        perPage: PAGE_SIZE,
+        q: searchQuery,
+        role: roleFilter,
+        districtId: districtFilter === 'All' ? undefined : Number(districtFilter),
+        status: statusFilter === 'All' ? 'all' : statusFilter === 'Active' ? 'active' : 'inactive',
+      })
+        .then(({ users: fetched, pagination: meta }) => {
+          if (cancelled) return;
+          setUsers(fetched);
+          if (meta) setPagination(meta);
+          setError('');
+        })
+        .catch((err) => {
+          if (!cancelled) setError((err as Error).message);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [page, searchQuery, roleFilter, districtFilter, statusFilter, refreshKey]);
 
   useEffect(() => {
-    load();
     masterApi('departments').list().then(({ items }) => setDepartments(items)).catch(() => {});
     masterApi('districts').list().then(({ items }) => setDistricts(items)).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    masterApi('roles').list().then(({ items }) => {
+      setRoles(items.map((item: { name: string }) => item.name));
+    }).catch(() => {});
   }, []);
-
-  useEffect(() => { setPage(1); }, [searchQuery, roleFilter, districtFilter, statusFilter]);
-
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return users
-      .filter((u) => roleFilter === 'All' || u.role === roleFilter)
-      .filter((u) => districtFilter === 'All' || u.district_id === Number(districtFilter))
-      .filter((u) => statusFilter === 'All' || (statusFilter === 'Active') === u.is_active)
-      .filter((u) => !q || [u.username, u.name, u.email].filter(Boolean).join(' ').toLowerCase().includes(q));
-  }, [users, searchQuery, roleFilter, districtFilter, statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   const selectUser = (u: AdminUser) => {
     setSelected(u);
@@ -106,8 +110,8 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
         department_id: editDepartment ? Number(editDepartment) : null,
         is_active: editActive,
       });
-      setUsers((prev) => prev.map((u) => (u.id === user.id ? user : u)));
       setSelected(user);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -122,10 +126,14 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
     setSuccessMessage('');
     try {
       const { message } = await api.deleteUser(deleteTarget.id);
-      setUsers((prev) => prev.filter((user) => user.id !== deleteTarget.id));
       if (selected?.id === deleteTarget.id) setSelected(null);
       setSuccessMessage(message || 'User deleted successfully');
       setDeleteTarget(null);
+      if (users.length === 1 && page > 1) {
+        setPage((current) => current - 1);
+      } else {
+        setRefreshKey((k) => k + 1);
+      }
     } catch (err) {
       setError((err as Error).message);
       setDeleteTarget(null);
@@ -151,34 +159,34 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
             placeholder="Search users…"
             className="w-full text-xs border border-slate-300 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white">
+        <select value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }} className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white">
           <option value="All">All Roles</option>
-          {ALL_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+          {roles.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
         </select>
-        <select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)} className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white">
+        <select value={districtFilter} onChange={(e) => { setDistrictFilter(e.target.value); setPage(1); }} className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white">
           <option value="All">All Districts</option>
           {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white">
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as any); setPage(1); }} className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white">
           <option value="All">All Statuses</option>
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
         </select>
         <span className="text-xs text-slate-400 ml-auto flex items-center gap-1.5">
           <UsersIcon className="w-3.5 h-3.5" />
-          {filtered.length} users
+          {pagination.total} users
         </span>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         {isLoading ? (
           <p className="text-sm text-slate-400 p-6">Loading…</p>
-        ) : filtered.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="p-10 text-center">
             <Inbox className="w-6 h-6 text-slate-300 mx-auto mb-2" />
             <p className="text-sm text-slate-400">No users match your filters.</p>
@@ -205,7 +213,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((u, index) => (
+              {users.map((u, index) => (
                 <tr
                   key={u.id}
                   onClick={() => setViewTarget(u)}
@@ -280,16 +288,16 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
           </table>
         )}
 
-        {filtered.length > 0 && (
+        {pagination.total > 0 && (
           <div className="flex items-center justify-between px-3 py-2.5 border-t border-slate-100 text-xs text-slate-500">
-            <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+            <span>Showing {pagination.from ?? 0}–{pagination.to ?? 0} of {pagination.total}</span>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40">
                 <ChevronLeft className="w-3.5 h-3.5" />
                 Previous
               </button>
-              <span>Page {page} of {totalPages}</span>
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40">
+              <span>Page {pagination.currentPage} of {pagination.lastPage}</span>
+              <button onClick={() => setPage((p) => Math.min(pagination.lastPage, p + 1))} disabled={page === pagination.lastPage} className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40">
                 Next
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -430,7 +438,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
                   disabled={isSelf}
                   className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 disabled:bg-slate-50 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  {ALL_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                  {(editRole && !roles.includes(editRole) ? [...roles, editRole] : roles).map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                 </select>
               </div>
               <div>

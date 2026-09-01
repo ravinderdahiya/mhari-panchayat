@@ -1,4 +1,4 @@
-enum UserRole { citizen, officer, survey }
+enum UserRole { citizen, officer, survey, gramSachiv }
 
 extension UserRoleStorage on UserRole {
   String get storageValue => name;

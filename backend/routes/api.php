@@ -70,7 +70,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // role has it by default - dropdowns need it everywhere), write by
     // master_data.manage. Fixed reference-list routes must come before the
     // {entity} wildcard.
-    Route::get('/master/roles', [MasterDataController::class, 'roles']);
     Route::get('/master/complaint-statuses', [MasterDataController::class, 'complaintStatuses']);
     Route::get('/master/asset-categories', [MasterDataController::class, 'assetCategories']);
     Route::get('/master/{entity}', [MasterDataController::class, 'index'])
@@ -85,10 +84,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/admin/asset-types/{id}', [AssetTypeController::class, 'destroy']);
     });
 
-    // Role/permission management - deliberately gated by role:super_admin
-    // (not permission:) so a super_admin can never misconfigure permissions
+    // Role/permission management - deliberately gated by role:admin
+    // (not permission:) so an admin can never misconfigure permissions
     // into locking themselves out of the permission editor itself.
-    Route::middleware('role:super_admin')->group(function () {
+    Route::middleware('role:admin')->group(function () {
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);
         Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'update']);
         Route::get('/users', [UserController::class, 'index']);
@@ -98,10 +97,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });
 
-    // Registration review - district_admin reviews surveyor (engineer)
+    // Registration review - ddpo reviews surveyor
     // registrations in their own district, state_admin reviews officer
-    // registrations, super_admin can review both.
-    Route::middleware('role:district_admin,state_admin,super_admin')->group(function () {
+    // registrations, admin can review both.
+    Route::middleware('role:ddpo,state_admin,admin')->group(function () {
         Route::get('/registrations/pending', [RegistrationController::class, 'pending']);
         Route::patch('/registrations/{id}/approve', [RegistrationController::class, 'approve']);
         Route::patch('/registrations/{id}/unapprove', [RegistrationController::class, 'unapprove']);
@@ -141,7 +140,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/complaints/{id}/reject', [ComplaintController::class, 'reject'])
         ->middleware('permission:complaints.reject');
     Route::delete('/complaints/{id}', [ComplaintController::class, 'destroy'])
-        ->middleware('role:super_admin');
+        ->middleware('role:admin');
 
     // Village Assets (GIS infrastructure tracking) - internal to staff roles,
     // not citizen-facing.
