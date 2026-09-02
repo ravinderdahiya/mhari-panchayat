@@ -4,6 +4,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../config/api_config.dart';
+import '../map/gis_map_image_layer.dart';
 import '../models/asset.dart';
 import '../models/complaint.dart';
 import '../models/survey.dart';
@@ -26,11 +28,19 @@ class ComplaintMapScreen extends StatefulWidget {
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   final _mapController = MapController();
 
-  static const _initialCenter = LatLng(28.3521, 77.0642);
-  static const _initialZoom = 12.0;
+  /// Same origin as the admin dashboard map (Haryana, zoom 8) so the
+  /// district boundary layer is visible at the service's minScale.
+  static const _haryanaCenter = LatLng(29.0588, 76.0856);
+  static const _haryanaZoom = 8.0;
+
   static const _myLocationZoom = 15.0;
+  static const _imageryTiles =
+      'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  static const _streetsTiles =
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 
   LatLng? _myLocation;
+  bool _streetsBasemap = false;
 
   List<Complaint> _complaints = [];
   List<AssetSummary> _assets = [];
@@ -62,7 +72,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
       final complaints = await ComplaintApi.getMine();
       if (!mounted) return;
       setState(() => _complaints = complaints);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _fitToComplaints());
     } on ComplaintApiException catch (_) {
       // Keep showing an empty map if complaints can't be loaded.
     } finally {
@@ -84,24 +93,10 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     setState(() {
       _statusFilter = _statusFilter == bucket ? null : bucket;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fitToComplaints());
   }
 
-  void _fitToComplaints() {
-    final points = _geoComplaints
-        .map((c) => LatLng(c.latitude!, c.longitude!))
-        .toList();
-    if (points.isEmpty) return;
-    if (points.length == 1) {
-      _mapController.move(points.first, _myLocationZoom);
-      return;
-    }
-    _mapController.fitCamera(
-      CameraFit.coordinates(
-        coordinates: points,
-        padding: const EdgeInsets.fromLTRB(40, 100, 40, 220),
-      ),
-    );
+  void _fitHaryana() {
+    _mapController.move(_haryanaCenter, _haryanaZoom);
   }
 
   Future<void> _loadMyLocation() async {
@@ -112,13 +107,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         ),
       );
       if (!mounted) return;
-      final here = LatLng(position.latitude, position.longitude);
-      setState(() => _myLocation = here);
-      if (_geoComplaints.isEmpty) {
-        _mapController.move(here, _myLocationZoom);
-      }
+      setState(() => _myLocation = LatLng(position.latitude, position.longitude));
     } catch (_) {
-      // Keep showing the default map center if location can't be read.
+      // Keep showing Haryana if location can't be read.
     }
   }
 
@@ -133,7 +124,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     if (here != null) {
       _mapController.move(here, _myLocationZoom);
     } else {
-      _mapController.move(_initialCenter, _initialZoom);
+      _fitHaryana();
       _loadMyLocation();
     }
   }
@@ -167,19 +158,22 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         FlutterMap(
           mapController: _mapController,
           options: const MapOptions(
-            initialCenter: _initialCenter,
-            initialZoom: _initialZoom,
-            minZoom: 4,
+            initialCenter: _haryanaCenter,
+            initialZoom: _haryanaZoom,
+            minZoom: 5,
             maxZoom: 18,
           ),
           children: [
             TileLayer(
-              urlTemplate:
-                  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+              urlTemplate: _streetsBasemap ? _streetsTiles : _imageryTiles,
               userAgentPackageName: 'com.example.my_first_app',
               errorTileCallback: (tile, error, stackTrace) {
                 debugPrint('Tile load failed for ${tile.coordinates}: $error');
               },
+            ),
+            GisMapImageLayer(
+              controller: _mapController,
+              mapServerUrl: ApiConfig.gisPanchayatMapServerUrl,
             ),
             MarkerLayer(
               markers: [
@@ -223,6 +217,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ],
         ),
         _buildSearchBar(context),
+        _buildBasemapToggle(),
         Positioned(
           left: AppSpacing.screen,
           bottom: AppSpacing.screen,
@@ -253,6 +248,48 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildBasemapToggle() {
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + 66,
+      right: AppSpacing.screen,
+      child: Material(
+        color: AppColors.background,
+        elevation: 3,
+        shadowColor: Colors.black26,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _BasemapChip(
+                label: 'Map',
+                selected: _streetsBasemap,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFDDD3B2), Color(0xFFC9BE96)],
+                ),
+                onTap: () => setState(() => _streetsBasemap = true),
+              ),
+              const SizedBox(width: 6),
+              _BasemapChip(
+                label: 'Satellite',
+                selected: !_streetsBasemap,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF5A6E4C), Color(0xFF3F5233)],
+                ),
+                onTap: () => setState(() => _streetsBasemap = false),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -313,6 +350,48 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BasemapChip extends StatelessWidget {
+  const _BasemapChip({
+    required this.label,
+    required this.selected,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Gradient gradient;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 72,
+        height: 44,
+        alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.only(bottom: 5),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(8),
+          border: selected
+              ? Border.all(color: AppColors.primary, width: 2)
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
       ),

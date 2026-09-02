@@ -56,7 +56,10 @@ class GisController extends Controller
         $query = array_merge($request->query(), ['token' => $token]);
 
         try {
-            $http = Http::timeout(15);
+            $http = Http::timeout(30)->withHeaders([
+                // Token is generated with client=referer; GIS rejects it without this.
+                'Referer' => (string) config("services.{$serviceKey}.referer"),
+            ]);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
@@ -88,7 +91,7 @@ class GisController extends Controller
         $ttlMinutes = config("services.{$serviceKey}.token_ttl_minutes", self::DEFAULT_TOKEN_TTL_MINUTES);
 
         try {
-            $http = Http::asForm()->timeout(10);
+            $http = Http::asForm()->timeout(30);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
