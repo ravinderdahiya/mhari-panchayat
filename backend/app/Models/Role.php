@@ -29,6 +29,10 @@ class Role extends Model
             'full_name' => 'Field Surveyor / क्षेत्र सर्वेक्षक',
             'main_responsibility' => 'Field survey, GPS/location capture, photos and data collection',
         ],
+        'cplo' => [
+            'full_name' => 'CPLO(CRID Panchayat Local Operator) / पंचायत स्तर अधिकारी',
+            'main_responsibility' => 'Panchayat-level data collection, verification support, field activities, GPS/photo-based records and submission',
+        ],
         'gram_sachiv' => [
             'full_name' => 'Gram Sachiv / ग्राम सचिव',
             'main_responsibility' => 'Village-level data verification and approval',

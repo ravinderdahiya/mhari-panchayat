@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AssetSurvey;
+use App\Models\AssetSurveyReview;
 use App\Models\AssetType;
+use App\Models\Panchayat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +22,28 @@ class AssetSurveyController extends Controller
         'reviewedBy:id,name,username',
     ];
 
-    private const REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
+    private const REVIEW_STATUSES = [
+        'pending', 'returned', 'gram_sachiv_approved', 'bdpo_forwarded', 'approved', 'rejected',
+    ];
+
+    // Gram Sachiv -> BDPO -> DDPO approval chain. `reject`'s role is
+    // resolved dynamically (whichever role currently owns the survey's
+    // stage may reject it), so it has no fixed 'role' entry here.
+    private const TRANSITIONS = [
+        'verify' => ['from' => 'pending', 'to' => 'gram_sachiv_approved', 'role' => 'gram_sachiv'],
+        'return' => ['from' => 'pending', 'to' => 'returned', 'role' => 'gram_sachiv'],
+        'forward' => ['from' => 'gram_sachiv_approved', 'to' => 'bdpo_forwarded', 'role' => 'bdpo'],
+        'approve' => ['from' => 'bdpo_forwarded', 'to' => 'approved', 'role' => 'ddpo'],
+        'reject' => ['from' => ['pending', 'gram_sachiv_approved', 'bdpo_forwarded'], 'to' => 'rejected', 'role' => null],
+    ];
+
+    // The role that owns each in-flight status, used to resolve `reject`'s
+    // actor requirement dynamically from the survey's current stage.
+    private const STAGE_OWNER = [
+        'pending' => 'gram_sachiv',
+        'gram_sachiv_approved' => 'bdpo',
+        'bdpo_forwarded' => 'ddpo',
+    ];
 
     public function options(): JsonResponse
     {
@@ -34,7 +57,7 @@ class AssetSurveyController extends Controller
 
     private function isSurveyorRole(string $role): bool
     {
-        return in_array($role, ['surveyor', 'department_officer', 'department_head'], true);
+        return in_array($role, ['surveyor', 'cplo', 'department_officer', 'department_head'], true);
     }
 
     private function ensureSurveyScope(Request $request, int $departmentId, int $assetTypeId): void
@@ -102,7 +125,7 @@ class AssetSurveyController extends Controller
 
     private function mapSurvey(Request $request, AssetSurvey $survey): array
     {
-        $survey->loadMissing(self::WITH);
+        $survey->loadMissing([...self::WITH, 'reviews.actor:id,name,username,role']);
         $surveyorName = $survey->surveyor?->name ?: $survey->surveyor?->username;
 
         return [
@@ -117,6 +140,8 @@ class AssetSurveyController extends Controller
             'district' => $survey->district,
             'panchayat' => $survey->panchayat,
             'panchayatId' => $survey->panchayat_id,
+            'blockId' => $survey->block_id,
+            'districtId' => $survey->district_id,
             'village' => $survey->village,
             'latitude' => $survey->latitude,
             'longitude' => $survey->longitude,
@@ -151,6 +176,14 @@ class AssetSurveyController extends Controller
             'reviewedByName' => $survey->reviewedBy?->name ?: $survey->reviewedBy?->username,
             'reviewedAt' => $survey->reviewed_at?->toISOString(),
             'rejectionReason' => $survey->rejection_reason,
+            'reviews' => $survey->reviews->map(fn (AssetSurveyReview $review) => [
+                'actorId' => $review->actor_id,
+                'actorName' => $review->actor?->name ?: $review->actor?->username,
+                'actorRole' => $review->actor_role,
+                'action' => $review->action,
+                'remarks' => $review->remarks,
+                'createdAt' => $review->created_at?->toISOString(),
+            ])->values(),
             'createdAt' => $survey->created_at?->toISOString(),
             'updatedAt' => $survey->updated_at?->toISOString(),
         ];
@@ -173,10 +206,19 @@ class AssetSurveyController extends Controller
             $query->where('asset_type_id', $request->integer('asset_type_id'));
         }
 
-        // Gram Sachiv only ever sees surveys from their own panchayat - no
-        // panchayat assigned means nothing to verify yet, not everything.
+        // Each reviewer stage only ever sees surveys from their own
+        // jurisdiction - no jurisdiction assigned means nothing to review
+        // yet, not everything. Admin/super_admin stay unrestricted.
         if ($user->role === 'gram_sachiv') {
             $query->where('panchayat_id', $user->panchayat_id ?: 0);
+        } elseif ($user->role === 'bdpo') {
+            $blockIds = $user->blocks()->pluck('blocks.id')->all();
+            if ($user->block_id) {
+                $blockIds[] = $user->block_id;
+            }
+            $query->whereIn('block_id', $blockIds ?: [0]);
+        } elseif ($user->role === 'ddpo') {
+            $query->where('district_id', $user->district_id ?: 0);
         }
 
         if (! $request->boolean('paginated')) {
@@ -199,13 +241,11 @@ class AssetSurveyController extends Controller
             'totalSurveys' => (clone $statsQuery)->count(),
             'activeSurveyors' => (clone $statsQuery)->distinct()->count('surveyor_id'),
             'poorDamaged' => (clone $statsQuery)->whereIn('condition', ['POOR', 'DAMAGED'])->count(),
-            // Unfiltered by review_status so all three tab counts show
+            // Unfiltered by review_status so all tab counts show
             // simultaneously, regardless of which tab is currently open.
-            'statusCounts' => [
-                'pending' => (clone $statsQuery)->where('review_status', 'pending')->count(),
-                'approved' => (clone $statsQuery)->where('review_status', 'approved')->count(),
-                'rejected' => (clone $statsQuery)->where('review_status', 'rejected')->count(),
-            ],
+            'statusCounts' => collect(self::REVIEW_STATUSES)->mapWithKeys(
+                fn (string $status) => [$status => (clone $statsQuery)->where('review_status', $status)->count()]
+            ),
         ];
 
         $search = trim((string) $request->query('q', ''));
@@ -273,6 +313,15 @@ class AssetSurveyController extends Controller
             abort(403, 'You can only view surveys from your own panchayat.');
         }
 
+        if ($user->role === 'bdpo' && $survey->block_id !== $user->block_id
+            && ! $user->blocks()->whereKey($survey->block_id)->exists()) {
+            abort(403, 'You can only view surveys from your own block.');
+        }
+
+        if ($user->role === 'ddpo' && $survey->district_id !== $user->district_id) {
+            abort(403, 'You can only view surveys from your own district.');
+        }
+
         return response()->json(['success' => true, 'survey' => $this->mapSurvey($request, $survey)]);
     }
 
@@ -283,9 +332,13 @@ class AssetSurveyController extends Controller
         $photoPaths = $this->storePhotos($request);
 
         $survey = DB::transaction(function () use ($request, $data, $photoPaths) {
+            $panchayat = Panchayat::with('block')->find($request->user()->panchayat_id);
+
             $survey = AssetSurvey::create([
                 'surveyor_id' => $request->user()->id,
-                'panchayat_id' => $request->user()->panchayat_id,
+                'panchayat_id' => $panchayat?->id,
+                'block_id' => $panchayat?->block_id,
+                'district_id' => $panchayat?->block?->district_id,
                 'department_id' => $data['departmentId'],
                 'asset_type_id' => $data['assetTypeId'],
                 'asset_name' => $data['assetName'],
@@ -316,7 +369,9 @@ class AssetSurveyController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
-        if ($survey->surveyor_id !== $request->user()->id && ! $request->user()->isSuperAdmin()) {
+        $user = $request->user();
+        $isFullAccess = $user->isSuperAdmin() || $user->role === 'admin';
+        if ($survey->surveyor_id !== $user->id && ! $isFullAccess) {
             abort(403, 'You can only update your own surveys.');
         }
 
@@ -344,6 +399,14 @@ class AssetSurveyController extends Controller
             }
             $updates['photo_paths'] = $this->storePhotos($request);
         }
+
+        // A correction the surveyor makes on a returned survey resubmits it
+        // to the front of the chain rather than leaving it stuck as
+        // 'returned' forever.
+        if ($survey->review_status === 'returned') {
+            $updates['review_status'] = 'pending';
+        }
+
         $survey->update($updates);
 
         return response()->json([
@@ -353,17 +416,55 @@ class AssetSurveyController extends Controller
         ]);
     }
 
+    // Gram Sachiv verifies a pending survey, sending it on to BDPO.
+    public function verify(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'verify');
+        $this->applyTransition($request, $survey, 'verify');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey verified.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // Gram Sachiv sends a pending survey back to the surveyor for correction.
+    public function returnForCorrection(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'return');
+        $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
+        $this->applyTransition($request, $survey, 'return', $data['reason']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey returned for correction.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // BDPO forwards a gram-sachiv-verified survey on to DDPO.
+    public function forward(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'forward');
+        $this->applyTransition($request, $survey, 'forward');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey forwarded.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // DDPO gives the final approval.
     public function approve(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
-        $this->ensureCanVerify($request, $survey);
-
-        $survey->update([
-            'review_status' => 'approved',
-            'reviewed_by_id' => $request->user()->id,
-            'reviewed_at' => now(),
-            'rejection_reason' => null,
-        ]);
+        $this->ensureStageActor($request, $survey, 'approve');
+        $this->applyTransition($request, $survey, 'approve');
 
         return response()->json([
             'success' => true,
@@ -372,18 +473,14 @@ class AssetSurveyController extends Controller
         ]);
     }
 
+    // Rejection is available at any in-flight stage, by whichever role
+    // currently owns that stage (or admin/super_admin from anywhere).
     public function reject(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
-        $this->ensureCanVerify($request, $survey);
+        $this->ensureStageActor($request, $survey, 'reject');
         $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
-
-        $survey->update([
-            'review_status' => 'rejected',
-            'reviewed_by_id' => $request->user()->id,
-            'reviewed_at' => now(),
-            'rejection_reason' => $data['reason'],
-        ]);
+        $this->applyTransition($request, $survey, 'reject', $data['reason']);
 
         return response()->json([
             'success' => true,
@@ -415,20 +512,66 @@ class AssetSurveyController extends Controller
         }
     }
 
-    // Approve/reject: admin can verify anything; a gram_sachiv can
-    // only verify surveys from their own assigned panchayat (per the memo's
-    // "CPLO submits, concerned Gram Sachiv verifies" requirement).
-    private function ensureCanVerify(Request $request, AssetSurvey $survey): void
+    // admin/super_admin can act at any stage, on any survey, regardless of
+    // jurisdiction. Otherwise the actor's role must match the stage that
+    // owns $action (verify/return -> gram_sachiv, forward -> bdpo,
+    // approve -> ddpo, reject -> whichever role owns the survey's current
+    // status), and the actor's own jurisdiction must cover the survey's.
+    private function ensureStageActor(Request $request, AssetSurvey $survey, string $action): void
     {
         $user = $request->user();
-        if ($user->isSuperAdmin()) {
+        if ($user->isSuperAdmin() || $user->role === 'admin') {
             return;
         }
 
-        if ($user->role === 'gram_sachiv' && $user->panchayat_id && $survey->panchayat_id === $user->panchayat_id) {
-            return;
+        $requiredRole = self::TRANSITIONS[$action]['role'] ?? self::STAGE_OWNER[$survey->review_status] ?? null;
+
+        $allowed = $requiredRole !== null && $user->role === $requiredRole && match ($requiredRole) {
+            'gram_sachiv' => (bool) $user->panchayat_id && $survey->panchayat_id === $user->panchayat_id,
+            'bdpo' => (bool) $survey->block_id && (
+                $survey->block_id === $user->block_id || $user->blocks()->whereKey($survey->block_id)->exists()
+            ),
+            'ddpo' => (bool) $user->district_id && $survey->district_id === $user->district_id,
+            default => false,
+        };
+
+        if (! $allowed) {
+            abort(403, 'You do not have permission to review this survey at its current stage.');
+        }
+    }
+
+    // Validates the survey's current status is a legal starting point for
+    // $action, applies the transition, and records one audit-trail row so
+    // an earlier stage's reviewer identity survives later stages acting.
+    private function applyTransition(Request $request, AssetSurvey $survey, string $action, ?string $reason = null): void
+    {
+        $config = self::TRANSITIONS[$action];
+        $from = (array) $config['from'];
+        $pastTense = match ($action) {
+            'verify' => 'verified',
+            'return' => 'returned',
+            'forward' => 'forwarded',
+            'approve' => 'approved',
+            'reject' => 'rejected',
+        };
+        if (! in_array($survey->review_status, $from, true)) {
+            abort(422, 'This survey is not at a stage where it can be '.$pastTense.'.');
         }
 
-        abort(403, 'Only admins or the concerned Gram Sachiv can review asset surveys.');
+        $user = $request->user();
+        $survey->update([
+            'review_status' => $config['to'],
+            'reviewed_by_id' => $user->id,
+            'reviewed_at' => now(),
+            'rejection_reason' => in_array($action, ['reject', 'return'], true) ? $reason : null,
+        ]);
+
+        AssetSurveyReview::create([
+            'survey_id' => $survey->id,
+            'actor_id' => $user->id,
+            'actor_role' => $user->role,
+            'action' => $pastTense,
+            'remarks' => $reason,
+        ]);
     }
 }

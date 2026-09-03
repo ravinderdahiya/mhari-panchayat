@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  *   BDPO (Block Development & Panchayat Officer) -> role bdpo, block_id
  *   DDPO (District Development & Panchayat Officer) -> role ddpo, district_id
  *   XEN  (Executive Engineer, Panchayati Raj)      -> role xen_pr, district_id
- *   CPLO (village-level functionary, one per Gram Panchayat) -> role secretary, panchayat_id
+ *   CPLO (village-level functionary, one per Gram Panchayat) -> role cplo, panchayat_id
  *
  * Source file: database/data/haryana_officials.json (built by matching
  * "List of BDPO DDPO XEN.xlsx" / "Total Active CPLO data ....xlsx" rows
@@ -107,7 +107,7 @@ class ImportHaryanaOfficials extends Command
                     $stats['skipped']++;
                     continue;
                 }
-                $this->upsertOfficial($row, 'secretary', [
+                $this->upsertOfficial($row, 'cplo', [
                     'panchayat_id' => $panchayat->id,
                     'block_id' => $panchayat->block_id,
                     'district_id' => $panchayat->block?->district_id,

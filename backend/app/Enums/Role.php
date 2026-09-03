@@ -17,6 +17,7 @@ enum Role: string
     case DepartmentHead = 'department_head';
     case DepartmentOfficer = 'department_officer';
     case Surveyor = 'surveyor';
+    case Cplo = 'cplo';
     case XenPr = 'xen_pr';
     case Sarpanch = 'sarpanch';
     case Secretary = 'secretary';

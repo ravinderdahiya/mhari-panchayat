@@ -59,7 +59,7 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
   }
 
   Color _statusColor(String status) => switch (status) {
-    'approved' => AppColors.resolvedText,
+    'gram_sachiv_approved' => AppColors.resolvedText,
     'rejected' => AppColors.rejectedText,
     _ => AppColors.pendingText,
   };
@@ -88,23 +88,27 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Row(
-                        children: [
-                          for (final s in const [
-                            ('pending', 'Pending'),
-                            ('approved', 'Approved'),
-                            ('rejected', 'Rejected'),
-                          ])
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: _StatusChip(
-                                label: s.$2,
-                                selected: _status == s.$1,
-                                color: _statusColor(s.$1),
-                                onTap: () => _switchStatus(s.$1),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final s in const [
+                              ('pending', 'Pending'),
+                              ('returned', 'Returned'),
+                              ('gram_sachiv_approved', 'Verified'),
+                              ('rejected', 'Rejected'),
+                            ])
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: _StatusChip(
+                                  label: s.$2,
+                                  selected: _status == s.$1,
+                                  color: _statusColor(s.$1),
+                                  onTap: () => _switchStatus(s.$1),
+                                ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     Expanded(

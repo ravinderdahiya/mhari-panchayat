@@ -41,14 +41,14 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
     return '$day ${months[date.month - 1]} ${date.year}';
   }
 
-  Future<void> _approve() async {
+  Future<void> _verify() async {
     if (_submitting) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
-      final updated = await SurveyReviewApi.approve(_survey.id);
+      final updated = await SurveyReviewApi.verify(_survey.id);
       if (!mounted) return;
       setState(() => _survey = updated);
       Navigator.of(context).pop(true);
@@ -63,7 +63,11 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   Future<void> _reject() async {
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => _RejectReasonDialog(),
+      builder: (context) => _ReasonDialog(
+        title: 'Reject survey',
+        actionLabel: 'Reject',
+        actionColor: AppColors.rejectedText,
+      ),
     );
     if (reason == null || reason.trim().isEmpty) return;
 
@@ -73,6 +77,37 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
     });
     try {
       final updated = await SurveyReviewApi.reject(_survey.id, reason.trim());
+      if (!mounted) return;
+      setState(() => _survey = updated);
+      Navigator.of(context).pop(true);
+    } on SurveyReviewApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _returnForCorrection() async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => _ReasonDialog(
+        title: 'Return for correction',
+        actionLabel: 'Return',
+        actionColor: AppColors.pendingText,
+      ),
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final updated = await SurveyReviewApi.returnForCorrection(
+        _survey.id,
+        reason.trim(),
+      );
       if (!mounted) return;
       setState(() => _survey = updated);
       Navigator.of(context).pop(true);
@@ -133,11 +168,26 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                           label: const Text('Reject'),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _submitting ? null : _returnForCorrection,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.pendingText,
+                            side: const BorderSide(
+                              color: AppColors.pendingText,
+                            ),
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                          icon: const Icon(Icons.undo_rounded, size: 18),
+                          label: const Text('Return'),
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: GradientButton(
-                          onPressed: _submitting ? null : _approve,
-                          label: _submitting ? 'कृपया प्रतीक्षा करें...' : 'Approve',
+                          onPressed: _submitting ? null : _verify,
+                          label: _submitting ? 'कृपया प्रतीक्षा करें...' : 'Verify',
                           icon: Icons.check_rounded,
                         ),
                       ),
@@ -228,7 +278,9 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
           const SizedBox(height: AppSpacing.gap),
           InfoStrip(
             icon: Icons.info_outline_rounded,
-            text: 'Rejected: ${survey.rejectionReason}',
+            text: survey.reviewStatus == 'returned'
+                ? 'Returned for correction: ${survey.rejectionReason}'
+                : 'Rejected: ${survey.rejectionReason}',
           ),
         ],
         if (survey.description != null && survey.description!.isNotEmpty) ...[
@@ -284,12 +336,22 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   }
 }
 
-class _RejectReasonDialog extends StatefulWidget {
+class _ReasonDialog extends StatefulWidget {
+  const _ReasonDialog({
+    required this.title,
+    required this.actionLabel,
+    required this.actionColor,
+  });
+
+  final String title;
+  final String actionLabel;
+  final Color actionColor;
+
   @override
-  State<_RejectReasonDialog> createState() => _RejectReasonDialogState();
+  State<_ReasonDialog> createState() => _ReasonDialogState();
 }
 
-class _RejectReasonDialogState extends State<_RejectReasonDialog> {
+class _ReasonDialogState extends State<_ReasonDialog> {
   final _controller = TextEditingController();
 
   @override
@@ -301,14 +363,14 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Reject survey'),
+      title: Text(widget.title),
       content: TextField(
         controller: _controller,
         autofocus: true,
         minLines: 2,
         maxLines: 4,
         decoration: const InputDecoration(
-          hintText: 'Reason for rejection…',
+          hintText: 'Reason…',
         ),
       ),
       actions: [
@@ -321,9 +383,9 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
               ? null
               : () => Navigator.of(context).pop(_controller.text),
           style: FilledButton.styleFrom(
-            backgroundColor: AppColors.rejectedText,
+            backgroundColor: widget.actionColor,
           ),
-          child: const Text('Reject'),
+          child: Text(widget.actionLabel),
         ),
       ],
     );

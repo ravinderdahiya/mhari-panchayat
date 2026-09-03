@@ -18,6 +18,8 @@ class UserController extends Controller
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
             'role' => ['sometimes', 'nullable', 'string', Rule::exists('roles', 'name')],
             'district_id' => ['sometimes', 'nullable', 'integer'],
+            'block_id' => ['sometimes', 'nullable', 'integer'],
+            'panchayat_id' => ['sometimes', 'nullable', 'integer'],
             'status' => ['sometimes', 'string', 'in:all,active,inactive'],
         ]);
 
@@ -41,6 +43,18 @@ class UserController extends Controller
 
         if (! empty($data['district_id'])) {
             $query->where('district_id', $data['district_id']);
+        }
+
+        if (! empty($data['block_id'])) {
+            $query->where(function ($blockQuery) use ($data) {
+                $blockQuery
+                    ->where('block_id', $data['block_id'])
+                    ->orWhereHas('blocks', fn ($assigned) => $assigned->where('blocks.id', $data['block_id']));
+            });
+        }
+
+        if (! empty($data['panchayat_id'])) {
+            $query->where('panchayat_id', $data['panchayat_id']);
         }
 
         $status = $data['status'] ?? 'all';
@@ -99,7 +113,7 @@ class UserController extends Controller
         $users = User::where('is_active', true)
             ->where('role', '!=', 'citizen')
             ->orderBy('name')
-            ->get(['id', 'name', 'username', 'role']);
+            ->get(['id', 'name', 'username', 'role', 'district_id', 'block_id', 'panchayat_id']);
 
         return response()->json(['success' => true, 'users' => $users]);
     }
@@ -109,11 +123,18 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $data = $request->validate([
+            'name' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'mobile' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:150'],
+            'employee_id' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'member_id' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'family_id' => ['sometimes', 'nullable', 'string', 'max:50'],
             'role' => ['sometimes', 'string', Rule::exists('roles', 'name')],
             'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
             'department_ids' => ['sometimes', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
             'district_id' => ['sometimes', 'nullable', 'exists:districts,id'],
+            'block_id' => ['sometimes', 'nullable', 'exists:blocks,id'],
             'panchayat_id' => ['sometimes', 'nullable', 'exists:panchayats,id'],
             'village_ids' => ['sometimes', 'array'],
             'village_ids.*' => ['integer', 'exists:villages,id'],
@@ -122,7 +143,11 @@ class UserController extends Controller
 
         // Setting a panchayat also fixes up block/district so the three stay
         // consistent (mirrors ImportHaryanaOfficials' CPLO jurisdiction wiring)
-        // - used by the CPLO / Gram Sachiv panchayat-assignment screen.
+        // - used by the CPLO / Gram Sachiv panchayat-assignment screen. This
+        // runs after the plain `block_id`/`district_id` validation above so a
+        // panchayat pick always wins over a stale block/district selection
+        // made before it (e.g. BDPO/DDPO edits set block/district directly,
+        // with no panchayat involved at all).
         if (array_key_exists('panchayat_id', $data)) {
             $panchayat = $data['panchayat_id'] ? Panchayat::with('block')->find($data['panchayat_id']) : null;
             $data['block_id'] = $panchayat?->block_id;

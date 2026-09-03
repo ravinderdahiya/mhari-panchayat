@@ -5,10 +5,19 @@ export interface User {
   username: string;
   name: string | null;
   email: string | null;
+  mobile?: string | null;
   role: string;
   is_active: boolean;
   is_super_admin?: boolean;
   permissions?: string[];
+  employee_id?: string | null;
+  member_id?: string | null;
+  family_id?: string | null;
+  registration_status?: string | null;
+  department?: NamedEntity | null;
+  district?: NamedEntity | null;
+  block?: NamedEntity | null;
+  panchayat?: NamedEntity | null;
   created_at: string;
   updated_at: string;
 }
@@ -18,6 +27,9 @@ export interface AssignableUser {
   name: string | null;
   username: string;
   role: string;
+  district_id: number | null;
+  block_id: number | null;
+  panchayat_id: number | null;
 }
 
 export type ComplaintStatus =
@@ -265,6 +277,20 @@ export interface VillageAsset {
   created_at: string;
 }
 
+// Gram Sachiv -> BDPO -> DDPO approval chain. 'returned' is a surveyor/CPLO
+// correction loop back to 'pending', not a terminal state.
+export type AssetSurveyReviewStatus =
+  | 'pending' | 'returned' | 'gram_sachiv_approved' | 'bdpo_forwarded' | 'approved' | 'rejected';
+
+export interface AssetSurveyReview {
+  actorId: number;
+  actorName: string | null;
+  actorRole: string;
+  action: 'verified' | 'returned' | 'forwarded' | 'approved' | 'rejected';
+  remarks: string | null;
+  createdAt: string;
+}
+
 export interface AssetSurvey {
   id: string;
   assetId: string;
@@ -275,6 +301,9 @@ export interface AssetSurvey {
   assetName: string;
   district: string;
   panchayat: string;
+  panchayatId: number | null;
+  blockId: number | null;
+  districtId: number | null;
   village: string;
   latitude: number;
   longitude: number;
@@ -290,10 +319,11 @@ export interface AssetSurvey {
   } | null;
   department: { id: number; name: string; code: string | null } | null;
   assetType: { id: number; name: string; iconKey: string | null } | null;
-  reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewStatus: AssetSurveyReviewStatus;
   reviewedByName: string | null;
   reviewedAt: string | null;
   rejectionReason: string | null;
+  reviews: AssetSurveyReview[];
   createdAt: string;
   updatedAt: string;
 }
@@ -311,5 +341,5 @@ export interface AssetSurveyStats {
   totalSurveys: number;
   activeSurveyors: number;
   poorDamaged: number;
-  statusCounts: { pending: number; approved: number; rejected: number };
+  statusCounts: Record<AssetSurveyReviewStatus, number>;
 }

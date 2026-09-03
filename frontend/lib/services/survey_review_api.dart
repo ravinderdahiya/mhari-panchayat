@@ -51,7 +51,8 @@ class SurveyReviewApi {
     return body;
   }
 
-  /// `reviewStatus` one of pending/approved/rejected, or null for all.
+  /// `reviewStatus` one of pending/returned/gram_sachiv_approved/
+  /// bdpo_forwarded/approved/rejected, or null for all.
   static Future<List<Survey>> getQueue({String? reviewStatus}) async {
     final headers = await _authHeaders();
     final uri = reviewStatus == null
@@ -76,12 +77,31 @@ class SurveyReviewApi {
         .toList();
   }
 
-  static Future<Survey> approve(String surveyId) async {
+  /// Gram Sachiv's positive action on a pending survey - sends it on to
+  /// BDPO. Named `verify` (not `approve`) because `/approve` is reserved
+  /// for DDPO's final sign-off further down the chain.
+  static Future<Survey> verify(String surveyId) async {
     final headers = await _authHeaders();
     late final http.Response response;
     try {
       response = await http
-          .post(_uri('/$surveyId/approve'), headers: headers)
+          .post(_uri('/$surveyId/verify'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  static Future<Survey> returnForCorrection(String surveyId, String reason) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/return'), headers: headers, body: {'reason': reason})
           .timeout(const Duration(seconds: 20));
     } catch (_) {
       throw SurveyReviewApiException(

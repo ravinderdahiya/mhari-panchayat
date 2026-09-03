@@ -311,7 +311,7 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth')->plainTextToken;
-        $user->load(['department', 'departments', 'district']);
+        $user->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
 
         return response()->json([
             'success' => true,
@@ -323,7 +323,7 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user()->load(['department', 'departments', 'district']);
+        $user = $request->user()->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
 
         return response()->json(['success' => true, 'user' => $user->toAuthArray()]);
     }

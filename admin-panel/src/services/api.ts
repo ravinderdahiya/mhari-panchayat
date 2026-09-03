@@ -172,6 +172,8 @@ export const getUsers = (options: {
   q?: string;
   role?: string;
   districtId?: number;
+  blockId?: number;
+  panchayatId?: number;
   status?: 'all' | 'active' | 'inactive';
 } = {}) => {
   const params = new URLSearchParams();
@@ -180,6 +182,8 @@ export const getUsers = (options: {
   if (options.q?.trim()) params.set('q', options.q.trim());
   if (options.role && options.role !== 'All') params.set('role', options.role);
   if (options.districtId) params.set('district_id', String(options.districtId));
+  if (options.blockId) params.set('block_id', String(options.blockId));
+  if (options.panchayatId) params.set('panchayat_id', String(options.panchayatId));
   if (options.status && options.status !== 'all') params.set('status', options.status);
   const qs = params.toString();
 
@@ -214,10 +218,17 @@ export const deleteCitizen = (id: number) =>
 export const updateUser = (
   id: number,
   fields: {
+    name?: string | null;
+    mobile?: string | null;
+    email?: string | null;
+    employee_id?: string | null;
+    member_id?: string | null;
+    family_id?: string | null;
     role?: string;
     department_id?: number | null;
     department_ids?: number[];
     district_id?: number | null;
+    block_id?: number | null;
     panchayat_id?: number | null;
     village_ids?: number[];
     is_active?: boolean;
@@ -323,7 +334,7 @@ export const getAssetSurveys = (options: {
   perPage?: number;
   query?: string;
   condition?: string;
-  reviewStatus?: 'pending' | 'approved' | 'rejected';
+  reviewStatus?: import('../types').AssetSurveyReviewStatus;
 } = {}) => {
   const params = new URLSearchParams({
     paginated: '1',
@@ -342,6 +353,19 @@ export const getAssetSurveys = (options: {
   }>(`/api/surveys?${params.toString()}`);
 };
 
+// Gram Sachiv verifies a pending survey, sending it on to BDPO.
+export const verifyAssetSurvey = (id: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/verify`, 'POST');
+
+// Gram Sachiv sends a pending survey back to the surveyor/CPLO for correction.
+export const returnAssetSurvey = (id: string, reason: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/return`, 'POST', { reason });
+
+// BDPO forwards a gram-sachiv-verified survey on to DDPO.
+export const forwardAssetSurvey = (id: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/forward`, 'POST');
+
+// DDPO gives the final approval.
 export const approveAssetSurvey = (id: string) =>
   jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/approve`, 'POST');
 

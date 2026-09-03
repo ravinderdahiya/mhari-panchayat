@@ -8,7 +8,7 @@ import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log';
+  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'profile';
 
 interface LayoutProps {
   currentUser: User;
@@ -71,9 +71,13 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'village-assets', label: 'Village Assets', icon: MapPinned, section: 'operations' },
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
   { id: 'cplo-management', label: 'Surveyor (CPLO) / Gram Sachiv', icon: UserCheck, adminOnly: true, section: 'operations' },
-  { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, adminOnly: true, section: 'operations', children: [
-    { id: 'pending-review', label: 'Pending review' },
-    { id: 'approved', label: 'Approved' },
+  { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, section: 'operations',
+    roles: ['super_admin', 'admin', 'gram_sachiv', 'bdpo', 'ddpo'], children: [
+    { id: 'pending-review', label: 'Pending' },
+    { id: 'returned', label: 'Returned' },
+    { id: 'gram-sachiv-approved', label: 'Verified (Gram Sachiv)' },
+    { id: 'bdpo-forwarded', label: 'Forwarded (BDPO)' },
+    { id: 'approved', label: 'Approved (DDPO)' },
     { id: 'rejected', label: 'Rejected' },
   ] },
   { id: 'asset-types', label: 'Asset Types', icon: Layers3, adminOnly: true, section: 'operations' },
@@ -102,6 +106,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   'project-meeting': 'Slide-style project overview, workflows and next actions',
   settings: 'System configuration',
   'audit-log': 'System activity history',
+  profile: 'Your account details',
 };
 
 function initials(name: string) {
@@ -116,7 +121,7 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     (!item.adminOnly || !!currentUser.is_super_admin) &&
     (!item.roles || item.roles.includes(currentUser.role)));
-  const activeLabel = NAV_ITEMS.find((item) => item.id === activeView)?.label ?? '';
+  const activeLabel = activeView === 'profile' ? 'My Profile' : NAV_ITEMS.find((item) => item.id === activeView)?.label ?? '';
   const displayName = currentUser.name || currentUser.username;
 
   useEffect(() => {
@@ -289,15 +294,22 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
         </nav>
 
         <div className="shrink-0 border-t border-white/10 pt-3.5 px-2.5">
-          <div className="flex items-center gap-3 px-2.5 pb-2.5 overflow-hidden whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => onNavigate('profile')}
+            title="View my profile"
+            className={`w-full flex items-center gap-3 px-2.5 py-1.5 mb-1 rounded-md overflow-hidden whitespace-nowrap cursor-pointer transition-colors ${
+              activeView === 'profile' ? 'bg-sidebar-active' : 'hover:bg-sidebar-hover'
+            }`}
+          >
             <div className="w-8 h-8 shrink-0 rounded-full bg-accent-soft text-sidebar font-serif font-semibold text-[13px] flex items-center justify-center">
               {initials(displayName)}
             </div>
-            <div className={`transition-opacity duration-150 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`text-left transition-opacity duration-150 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
               <p className="text-[13px] text-white font-medium leading-tight">{displayName}</p>
               <p className="text-[10px] tracking-wide uppercase text-accent leading-tight">{currentUser.role.replaceAll('_', ' ')}</p>
             </div>
-          </div>
+          </button>
           <button
             onClick={onLogout}
             className="w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold text-white/80 hover:text-white bg-black/15 hover:bg-black/25 border border-white/10 px-3 py-2 rounded-md mb-1 cursor-pointer"

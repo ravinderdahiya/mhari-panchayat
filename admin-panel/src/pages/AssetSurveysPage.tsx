@@ -1,27 +1,50 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, MapPin, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
+import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, Forward, MapPin, RotateCcw, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
 import * as api from '../services/api';
-import type { AssetSurvey, AssetSurveyPagination, AssetSurveyStats } from '../types';
+import type { AssetSurvey, AssetSurveyPagination, AssetSurveyReviewStatus, AssetSurveyStats, User } from '../types';
 
-type ReviewStatus = 'pending' | 'approved' | 'rejected';
+type ReviewStatus = AssetSurveyReviewStatus;
 
 const CHILD_TO_REVIEW_STATUS: Record<string, ReviewStatus> = {
   'pending-review': 'pending',
+  returned: 'returned',
+  'gram-sachiv-approved': 'gram_sachiv_approved',
+  'bdpo-forwarded': 'bdpo_forwarded',
   approved: 'approved',
   rejected: 'rejected',
 };
 
 const REVIEW_BADGE: Record<ReviewStatus, string> = {
   pending: 'bg-amber-50 text-amber-800 border-amber-200',
+  returned: 'bg-orange-50 text-orange-700 border-orange-200',
+  gram_sachiv_approved: 'bg-sky-50 text-sky-700 border-sky-200',
+  bdpo_forwarded: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 
 const REVIEW_LABEL: Record<ReviewStatus, string> = {
   pending: 'Pending review',
+  returned: 'Returned for correction',
+  gram_sachiv_approved: 'Verified by Gram Sachiv',
+  bdpo_forwarded: 'Forwarded by BDPO',
   approved: 'Approved',
   rejected: 'Rejected',
 };
+
+// The role that owns each in-flight status - matches the backend's
+// AssetSurveyController::STAGE_OWNER. Terminal statuses (returned, approved,
+// rejected) have no owner since no further stage action applies.
+const STAGE_OWNER: Partial<Record<ReviewStatus, string>> = {
+  pending: 'gram_sachiv',
+  gram_sachiv_approved: 'bdpo',
+  bdpo_forwarded: 'ddpo',
+};
+
+function canActOnStage(currentUser: User, status: ReviewStatus): boolean {
+  if (currentUser.is_super_admin || currentUser.role === 'admin') return true;
+  return STAGE_OWNER[status] === currentUser.role;
+}
 
 function ReviewBadge({ value }: { value: ReviewStatus }) {
   return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${REVIEW_BADGE[value]}`}>{REVIEW_LABEL[value]}</span>;
@@ -50,7 +73,9 @@ const EMPTY_PAGINATION: AssetSurveyPagination = {
 
 const EMPTY_STATS: AssetSurveyStats = {
   totalSurveys: 0, activeSurveyors: 0, poorDamaged: 0,
-  statusCounts: { pending: 0, approved: 0, rejected: 0 },
+  statusCounts: {
+    pending: 0, returned: 0, gram_sachiv_approved: 0, bdpo_forwarded: 0, approved: 0, rejected: 0,
+  },
 };
 
 function visiblePages(currentPage: number, lastPage: number) {
@@ -60,11 +85,18 @@ function visiblePages(currentPage: number, lastPage: number) {
 }
 
 interface AssetSurveysPageProps {
-  // Sidebar sub-item id: 'pending-review' | 'approved' | 'rejected'.
+  currentUser: User;
+  // Sidebar sub-item id, e.g. 'pending-review' | 'returned' | 'gram-sachiv-approved' | 'bdpo-forwarded' | 'approved' | 'rejected'.
   childId?: string;
 }
 
-export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
+// A reason-required action pending confirmation (reject or return-for-correction).
+interface ReasonAction {
+  survey: AssetSurvey;
+  action: 'reject' | 'return';
+}
+
+export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysPageProps) {
   const reviewStatus = CHILD_TO_REVIEW_STATUS[childId ?? ''] ?? 'pending';
 
   const [surveys, setSurveys] = useState<AssetSurvey[]>([]);
@@ -79,8 +111,8 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actioningId, setActioningId] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
+  const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
+  const [reasonText, setReasonText] = useState('');
 
   // Switching tabs (Pending/Approved/Rejected) should feel like a fresh list,
   // not a page you scrolled down on.
@@ -117,11 +149,13 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
     };
   }, [page, perPage, query, condition, reviewStatus, refreshTick]);
 
-  const handleApprove = async (survey: AssetSurvey) => {
+  // Shared by verify/forward/approve - the three no-reason positive
+  // transitions, one per stage.
+  const runStageAction = async (survey: AssetSurvey, action: () => Promise<unknown>) => {
     setActioningId(survey.id);
     setActionError('');
     try {
-      await api.approveAssetSurvey(survey.id);
+      await action();
       setSurveys((prev) => prev.filter((s) => s.id !== survey.id));
       setSelected(null);
       setRefreshTick((t) => t + 1);
@@ -131,6 +165,10 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
       setActioningId(null);
     }
   };
+
+  const handleVerify = (survey: AssetSurvey) => runStageAction(survey, () => api.verifyAssetSurvey(survey.id));
+  const handleForward = (survey: AssetSurvey) => runStageAction(survey, () => api.forwardAssetSurvey(survey.id));
+  const handleFinalApprove = (survey: AssetSurvey) => runStageAction(survey, () => api.approveAssetSurvey(survey.id));
 
   const handleDelete = async (survey: AssetSurvey) => {
     if (!confirm(`Delete survey for "${survey.assetName}"? This cannot be undone.`)) return;
@@ -148,16 +186,23 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
     }
   };
 
-  const handleReject = async (survey: AssetSurvey, reason: string) => {
+  // Reject and return-for-correction both need a typed reason. Shared by
+  // the inline table row (via reasonAction state) and the detail modal
+  // (which tracks its own local reason input).
+  const submitReasonActionFor = async (survey: AssetSurvey, action: 'reject' | 'return', reason: string) => {
     if (!reason.trim()) return;
     setActioningId(survey.id);
     setActionError('');
     try {
-      await api.rejectAssetSurvey(survey.id, reason.trim());
+      if (action === 'reject') {
+        await api.rejectAssetSurvey(survey.id, reason.trim());
+      } else {
+        await api.returnAssetSurvey(survey.id, reason.trim());
+      }
       setSurveys((prev) => prev.filter((s) => s.id !== survey.id));
       setSelected(null);
-      setRejectingId(null);
-      setRejectReason('');
+      setReasonAction(null);
+      setReasonText('');
       setRefreshTick((t) => t + 1);
     } catch (err) {
       setActionError((err as Error).message);
@@ -220,20 +265,40 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
                 <td className="px-4 py-3 text-[11px] text-muted whitespace-nowrap">{formatDate(survey.surveyDate)}</td>
                 <td className="px-4 py-3">
                   <ReviewBadge value={survey.reviewStatus} />
-                  {survey.reviewStatus === 'rejected' && survey.rejectionReason && (
+                  {(survey.reviewStatus === 'rejected' || survey.reviewStatus === 'returned') && survey.rejectionReason && (
                     <p className="text-[10px] text-red-600 mt-1 max-w-[160px]" title={survey.rejectionReason}>{survey.rejectionReason}</p>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2.5 flex-wrap">
                     <button onClick={() => setSelected(survey)} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline cursor-pointer"><Eye className="w-3.5 h-3.5" /> View</button>
-                    {survey.reviewStatus === 'pending' && (
+                    {canActOnStage(currentUser, survey.reviewStatus) && (
                       <>
-                        <button disabled={actioningId === survey.id} onClick={() => handleApprove(survey)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 cursor-pointer">
-                          <Check className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button disabled={actioningId === survey.id} onClick={() => { setRejectingId(survey.id); setRejectReason(''); }}
+                        {survey.reviewStatus === 'pending' && (
+                          <>
+                            <button disabled={actioningId === survey.id} onClick={() => handleVerify(survey)}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 cursor-pointer">
+                              <Check className="w-3.5 h-3.5" /> Verify
+                            </button>
+                            <button disabled={actioningId === survey.id} onClick={() => { setReasonAction({ survey, action: 'return' }); setReasonText(''); }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline disabled:opacity-50 cursor-pointer">
+                              <RotateCcw className="w-3.5 h-3.5" /> Return
+                            </button>
+                          </>
+                        )}
+                        {survey.reviewStatus === 'gram_sachiv_approved' && (
+                          <button disabled={actioningId === survey.id} onClick={() => handleForward(survey)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline disabled:opacity-50 cursor-pointer">
+                            <Forward className="w-3.5 h-3.5" /> Forward
+                          </button>
+                        )}
+                        {survey.reviewStatus === 'bdpo_forwarded' && (
+                          <button disabled={actioningId === survey.id} onClick={() => handleFinalApprove(survey)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 cursor-pointer">
+                            <Check className="w-3.5 h-3.5" /> Approve
+                          </button>
+                        )}
+                        <button disabled={actioningId === survey.id} onClick={() => { setReasonAction({ survey, action: 'reject' }); setReasonText(''); }}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline disabled:opacity-50 cursor-pointer">
                           <ShieldAlert className="w-3.5 h-3.5" /> Reject
                         </button>
@@ -246,18 +311,18 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
                   </div>
                 </td>
               </tr>
-              {rejectingId === survey.id && (
-                <tr className="bg-red-50/40">
+              {reasonAction?.survey.id === survey.id && (
+                <tr className={reasonAction.action === 'reject' ? 'bg-red-50/40' : 'bg-orange-50/40'}>
                   <td colSpan={9} className="px-4 py-3">
                     <div className="flex gap-2 items-center">
-                      <input value={rejectReason} onChange={(event) => setRejectReason(event.target.value)}
-                        placeholder="Reason for rejection…" autoFocus
+                      <input value={reasonText} onChange={(event) => setReasonText(event.target.value)}
+                        placeholder={reasonAction.action === 'reject' ? 'Reason for rejection…' : 'Reason for returning for correction…'} autoFocus
                         className="flex-1 text-xs border border-line rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-red-300" />
-                      <button disabled={!rejectReason.trim() || actioningId === survey.id} onClick={() => handleReject(survey, rejectReason)}
-                        className="bg-red-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
-                        {actioningId === survey.id ? 'Rejecting…' : 'Confirm reject'}
+                      <button disabled={!reasonText.trim() || actioningId === survey.id} onClick={() => submitReasonActionFor(survey, reasonAction.action, reasonText)}
+                        className={`hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer ${reasonAction.action === 'reject' ? 'bg-red-600' : 'bg-orange-600'}`}>
+                        {actioningId === survey.id ? 'Submitting…' : reasonAction.action === 'reject' ? 'Confirm reject' : 'Confirm return'}
                       </button>
-                      <button onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                      <button onClick={() => { setReasonAction(null); setReasonText(''); }}
                         className="text-xs font-bold px-3 py-2 rounded-lg border border-line text-muted hover:bg-white cursor-pointer">
                         Cancel
                       </button>
@@ -300,9 +365,13 @@ export default function AssetSurveysPage({ childId }: AssetSurveysPageProps) {
       {selected && (
         <SurveyDetails
           survey={selected}
+          currentUser={currentUser}
           onClose={() => setSelected(null)}
-          onApprove={() => handleApprove(selected)}
-          onReject={(reason) => handleReject(selected, reason)}
+          onVerify={() => handleVerify(selected)}
+          onReturn={(reason) => submitReasonActionFor(selected, 'return', reason)}
+          onForward={() => handleForward(selected)}
+          onFinalApprove={() => handleFinalApprove(selected)}
+          onReject={(reason) => submitReasonActionFor(selected, 'reject', reason)}
           onDelete={() => handleDelete(selected)}
           isActioning={actioningId === selected.id}
         />
@@ -318,16 +387,25 @@ function Stat({ label, value, icon }: { label: string; value: number; icon: Reac
   </div>;
 }
 
-function SurveyDetails({ survey, onClose, onApprove, onReject, onDelete, isActioning }: {
+const ACTION_PAST_TENSE: Record<string, string> = {
+  verified: 'Verified', returned: 'Returned for correction', forwarded: 'Forwarded', approved: 'Approved', rejected: 'Rejected',
+};
+
+function SurveyDetails({ survey, currentUser, onClose, onVerify, onReturn, onForward, onFinalApprove, onReject, onDelete, isActioning }: {
   survey: AssetSurvey;
+  currentUser: User;
   onClose: () => void;
-  onApprove: () => void;
+  onVerify: () => void;
+  onReturn: (reason: string) => void;
+  onForward: () => void;
+  onFinalApprove: () => void;
   onReject: (reason: string) => void;
   onDelete: () => void;
   isActioning: boolean;
 }) {
-  const [showReject, setShowReject] = useState(false);
+  const [reasonMode, setReasonMode] = useState<'reject' | 'return' | null>(null);
   const [reason, setReason] = useState('');
+  const canAct = canActOnStage(currentUser, survey.reviewStatus);
 
   return <div className="fixed inset-0 bg-black/45 z-[70] flex items-center justify-center p-5" onClick={onClose}>
     <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
@@ -362,25 +440,51 @@ function SurveyDetails({ survey, onClose, onApprove, onReject, onDelete, isActio
             <a key={url} href={api.mediaUrl(url)} target="_blank" rel="noreferrer" className="block aspect-[4/3] rounded-lg overflow-hidden border border-line bg-cream"><img src={api.mediaUrl(url)} alt={`Survey ${index + 1}`} className="w-full h-full object-cover" /></a>)}</div>
         </div>
 
-        {survey.reviewStatus !== 'pending' && (
-          <div className="border border-line rounded-lg p-3 text-xs text-muted">
-            {survey.reviewStatus === 'approved' ? 'Approved' : 'Rejected'} by {survey.reviewedByName || 'admin'}
-            {survey.reviewedAt ? ` on ${formatDate(survey.reviewedAt)}` : ''}
-            {survey.reviewStatus === 'rejected' && survey.rejectionReason && (
-              <p className="text-red-600 mt-1">Reason: {survey.rejectionReason}</p>
-            )}
+        {survey.reviews.length > 0 && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-muted mb-2">Approval history</p>
+            <div className="space-y-2">
+              {survey.reviews.map((review, index) => (
+                <div key={index} className="border border-line rounded-lg p-3 text-xs text-muted">
+                  <span className="font-semibold text-ink">{ACTION_PAST_TENSE[review.action] ?? review.action}</span>
+                  {' by '}{review.actorName || 'admin'} ({review.actorRole})
+                  {review.createdAt ? ` on ${formatDate(review.createdAt)}` : ''}
+                  {review.remarks && <p className="text-red-600 mt-1">Reason: {review.remarks}</p>}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {survey.reviewStatus === 'pending' && (
+        {canAct && (
           <div className="border-t border-line pt-4">
-            {!showReject ? (
-              <div className="flex gap-2">
-                <button disabled={isActioning} onClick={onApprove}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
-                  <Check className="w-3.5 h-3.5" /> {isActioning ? 'Approving…' : 'Approve survey'}
-                </button>
-                <button disabled={isActioning} onClick={() => setShowReject(true)}
+            {!reasonMode ? (
+              <div className="flex gap-2 flex-wrap">
+                {survey.reviewStatus === 'pending' && (
+                  <>
+                    <button disabled={isActioning} onClick={onVerify}
+                      className="flex items-center gap-1.5 bg-emerald-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                      <Check className="w-3.5 h-3.5" /> {isActioning ? 'Verifying…' : 'Verify survey'}
+                    </button>
+                    <button disabled={isActioning} onClick={() => { setReasonMode('return'); setReason(''); }}
+                      className="flex items-center gap-1.5 border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                      <RotateCcw className="w-3.5 h-3.5" /> Return for correction
+                    </button>
+                  </>
+                )}
+                {survey.reviewStatus === 'gram_sachiv_approved' && (
+                  <button disabled={isActioning} onClick={onForward}
+                    className="flex items-center gap-1.5 bg-indigo-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                    <Forward className="w-3.5 h-3.5" /> {isActioning ? 'Forwarding…' : 'Forward to DDPO'}
+                  </button>
+                )}
+                {survey.reviewStatus === 'bdpo_forwarded' && (
+                  <button disabled={isActioning} onClick={onFinalApprove}
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                    <Check className="w-3.5 h-3.5" /> {isActioning ? 'Approving…' : 'Give final approval'}
+                  </button>
+                )}
+                <button disabled={isActioning} onClick={() => { setReasonMode('reject'); setReason(''); }}
                   className="flex items-center gap-1.5 border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
                   <ShieldAlert className="w-3.5 h-3.5" /> Reject survey
                 </button>
@@ -388,13 +492,13 @@ function SurveyDetails({ survey, onClose, onApprove, onReject, onDelete, isActio
             ) : (
               <div className="flex gap-2">
                 <input value={reason} onChange={(event) => setReason(event.target.value)}
-                  placeholder="Reason for rejection…" autoFocus
+                  placeholder={reasonMode === 'reject' ? 'Reason for rejection…' : 'Reason for returning for correction…'} autoFocus
                   className="flex-1 text-xs border border-line rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-red-300" />
-                <button disabled={!reason.trim() || isActioning} onClick={() => onReject(reason)}
-                  className="bg-red-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
-                  {isActioning ? 'Rejecting…' : 'Confirm reject'}
+                <button disabled={!reason.trim() || isActioning} onClick={() => (reasonMode === 'reject' ? onReject(reason) : onReturn(reason))}
+                  className={`hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer ${reasonMode === 'reject' ? 'bg-red-600' : 'bg-orange-600'}`}>
+                  {isActioning ? 'Submitting…' : reasonMode === 'reject' ? 'Confirm reject' : 'Confirm return'}
                 </button>
-                <button onClick={() => { setShowReject(false); setReason(''); }}
+                <button onClick={() => { setReasonMode(null); setReason(''); }}
                   className="text-xs font-bold px-3 py-2 rounded-lg border border-line text-muted hover:bg-cream cursor-pointer">
                   Cancel
                 </button>

@@ -41,6 +41,17 @@ class ComplaintController extends Controller
         'duplicateOf.category',
     ];
 
+    // What geographic tier each staff role is scoped to for *seeing*
+    // complaints in index()/show() - independent of findResolver()'s
+    // auto-assignment matching above, which only panchayat-matches
+    // secretary/sarpanch today. A complaint explicitly assigned/transferred
+    // to a user is always visible to them regardless of this scope.
+    private const JURISDICTION_SCOPE_BY_ROLE = [
+        'cplo' => 'panchayat', 'gram_sachiv' => 'panchayat', 'secretary' => 'panchayat', 'sarpanch' => 'panchayat',
+        'bdpo' => 'block',
+        'ddpo' => 'district', 'xen_pr' => 'district', 'deputy_commissioner' => 'district',
+    ];
+
     public function categories(Request $request)
     {
         $assetTypeId = $request->integer('asset_type_id') ?: null;
@@ -259,6 +270,71 @@ class ComplaintController extends Controller
         return $query->first();
     }
 
+    // Restricts $query to complaints within $user's jurisdiction (per
+    // JURISDICTION_SCOPE_BY_ROLE), plus anything already assigned to them
+    // directly. Roles with no entry (admin, department staff, ...) aren't
+    // geo-scoped and see everything, unchanged.
+    private function applyJurisdictionScope($query, User $user): void
+    {
+        $scope = self::JURISDICTION_SCOPE_BY_ROLE[$user->role] ?? null;
+        if ($scope === null) {
+            return;
+        }
+
+        $query->where(function ($q) use ($scope, $user) {
+            $q->where('assigned_to_id', $user->id);
+
+            if ($scope === 'panchayat' && $user->panchayat_id) {
+                $q->orWhere('panchayat_id', $user->panchayat_id);
+                if ($user->district_id) {
+                    $q->orWhere(fn ($dq) => $dq->whereNull('panchayat_id')->where('district_id', $user->district_id));
+                }
+            } elseif ($scope === 'block') {
+                $blockIds = $user->blocks()->pluck('blocks.id')->all();
+                if ($user->block_id) {
+                    $blockIds[] = $user->block_id;
+                }
+                if ($blockIds !== []) {
+                    $q->orWhereHas('panchayatMaster', fn ($pq) => $pq->whereIn('block_id', $blockIds));
+                }
+                if ($user->district_id) {
+                    $q->orWhere(fn ($dq) => $dq->whereDoesntHave('panchayatMaster')->where('district_id', $user->district_id));
+                }
+            } elseif ($scope === 'district' && $user->district_id) {
+                $q->orWhere('district_id', $user->district_id);
+            }
+        });
+    }
+
+    // Single-record equivalent of applyJurisdictionScope(), for show() - a
+    // scoped-out complaint shouldn't be openable by guessing its id either.
+    private function isJurisdictionRelevant(User $user, Complaint $complaint): bool
+    {
+        $scope = self::JURISDICTION_SCOPE_BY_ROLE[$user->role] ?? null;
+        if ($scope === null || $complaint->assigned_to_id === $user->id) {
+            return true;
+        }
+
+        return match ($scope) {
+            'panchayat' => $complaint->panchayat_id !== null
+                ? $complaint->panchayat_id === $user->panchayat_id
+                : ($user->district_id !== null && $complaint->district_id === $user->district_id),
+            'block' => $this->bdpoBlockMatches($user, $complaint),
+            'district' => $user->district_id !== null && $complaint->district_id === $user->district_id,
+            default => true,
+        };
+    }
+
+    private function bdpoBlockMatches(User $user, Complaint $complaint): bool
+    {
+        $blockId = $complaint->panchayatMaster?->block_id;
+        if ($blockId === null) {
+            return $user->district_id !== null && $complaint->district_id === $user->district_id;
+        }
+
+        return $blockId === $user->block_id || $user->blocks()->whereKey($blockId)->exists();
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -470,9 +546,12 @@ class ComplaintController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = Complaint::with(self::LIST_WITH)->orderByDesc('created_at');
-        if ($request->user()->role === 'citizen') {
-            $query->where('user_id', $request->user()->id);
+        if ($user->role === 'citizen') {
+            $query->where('user_id', $user->id);
+        } else {
+            $this->applyJurisdictionScope($query, $user);
         }
 
         return response()->json(['success' => true, 'complaints' => $query->get()]);
@@ -480,11 +559,16 @@ class ComplaintController extends Controller
 
     public function show(Request $request, int $id)
     {
+        $user = $request->user();
         $complaint = Complaint::with(self::WITH)->find($id);
-        $isOwner = $complaint && $complaint->user_id === $request->user()->id;
-        $isStaff = $request->user()->role !== 'citizen';
+        $isOwner = $complaint && $complaint->user_id === $user->id;
+        $isStaff = $user->role !== 'citizen';
 
         if (! $complaint || (! $isOwner && ! $isStaff)) {
+            return response()->json(['success' => false, 'message' => 'Complaint not found'], 404);
+        }
+
+        if ($isStaff && ! $isOwner && ! $this->isJurisdictionRelevant($user, $complaint)) {
             return response()->json(['success' => false, 'message' => 'Complaint not found'], 404);
         }
 

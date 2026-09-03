@@ -22,6 +22,14 @@ const TABS: (ComplaintStatus | 'All')[] = [
 
 const PAGE_SIZE = 10;
 
+// A complaint escalates up the same panchayat->block->district chain as the
+// asset-survey workflow: CPLO hands off to their Gram Sachiv, Gram Sachiv to
+// BDPO, BDPO to DDPO. Whoever is logged in only needs to see the next rung,
+// not the whole staff directory.
+const NEXT_ROLE: Partial<Record<string, string>> = {
+  cplo: 'gram_sachiv', gram_sachiv: 'bdpo', bdpo: 'ddpo',
+};
+
 const TIMELINE_ICONS: Record<string, typeof FileText> = {
   Pending: FileText,
   Acknowledged: UserCheck,
@@ -210,6 +218,22 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
 
   const hasPermission = (key: string) =>
     !!currentUser.is_super_admin || (currentUser.permissions ?? []).includes(key);
+
+  // Geo-scoped roles (cplo, gram_sachiv, bdpo, ddpo, ...) only make sense to
+  // assign/transfer within the complaint's own district - with 2500+ CPLOs
+  // system-wide, an unfiltered list is useless. Roles with no district_id at
+  // all (admin, department-level staff) aren't geo-scoped, so they always show.
+  const geoRelevantAssignableUsers = useMemo(() => {
+    let pool = assignableUsers;
+
+    const nextRole = NEXT_ROLE[currentUser.role];
+    if (nextRole) {
+      pool = pool.filter((u) => u.role === nextRole);
+    }
+
+    if (!selected || selected.district_id === null) return pool;
+    return pool.filter((u) => u.district_id === null || u.district_id === selected.district_id);
+  }, [assignableUsers, selected, currentUser.role]);
 
   const canAcknowledge = !!selected && (selected.status === 'Pending' || selected.status === 'Reopened') && hasPermission('complaints.acknowledge');
   const canSurvey = !!selected && hasPermission('complaints.survey') && !!nextSurveyStage(selected.status);
@@ -586,7 +610,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     className="flex-1 text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     <option value="">Assign to… (optional)</option>
-                    {assignableUsers.map((u) => (
+                    {geoRelevantAssignableUsers.map((u) => (
                       <option key={u.id} value={u.id}>{u.name || u.username} · {u.role.replace(/_/g, ' ')}</option>
                     ))}
                   </select>
@@ -667,7 +691,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                     className="w-48 text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     <option value="">Transfer to…</option>
-                    {assignableUsers.map((u) => (
+                    {geoRelevantAssignableUsers.map((u) => (
                       <option key={u.id} value={u.id}>{u.name || u.username} · {u.role.replace(/_/g, ' ')}</option>
                     ))}
                   </select>
