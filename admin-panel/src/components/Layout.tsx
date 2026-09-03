@@ -94,7 +94,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   master: 'Manage master data used across the system',
   reports: 'Generate and view system reports',
   complaints: 'Track and resolve citizen grievances',
-  'my-surveys': 'Your assigned field surveys',
+  'my-surveys': 'Field surveys you submitted from the app',
   'village-assets': 'GIS infrastructure tracking',
   surveyors: 'Assign departments so surveyors can pick department → assets in the app',
   'cplo-management': 'Give a Surveyor (acting as CPLO) and a Gram Sachiv (verify) a panchayat',

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Search, Users as UsersIcon, Inbox, ChevronLeft, ChevronRight, Lock, Trash2, Eye, Pencil,
+  Search, Users as UsersIcon, Inbox, ChevronLeft, ChevronRight, Lock, Trash2, Eye, EyeOff, Pencil,
   Phone, Mail, MapPin, IdCard, Users2, ShieldCheck, X, RefreshCw,
 } from 'lucide-react';
 import * as api from '../services/api';
@@ -81,6 +81,9 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const [editBlock, setEditBlock] = useState('');
   const [editPanchayat, setEditPanchayat] = useState('');
   const [editActive, setEditActive] = useState(true);
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [hiddenPasswordIds, setHiddenPasswordIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +169,8 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
     setEditBlock(u.block_id ? String(u.block_id) : '');
     setEditPanchayat(u.panchayat_id ? String(u.panchayat_id) : '');
     setEditActive(u.is_active);
+    setEditPassword('');
+    setShowEditPassword(false);
     setError('');
   };
 
@@ -187,6 +192,9 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
         department_id: editDepartment ? Number(editDepartment) : null,
         is_active: editActive,
       };
+      if (editPassword.trim()) {
+        payload.password = editPassword.trim();
+      }
 
       // The backend derives block/district FROM panchayat whenever
       // panchayat_id is present in the request (even as null) - only send it
@@ -202,6 +210,8 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
 
       const { user } = await api.updateUser(selected.id, payload);
       setSelected(user);
+      setEditPassword('');
+      setShowEditPassword(false);
       setRefreshKey((k) => k + 1);
     } catch (err) {
       setError((err as Error).message);
@@ -331,6 +341,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
               <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
                 <th className="text-left p-2.5">S.No.</th>
                 <th className="text-left p-2.5">Username</th>
+                <th className="text-left p-2.5">Password</th>
                 <th className="text-left p-2.5">Phone No.</th>
                 <th className="text-left p-2.5">Name</th>
                 <th className="text-left p-2.5">Email</th>
@@ -357,6 +368,19 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
                   <td className="p-2.5 font-semibold text-slate-800">
                     {u.username}
                     {u.id === currentUser.id && <span className="ml-1.5 text-[9px] text-slate-400">(you)</span>}
+                  </td>
+                  <td className="p-2.5" onClick={(event) => event.stopPropagation()}>
+                    <PasswordReveal
+                      password={u.login_password}
+                      hidden={hiddenPasswordIds.has(u.id)}
+                      onToggle={() => setHiddenPasswordIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(u.id)) next.delete(u.id);
+                        else next.add(u.id);
+                        return next;
+                      })}
+                      onSet={() => selectUser(u)}
+                    />
                   </td>
                   <td className="p-2.5 text-slate-500">{u.mobile || '—'}</td>
                   <td className="p-2.5 text-slate-600">{u.name || '—'}</td>
@@ -494,6 +518,11 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
 
               <ViewSection title="Account" icon={<ShieldCheck className="w-3.5 h-3.5" />}>
                 <ViewField
+                  label="Password"
+                  value={viewTarget.login_password}
+                  mono
+                />
+                <ViewField
                   label="Status"
                   value={viewTarget.is_active ? 'Active' : 'Inactive'}
                   badge={viewTarget.is_active ? 'emerald' : 'slate'}
@@ -571,6 +600,30 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
                 <TextField label="Full Name" value={editName} onChange={setEditName} span={2} />
                 <TextField label="Phone No." value={editMobile} onChange={setEditMobile} icon={<Phone className="w-3.5 h-3.5" />} />
                 <TextField label="Email" value={editEmail} onChange={setEditEmail} icon={<Mail className="w-3.5 h-3.5" />} />
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showEditPassword ? 'text' : 'password'}
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      placeholder={selected.login_password ? 'Leave blank to keep current' : 'Set a password to show it here'}
+                      autoComplete="new-password"
+                      className="w-full text-xs border border-slate-300 rounded-lg py-1.5 pl-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      title={showEditPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  {selected.login_password && !editPassword && (
+                    <p className="mt-1 font-mono text-[11px] text-slate-500">Current: {selected.login_password}</p>
+                  )}
+                </div>
               </EditSection>
 
               <EditSection title="Identifiers" icon={<IdCard className="w-3.5 h-3.5" />}>
@@ -741,7 +794,7 @@ function ViewSection({ title, icon, children }: { title: string; icon: React.Rea
   );
 }
 
-function ViewField({ label, value, badge }: { label: string; value?: string | null; badge?: 'emerald' | 'slate' }) {
+function ViewField({ label, value, badge, mono }: { label: string; value?: string | null; badge?: 'emerald' | 'slate'; mono?: boolean }) {
   return (
     <div>
       <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">{label}</p>
@@ -752,8 +805,44 @@ function ViewField({ label, value, badge }: { label: string; value?: string | nu
           {value || '—'}
         </span>
       ) : (
-        <p className="text-slate-700 font-medium">{value || '—'}</p>
+        <p className={`text-slate-700 font-medium ${mono ? 'font-mono text-[11px]' : ''}`}>{value || '—'}</p>
       )}
+    </div>
+  );
+}
+
+function PasswordReveal({
+  password, hidden, onToggle, onSet,
+}: {
+  password?: string | null;
+  hidden: boolean;
+  onToggle: () => void;
+  onSet: () => void;
+}) {
+  if (!password) {
+    return (
+      <button
+        type="button"
+        onClick={onSet}
+        className="text-[11px] font-semibold text-accent hover:underline"
+        title="Password was set before it could be stored for admin view. Set a new one to show it here."
+      >
+        Set password
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 min-w-[120px]">
+      <span className="font-mono text-[11px] text-slate-800">{hidden ? '••••••••' : password}</span>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        title={hidden ? 'Show password' : 'Hide password'}
+      >
+        {hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+      </button>
     </div>
   );
 }

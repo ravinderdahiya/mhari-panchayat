@@ -192,6 +192,7 @@ export interface AdminUser {
   member_id: string | null;
   family_id: string | null;
   mobile: string | null;
+  login_password?: string | null;
   created_at: string;
   registration_status:
     | 'pending_email'

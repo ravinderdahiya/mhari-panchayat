@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -12,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
+use Throwable;
 
 #[Fillable([
     'username', 'name', 'email', 'password', 'role', 'is_active', 'department_id',
@@ -22,7 +26,7 @@ use Laravel\Sanctum\HasApiTokens;
     'set_password_token', 'set_password_token_expires_at',
     'rejection_reason', 'reviewed_by_id', 'reviewed_at',
 ])]
-#[Hidden(['password', 'email_verification_token', 'set_password_token'])]
+#[Hidden(['password', 'login_password_enc', 'email_verification_token', 'set_password_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -39,6 +43,40 @@ class User extends Authenticatable
             'set_password_token_expires_at' => 'datetime',
             'reviewed_at' => 'datetime',
         ];
+    }
+
+    public function setAttribute($key, $value)
+    {
+        if ($key === 'password' && is_string($value) && $value !== '' && ! Hash::isHashed($value)) {
+            parent::setAttribute('login_password_enc', Crypt::encryptString($value));
+        }
+
+        return parent::setAttribute($key, $value);
+    }
+
+    /** Plain login password for the admin Users table. Null when it was never captured (bcrypt cannot be reversed). */
+    public function revealedLoginPassword(): ?string
+    {
+        $blob = $this->attributes['login_password_enc'] ?? null;
+        if (! is_string($blob) || $blob === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($blob);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    protected function loginPassword(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->revealedLoginPassword());
+    }
+
+    public function appendRevealedLoginPassword(): static
+    {
+        return $this->append('login_password');
     }
 
     public function complaints(): HasMany
@@ -135,6 +173,7 @@ class User extends Authenticatable
     public function toAuthArray(): array
     {
         $data = $this->toArray();
+        unset($data['login_password'], $data['login_password_enc']);
         $data['is_super_admin'] = $this->isSuperAdmin();
         $data['permissions'] = $this->permissionKeys();
 

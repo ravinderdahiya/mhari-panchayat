@@ -11,10 +11,10 @@ class ApiConfig {
 
   /// Phone + PC same Wi‑Fi / hotspot. Change this IP if your LAN address
   /// changes - check with `ipconfig` on the PC side.
-  //static const String localBaseUrl = 'http://192.168.137.1:8083';
+  static const String localBaseUrl = 'http://192.168.137.1:8083';
 
   /// Phone + PC same Wi‑Fi. Change this IP if your LAN address changes.
-  static const String localBaseUrl = 'http://172.16.1.190:8083';
+  // static const String localBaseUrl = 'http://172.16.1.190:8083';
 
 
   static const String liveBaseUrl = 'https://hsac.in/mhari-panchayat';

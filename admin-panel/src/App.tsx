@@ -108,7 +108,7 @@ export default function App() {
       {activeView === 'dashboard' && <DashboardPage onNavigateToComplaints={goToComplaints} onNavigateToComplaint={goToComplaint} />}
       {activeView === 'master' && <MasterDataPage initialEntityKey={masterEntityKey} />}
       {activeView === 'complaints' && <ComplaintsPage currentUser={currentUser} initialStatus={complaintsFilter} initialComplaintId={complaintsInitialId} />}
-      {activeView === 'my-surveys' && <MySurveysPage currentUser={currentUser} onNavigateToComplaint={goToComplaint} />}
+      {activeView === 'my-surveys' && <MySurveysPage />}
       {activeView === 'surveyors' && <SurveyorsPage onNavigateToComplaint={goToComplaint} />}
       {activeView === 'cplo-management' && <CploManagementPage />}
       {activeView === 'asset-surveys' && <AssetSurveysPage currentUser={currentUser} childId={assetSurveyChildId} />}

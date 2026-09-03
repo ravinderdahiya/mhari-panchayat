@@ -69,6 +69,7 @@ class UserController extends Controller
         if ($request->has('page')) {
             $paginator = $query->paginate((int) ($data['per_page'] ?? 10));
             $this->backfillEmployeeIds($paginator->getCollection());
+            $this->revealLoginPasswords($paginator->getCollection());
 
             return response()->json([
                 'success' => true,
@@ -86,6 +87,7 @@ class UserController extends Controller
 
         $users = $query->get();
         $this->backfillEmployeeIds($users);
+        $this->revealLoginPasswords($users);
 
         return response()->json(['success' => true, 'users' => $users->values()]);
     }
@@ -101,6 +103,13 @@ class UserController extends Controller
             $user->forceFill([
                 'employee_id' => sprintf('SUR-%s-%04d', $distCode, $user->id),
             ])->save();
+        }
+    }
+
+    private function revealLoginPasswords($users): void
+    {
+        foreach ($users as $user) {
+            $user->appendRevealedLoginPassword();
         }
     }
 
@@ -139,6 +148,7 @@ class UserController extends Controller
             'village_ids' => ['sometimes', 'array'],
             'village_ids.*' => ['integer', 'exists:villages,id'],
             'is_active' => ['sometimes', 'boolean'],
+            'password' => ['sometimes', 'nullable', 'string', 'min:8'],
         ]);
 
         // Setting a panchayat also fixes up block/district so the three stay
@@ -174,6 +184,10 @@ class UserController extends Controller
         $villageIds = $data['village_ids'] ?? null;
         unset($data['village_ids']);
 
+        if (! filled($data['password'] ?? null)) {
+            unset($data['password']);
+        }
+
         if ($villageIds !== null) {
             $user->villages()->sync($villageIds);
         }
@@ -185,7 +199,8 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
-            'user' => $user->fresh(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name', 'villages']),
+            'user' => $user->fresh(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name', 'villages'])
+                ?->appendRevealedLoginPassword(),
         ]);
     }
 

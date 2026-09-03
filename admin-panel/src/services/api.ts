@@ -232,6 +232,7 @@ export const updateUser = (
     panchayat_id?: number | null;
     village_ids?: number[];
     is_active?: boolean;
+    password?: string;
   },
 ) => jsonRequest<{ success: boolean; message: string; user: AdminUser }>(`/api/users/${id}`, 'PATCH', fields);
 
