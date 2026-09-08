@@ -176,6 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
         officerName: result.name,
         staffId: result.staffId,
         officerProfileId: result.officerProfileId,
+        assignedPanchayatId: result.assignedPanchayatId,
+        assignedPanchayatName: result.assignedPanchayatName,
       );
       if (!mounted) return;
       pushReplacement(context, dashboardForRole(serverRole));

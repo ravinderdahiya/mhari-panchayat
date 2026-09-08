@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js';
 import { Doughnut, Line } from 'react-chartjs-2';
 import type MapView from '@arcgis/core/views/MapView.js';
@@ -7,6 +8,7 @@ import FeatureLayer from '@arcgis/core/layers/FeatureLayer.js';
 import MapImageLayer from '@arcgis/core/layers/MapImageLayer.js';
 import UniqueValueRenderer from '@arcgis/core/renderers/UniqueValueRenderer.js';
 import Extent from '@arcgis/core/geometry/Extent.js';
+import * as reactiveUtils from '@arcgis/core/core/reactiveUtils.js';
 import ArcGISMap from '../map/ArcGISMap';
 import { dotSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
@@ -14,6 +16,7 @@ import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
 import { ListChecks, Hourglass, Wrench } from 'lucide-react';
 import * as api from '../services/api';
+import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import type { Complaint, ComplaintReports, ComplaintStatus } from '../types';
 
 ChartJS.register(ArcElement, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
@@ -99,6 +102,24 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const [filterTab, setFilterTab] = useState<'status' | 'category'>('status');
   const pointLayerRef = useRef<FeatureLayer | null>(null);
   const onNavigateToComplaintRef = useLatestRef(onNavigateToComplaint);
+  const complaintsRef = useLatestRef(complaints);
+  const popupRootRef = useRef<{ root: Root; container: HTMLDivElement } | null>(null);
+  // Unmounts the React root backing the popup's custom content, if any. The
+  // popup widget only ever detaches the content node from the DOM - it never
+  // unmounts what was rendered into it - so this has to be done by hand
+  // whenever the popup closes or its content is replaced for a new feature.
+  // Deferred a tick: unmounting synchronously here can collide with React's
+  // own in-progress render of this component (e.g. a click that both
+  // selects a new feature and triggers a parent re-render), which React
+  // warns about ("Attempted to synchronously unmount a root while React was
+  // already rendering"). A fresh task sidesteps whatever call stack
+  // triggered this.
+  const unmountPopupRoot = () => {
+    if (!popupRootRef.current) return;
+    const { root } = popupRootRef.current;
+    popupRootRef.current = null;
+    setTimeout(() => root.unmount(), 0);
+  };
 
   const isInitialBasemapRef = useRef(true);
   useEffect(() => {
@@ -142,16 +163,24 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     };
   }, [view]);
 
-  // Register the popup's "View Details" action handler once per view.
+  // Register the popup's "View Details" action handler once per view, and
+  // unmount the React root backing the popup's custom content whenever it
+  // closes - the popup widget just detaches the content node, it never
+  // unmounts what was rendered into it.
   useEffect(() => {
     if (!view?.popup) return undefined;
     const popup = view.popup;
-    const handle = popup.on('trigger-action', (event) => {
+    const actionHandle = popup.on('trigger-action', (event) => {
       if (event.action.id !== 'view-details') return;
       const id = popup.selectedFeature?.attributes?.id;
       if (id != null) onNavigateToComplaintRef.current(id);
     });
-    return () => handle.remove();
+    const visibleHandle = reactiveUtils.watch(() => popup.visible, (visible) => { if (!visible) unmountPopupRoot(); });
+    return () => {
+      actionHandle.remove();
+      visibleHandle.remove();
+      unmountPopupRoot();
+    };
   }, [view, onNavigateToComplaintRef]);
 
   // Rebuild the points FeatureLayer whenever the filtered set changes.
@@ -188,7 +217,15 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       }),
       popupTemplate: {
         title: 'Complaint {code}',
-        content: '{category} — {statusLabel}',
+        content: (event) => {
+          const complaint = complaintsRef.current.find((c) => c.id === event.graphic.attributes.id);
+          unmountPopupRoot();
+          const container = document.createElement('div');
+          const root = createRoot(container);
+          popupRootRef.current = { root, container };
+          root.render(complaint ? <ComplaintPopupCard complaint={complaint} /> : <span className="text-xs text-muted">Complaint details unavailable.</span>);
+          return container;
+        },
         actions: [{ type: 'button', title: 'View Details', id: 'view-details' }],
       },
     });

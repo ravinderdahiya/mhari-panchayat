@@ -55,6 +55,13 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
   bool _saving = false;
   String? _officerName;
 
+  // Set only for a Surveyor acting as CPLO (admin assigns them a single
+  // panchayat via CploManagementPage). Their data collection is meant to
+  // stay inside that one panchayat, so the GPS fix is checked against it.
+  int? _assignedPanchayatId;
+  String? _assignedPanchayatName;
+  bool _outOfAssignedArea = false;
+
   @override
   void initState() {
     super.initState();
@@ -99,7 +106,73 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
   Future<void> _loadOfficerName() async {
     final session = await AuthService.getSession();
     if (!mounted) return;
-    setState(() => _officerName = session?.officerName);
+    setState(() {
+      _officerName = session?.officerName;
+      _assignedPanchayatId = session?.assignedPanchayatId;
+      _assignedPanchayatName = session?.assignedPanchayatName;
+    });
+    // New-asset surveys check the area once their own GPS fix comes in
+    // (_enableGps). An existing survey already has coordinates from when it
+    // was first filed, so check those now instead of waiting for a fix that
+    // won't come.
+    if (widget.existingSurvey != null && _lat != null && _lng != null) {
+      _checkAssignedArea(_lat!, _lng!);
+    }
+  }
+
+  /// Compares a GPS fix against the signed-in CPLO's assigned panchayat, if
+  /// any. Surveyors with no panchayat assigned aren't scoped to any one area,
+  /// so this is a no-op for them; an inconclusive lookup (offline, no match)
+  /// fails open rather than blocking a legitimate submission.
+  Future<void> _checkAssignedArea(double lat, double lng) async {
+    final assignedId = _assignedPanchayatId;
+    if (assignedId == null) return;
+    DetectedLocation? location;
+    try {
+      location = await LocationApi.reverse(latitude: lat, longitude: lng);
+    } catch (_) {
+      return;
+    }
+    final detectedId = location?.panchayatId;
+    if (detectedId == null) return;
+    final outOfArea = detectedId != assignedId;
+    if (!mounted) return;
+    setState(() => _outOfAssignedArea = outOfArea);
+    if (outOfArea) _showOutOfAreaAlert();
+  }
+
+  Future<void> _showOutOfAreaAlert() async {
+    if (!mounted) return;
+    final area = _assignedPanchayatName;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.location_off_rounded,
+          color: AppColors.rejectedText,
+          size: 32,
+        ),
+        title: Text(
+          'क्षेत्र से बाहर',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          area != null
+              ? 'आप अपनी निर्धारित पंचायत "$area" के क्षेत्र से बाहर हैं। डेटा संग्रहण और सबमिशन केवल आपके निर्धारित क्षेत्र में ही किया जा सकता है।'
+              : 'आप अपने निर्धारित क्षेत्र से बाहर हैं। डेटा संग्रहण और सबमिशन केवल आपके निर्धारित क्षेत्र में ही किया जा सकता है।',
+          style: GoogleFonts.poppins(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'ठीक है',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -224,6 +297,7 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
           _districtController.text = detectedDistrict;
         }
       });
+      await _checkAssignedArea(position.latitude, position.longitude);
     } catch (_) {
       _showMessage('लोकेशन प्राप्त नहीं हो सकी। कृपया पुनः प्रयास करें।');
     } finally {
@@ -277,6 +351,11 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
 
     if (!_gpsEnabled || _lat == null || _lng == null) {
       _showMessage('Enable GPS to capture coordinates');
+      return;
+    }
+
+    if (_outOfAssignedArea) {
+      _showOutOfAreaAlert();
       return;
     }
 

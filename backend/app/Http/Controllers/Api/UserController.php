@@ -121,6 +121,7 @@ class UserController extends Controller
 
         $users = User::where('is_active', true)
             ->where('role', '!=', 'citizen')
+            ->with(['district:id,name', 'block:id,name', 'panchayat:id,name'])
             ->orderBy('name')
             ->get(['id', 'name', 'username', 'role', 'district_id', 'block_id', 'panchayat_id']);
 

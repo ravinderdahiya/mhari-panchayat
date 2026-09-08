@@ -44,6 +44,8 @@ class StaffLoginResult {
     required this.role,
     this.name,
     this.officerProfileId,
+    this.assignedPanchayatId,
+    this.assignedPanchayatName,
   });
 
   final String token;
@@ -55,6 +57,11 @@ class StaffLoginResult {
   /// The Officer table's own id (distinct from the login User id) —
   /// null for non-OFFICER staff (e.g. SURVEYOR).
   final String? officerProfileId;
+
+  /// Set only when this account has been given a single panchayat to act as
+  /// CPLO (see CploManagementPage on the admin side).
+  final int? assignedPanchayatId;
+  final String? assignedPanchayatName;
 }
 
 class UserProfile {
@@ -151,6 +158,7 @@ class AuthApi {
     final user = body['user'] as Map<String, dynamic>? ?? const {};
     final role = (user['role'] as String? ?? 'department_officer')
         .toLowerCase();
+    final panchayat = user['panchayat'] as Map<String, dynamic>?;
     return StaffLoginResult(
       token: body['token'] as String? ?? '',
       id: user['id']?.toString() ?? '',
@@ -161,6 +169,8 @@ class AuthApi {
       role: role,
       name: user['name'] as String?,
       officerProfileId: user['id']?.toString(),
+      assignedPanchayatId: (panchayat?['id'] as num?)?.toInt(),
+      assignedPanchayatName: panchayat?['name'] as String?,
     );
   }
 
