@@ -10,6 +10,8 @@ class AuthSession {
     this.officerName,
     this.staffId,
     this.officerProfileId,
+    this.assignedPanchayatId,
+    this.assignedPanchayatName,
   });
 
   final String token;
@@ -26,6 +28,13 @@ class AuthSession {
   /// User's id). Null for non-OFFICER staff (e.g. SURVEYOR).
   final String? officerProfileId;
 
+  /// Set only for a Surveyor acting as CPLO (admin-assigned a single
+  /// panchayat via the CPLO Management tab). Null for every other staff
+  /// account, including surveyors with no panchayat assigned — those aren't
+  /// scoped to any one area.
+  final int? assignedPanchayatId;
+  final String? assignedPanchayatName;
+
   bool get isValid => token.isNotEmpty;
 }
 
@@ -39,6 +48,8 @@ class AuthService {
   static const _officerNameKey = 'officer_name';
   static const _staffIdKey = 'staff_id';
   static const _officerProfileIdKey = 'officer_profile_id';
+  static const _assignedPanchayatIdKey = 'assigned_panchayat_id';
+  static const _assignedPanchayatNameKey = 'assigned_panchayat_name';
 
   static Future<AuthSession?> getSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -57,6 +68,8 @@ class AuthService {
       officerName: prefs.getString(_officerNameKey),
       staffId: prefs.getString(_staffIdKey),
       officerProfileId: prefs.getString(_officerProfileIdKey),
+      assignedPanchayatId: prefs.getInt(_assignedPanchayatIdKey),
+      assignedPanchayatName: prefs.getString(_assignedPanchayatNameKey),
     );
   }
 
@@ -72,6 +85,8 @@ class AuthService {
     String? officerName,
     String? staffId,
     String? officerProfileId,
+    int? assignedPanchayatId,
+    String? assignedPanchayatName,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -102,6 +117,18 @@ class AuthService {
     } else {
       await prefs.remove(_officerProfileIdKey);
     }
+
+    if (assignedPanchayatId != null) {
+      await prefs.setInt(_assignedPanchayatIdKey, assignedPanchayatId);
+    } else {
+      await prefs.remove(_assignedPanchayatIdKey);
+    }
+
+    if (assignedPanchayatName != null) {
+      await prefs.setString(_assignedPanchayatNameKey, assignedPanchayatName);
+    } else {
+      await prefs.remove(_assignedPanchayatNameKey);
+    }
   }
 
   static Future<void> logout() async {
@@ -113,5 +140,7 @@ class AuthService {
     await prefs.remove(_officerNameKey);
     await prefs.remove(_staffIdKey);
     await prefs.remove(_officerProfileIdKey);
+    await prefs.remove(_assignedPanchayatIdKey);
+    await prefs.remove(_assignedPanchayatNameKey);
   }
 }

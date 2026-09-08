@@ -50,6 +50,15 @@ function categoryColor(name: string): string {
   return CATEGORY_DOT_COLORS[Math.abs(hash) % CATEGORY_DOT_COLORS.length];
 }
 
+// "AJAY KUMAR · cplo — Hisar / Hansi / Bir Hisar" - the jurisdiction suffix
+// is what tells two same-named CPLOs (or a long alphabetical list) apart in
+// a plain <option>, which can't carry any richer markup than text.
+function assignableUserLabel(u: AssignableUser): string {
+  const jurisdiction = [u.district?.name, u.block?.name, u.panchayat?.name].filter(Boolean).join(' / ');
+  const base = `${u.name || u.username} · ${u.role.replace(/_/g, ' ')}`;
+  return jurisdiction ? `${base} — ${jurisdiction}` : base;
+}
+
 function toCsvValue(value: string | number | null | undefined): string {
   const s = String(value ?? '');
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -223,6 +232,12 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
   // assign/transfer within the complaint's own district - with 2500+ CPLOs
   // system-wide, an unfiltered list is useless. Roles with no district_id at
   // all (admin, department-level staff) aren't geo-scoped, so they always show.
+  //
+  // Narrowed the same way tier by tier - district, then block, then the exact
+  // panchayat - each tier only applied when the complaint actually has that
+  // level resolved *and* narrowing wouldn't wipe the list to empty (a CPLO
+  // whose own jurisdiction fields are still null always passes every tier,
+  // same reasoning as the district check).
   const geoRelevantAssignableUsers = useMemo(() => {
     let pool = assignableUsers;
 
@@ -231,8 +246,23 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
       pool = pool.filter((u) => u.role === nextRole);
     }
 
-    if (!selected || selected.district_id === null) return pool;
-    return pool.filter((u) => u.district_id === null || u.district_id === selected.district_id);
+    if (!selected) return pool;
+
+    if (selected.district_id !== null) {
+      pool = pool.filter((u) => u.district_id === null || u.district_id === selected.district_id);
+    }
+
+    const blockId = selected.panchayatMaster?.block_id ?? null;
+    if (blockId !== null) {
+      pool = pool.filter((u) => u.block_id === null || u.block_id === blockId);
+    }
+
+    if (selected.panchayat_id !== null) {
+      const exact = pool.filter((u) => u.panchayat_id === selected.panchayat_id);
+      if (exact.length > 0) pool = exact;
+    }
+
+    return pool;
   }, [assignableUsers, selected, currentUser.role]);
 
   const canAcknowledge = !!selected && (selected.status === 'Pending' || selected.status === 'Reopened') && hasPermission('complaints.acknowledge');
@@ -611,7 +641,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                   >
                     <option value="">Assign to… (optional)</option>
                     {geoRelevantAssignableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name || u.username} · {u.role.replace(/_/g, ' ')}</option>
+                      <option key={u.id} value={u.id}>{assignableUserLabel(u)}</option>
                     ))}
                   </select>
                   <button
@@ -692,7 +722,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                   >
                     <option value="">Transfer to…</option>
                     {geoRelevantAssignableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name || u.username} · {u.role.replace(/_/g, ' ')}</option>
+                      <option key={u.id} value={u.id}>{assignableUserLabel(u)}</option>
                     ))}
                   </select>
                   <input

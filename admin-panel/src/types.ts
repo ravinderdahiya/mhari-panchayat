@@ -30,6 +30,9 @@ export interface AssignableUser {
   district_id: number | null;
   block_id: number | null;
   panchayat_id: number | null;
+  district: { id: number; name: string } | null;
+  block: { id: number; name: string } | null;
+  panchayat: { id: number; name: string } | null;
 }
 
 export type ComplaintStatus =
@@ -94,6 +97,10 @@ export interface Complaint {
   tehsil: { id: number; name: string } | null;
   village: string | null;
   panchayat: string | null;
+  // The panchayat_id FK resolved to a master-data record - only its block_id
+  // is needed client-side (to scope the Assign/Transfer dropdowns), the name
+  // is already covered by the `panchayat` free-text field above.
+  panchayatMaster: { id: number; name: string; block_id: number | null } | null;
   description: string | null;
   priority_id: number;
   priority: ComplaintPriority;

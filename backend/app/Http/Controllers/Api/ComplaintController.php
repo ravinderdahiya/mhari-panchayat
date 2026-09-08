@@ -23,7 +23,7 @@ class ComplaintController extends Controller
         'user', 'assignedTo', 'verifiedBy', 'category', 'priority', 'timeline.performedBy',
         'department:id,name,code', 'assetType:id,name,icon_key',
         'district:id,name', 'tehsil:id,name', 'villageMaster:id,name,panchayat_id',
-        'panchayatMaster:id,name',
+        'panchayatMaster:id,name,block_id',
         'transfers.fromUser', 'transfers.toUser', 'transfers.transferredBy',
         'duplicateOf.category',
     ];
@@ -37,7 +37,7 @@ class ComplaintController extends Controller
         'user:id,name,username,mobile', 'assignedTo:id,name,username,mobile', 'category', 'priority',
         'department:id,name,code', 'assetType:id,name,icon_key',
         'district:id,name', 'tehsil:id,name', 'villageMaster:id,name,panchayat_id',
-        'panchayatMaster:id,name',
+        'panchayatMaster:id,name,block_id',
         'duplicateOf.category',
     ];
 
