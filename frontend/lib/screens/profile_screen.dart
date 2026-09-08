@@ -15,6 +15,16 @@ String _formatMobile(String? mobile) {
   return '+91 ${mobile.substring(0, 5)} ${mobile.substring(5)}';
 }
 
+// Mirrors the admin panel's `role.replace(/_/g, ' ')` convention (e.g.
+// "gram_sachiv" -> "gram sachiv") so the same account reads the same way in
+// both places. This screen is shared by every non-survey role (citizen,
+// officer, cplo, bdpo, ddpo, gram sachiv, ...), so the label has to come from
+// the signed-in user's actual role rather than being hardcoded.
+String _roleLabel(String? role) {
+  if (role == null || role.isEmpty) return '';
+  return role.replaceAll('_', ' ');
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.showReportsLink = false});
 
@@ -55,7 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const _ProfileHeader(subtitle: 'Citizen'),
+            _ProfileHeader(subtitle: _roleLabel(_profile?.role)),
             Transform.translate(
               offset: const Offset(0, -28),
               child: Padding(
@@ -72,11 +82,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     else
                       _InfoCard(
                         rows: [
+                          if ((_profile?.name ?? '').isNotEmpty)
+                            _InfoRowData(
+                              icon: Icons.badge_rounded,
+                              label: 'Name',
+                              value: _profile!.name!,
+                            ),
                           _InfoRowData(
                             icon: Icons.phone_rounded,
                             label: 'Mobile',
                             value: _formatMobile(_profile?.mobile),
                           ),
+                          if ((_profile?.email ?? '').isNotEmpty)
+                            _InfoRowData(
+                              icon: Icons.email_rounded,
+                              label: 'Email',
+                              value: _profile!.email!,
+                            ),
+                          if ((_profile?.districtName ?? '').isNotEmpty)
+                            _InfoRowData(
+                              icon: Icons.location_city_rounded,
+                              label: 'District',
+                              value: _profile!.districtName!,
+                            ),
+                          if ((_profile?.blockName ?? '').isNotEmpty)
+                            _InfoRowData(
+                              icon: Icons.map_rounded,
+                              label: 'Block',
+                              value: _profile!.blockName!,
+                            ),
+                          if ((_profile?.panchayatName ?? '').isNotEmpty)
+                            _InfoRowData(
+                              icon: Icons.home_work_rounded,
+                              label: 'Panchayat',
+                              value: _profile!.panchayatName!,
+                            ),
                         ],
                       ),
                     const SizedBox(height: AppSpacing.screen),

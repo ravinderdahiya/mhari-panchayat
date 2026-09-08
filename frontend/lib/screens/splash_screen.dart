@@ -6,6 +6,7 @@ import '../navigation/app_navigation.dart';
 import '../navigation/role_navigation.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/partner_logos.dart';
 import 'login_screen.dart';
 
 typedef SplashCompleteCallback = void Function(AuthSession? session);
@@ -95,6 +96,8 @@ class _SplashScreenState extends State<SplashScreen> {
                       fontSize: 14,
                     ),
                   ),
+                  const SizedBox(height: 22),
+                  const PartnerLogosRow(),
                   const Spacer(flex: 6),
                   const SizedBox(
                     height: 220,

@@ -124,6 +124,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:complaints.view');
     Route::get('/complaints/reports', [ComplaintController::class, 'reports'])
         ->middleware('permission:complaints.view_reports');
+    // Must stay registered ahead of /complaints/{id} below - otherwise
+    // "officer-queue" gets swallowed by the {id} wildcard and 404s/500s
+    // trying to look up a complaint with that id.
+    Route::get('/complaints/officer-queue', [ComplaintController::class, 'officerQueue'])
+        ->middleware('permission:complaints.view');
     Route::get('/complaints/{id}', [ComplaintController::class, 'show'])
         ->middleware('permission:complaints.view');
     Route::patch('/complaints/{id}/acknowledge', [ComplaintController::class, 'acknowledge'])

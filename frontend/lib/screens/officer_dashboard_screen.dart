@@ -13,7 +13,11 @@ import 'notification_screen.dart';
 import 'officer_action_screen.dart';
 
 class OfficerDashboardScreen extends StatefulWidget {
-  const OfficerDashboardScreen({super.key});
+  const OfficerDashboardScreen({super.key, this.onProfileTap});
+
+  /// Switches OfficerShell's bottom nav to its Profile tab. Null when this
+  /// screen is hosted somewhere without that tab.
+  final VoidCallback? onProfileTap;
 
   @override
   State<OfficerDashboardScreen> createState() => _OfficerDashboardScreenState();
@@ -124,6 +128,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
           _OfficerHeader(
             designation: _officerName ?? 'Field Officer',
             onNotificationTap: () => push(context, const NotificationScreen()),
+            onProfileTap: widget.onProfileTap,
           ),
           Expanded(
             child: Transform.translate(
@@ -245,10 +250,12 @@ class _OfficerHeader extends StatelessWidget {
   const _OfficerHeader({
     required this.designation,
     required this.onNotificationTap,
+    this.onProfileTap,
   });
 
   final String designation;
   final VoidCallback onNotificationTap;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -294,13 +301,17 @@ class _OfficerHeader extends StatelessWidget {
             tooltip: 'Notifications',
           ),
           const SizedBox(width: 4),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.white.withValues(alpha: 0.22),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 22,
+          InkWell(
+            onTap: onProfileTap,
+            customBorder: const CircleBorder(),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white.withValues(alpha: 0.22),
+              child: const Icon(
+                Icons.person_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
         ],

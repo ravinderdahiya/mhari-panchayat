@@ -52,6 +52,10 @@ class ComplaintController extends Controller
         'ddpo' => 'district', 'xen_pr' => 'district', 'deputy_commissioner' => 'district',
     ];
 
+    // officerQueue() excludes complaints already at one of these - it's a
+    // to-do list, not the full history (that's index()).
+    private const TERMINAL_STATUSES = ['Resolved', 'Rejected', 'Closed'];
+
     public function categories(Request $request)
     {
         $assetTypeId = $request->integer('asset_type_id') ?: null;
@@ -553,6 +557,22 @@ class ComplaintController extends Controller
         } else {
             $this->applyJurisdictionScope($query, $user);
         }
+
+        return response()->json(['success' => true, 'complaints' => $query->get()]);
+    }
+
+    // The field app's "Home"/"My Tasks" queue for staff roles (officer, cplo,
+    // bdpo, ddpo, ...) - same jurisdiction scoping as index(), narrowed to
+    // complaints still needing action. Route must be registered ahead of
+    // /complaints/{id} (see routes/api.php) - this endpoint has no numeric
+    // id, so it'd otherwise be swallowed by that wildcard.
+    public function officerQueue(Request $request)
+    {
+        $user = $request->user();
+        $query = Complaint::with(self::LIST_WITH)
+            ->whereNotIn('status', self::TERMINAL_STATUSES)
+            ->orderByDesc('created_at');
+        $this->applyJurisdictionScope($query, $user);
 
         return response()->json(['success' => true, 'complaints' => $query->get()]);
     }

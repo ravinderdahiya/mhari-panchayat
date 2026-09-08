@@ -71,6 +71,10 @@ class UserProfile {
     this.staffId,
     this.name,
     required this.role,
+    this.email,
+    this.districtName,
+    this.blockName,
+    this.panchayatName,
   });
 
   final String id;
@@ -78,8 +82,19 @@ class UserProfile {
   final String? staffId;
   final String? name;
   final String role;
+  final String? email;
+
+  // Jurisdiction the account is scoped to, if any (district-level staff
+  // carry only districtName; a CPLO/Gram Sachiv carries all three since
+  // panchayat implies a block implies a district).
+  final String? districtName;
+  final String? blockName;
+  final String? panchayatName;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    String? relationName(String key) =>
+        (json[key] as Map<String, dynamic>?)?['name'] as String?;
+
     return UserProfile(
       id: json['id']?.toString() ?? '',
       mobile: json['mobile'] as String?,
@@ -89,6 +104,10 @@ class UserProfile {
           json['employee_id'] as String?,
       name: json['name'] as String?,
       role: json['role'] as String? ?? 'citizen',
+      email: json['email'] as String?,
+      districtName: relationName('district'),
+      blockName: relationName('block'),
+      panchayatName: relationName('panchayat'),
     );
   }
 }

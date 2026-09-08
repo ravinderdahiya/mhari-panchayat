@@ -14,16 +14,16 @@ class OfficerShell extends StatefulWidget {
 class _OfficerShellState extends State<OfficerShell> {
   int _index = 0;
 
-  final _screens = const [
-    OfficerDashboardScreen(),
-    OfficerTasksScreen(),
-    ProfileScreen(showReportsLink: true),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      OfficerDashboardScreen(onProfileTap: () => setState(() => _index = 2)),
+      const OfficerTasksScreen(),
+      const ProfileScreen(showReportsLink: true),
+    ];
+
     return Scaffold(
-      body: _screens[_index],
+      body: screens[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),

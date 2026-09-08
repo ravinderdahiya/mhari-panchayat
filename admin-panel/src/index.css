@@ -28,3 +28,13 @@ body {
   background-color: var(--color-cream);
   color: var(--color-ink);
 }
+
+/* Slow continuous rotation for the HARSAC / Govt of Haryana credential
+   marks in the sidebar footer - Tailwind's built-in animate-spin is tuned
+   for loading spinners (1s), too fast for a seal-like badge. */
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 9s linear infinite;
+}
