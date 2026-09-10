@@ -6,9 +6,6 @@ import {
 } from 'lucide-react';
 import type { User } from '../types';
 
-// BASE_URL is `/` in local dev and `/mhari-panchayat/` on IIS.
-const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
-
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
   | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'profile';
@@ -297,22 +294,6 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
         </nav>
 
         <div className="shrink-0 border-t border-white/10 pt-3.5 px-2.5">
-          {expanded && (
-            <div className="flex items-center justify-center gap-4 pb-3">
-              <img
-                src={asset('images/harsac-logo.png')}
-                alt="HARSAC"
-                title="Haryana Space Applications Centre"
-                className="w-9 h-9 object-contain animate-spin-slow"
-              />
-              <img
-                src={asset('images/haryana-emblem.svg')}
-                alt="Government of Haryana"
-                title="Government of Haryana"
-                className="w-8 h-8 object-contain animate-spin-slow"
-              />
-            </div>
-          )}
           <button
             type="button"
             onClick={() => onNavigate('profile')}

@@ -16,7 +16,10 @@ class UserController extends Controller
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'role' => ['sometimes', 'nullable', 'string', Rule::exists('roles', 'name')],
+            // Comma-separated to support multi-role tabs (e.g. the CPLO
+            // management screen's "Surveyor (CPLO)" tab covers both the
+            // imported `cplo` role and `surveyor`s acting as CPLO).
+            'role' => ['sometimes', 'nullable', 'string'],
             'district_id' => ['sometimes', 'nullable', 'integer'],
             'block_id' => ['sometimes', 'nullable', 'integer'],
             'panchayat_id' => ['sometimes', 'nullable', 'integer'],
@@ -38,7 +41,8 @@ class UserController extends Controller
         }
 
         if (! empty($data['role'])) {
-            $query->where('role', $data['role']);
+            $roles = array_values(array_filter(array_map('trim', explode(',', $data['role']))));
+            $query->whereIn('role', $roles);
         }
 
         if (! empty($data['district_id'])) {

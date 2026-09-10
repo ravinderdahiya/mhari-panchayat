@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/user_role.dart';
@@ -12,7 +14,6 @@ import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'registration_screen.dart';
-import 'splash_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -331,6 +332,24 @@ class _LoginScreenState extends State<LoginScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: _TermsFooter(onLinkTap: _showMessage, isEnglish: _isEnglish),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '© 2026 HARSAC. All rights reserved.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Version 1.0.1',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: AppColors.secondaryText,
+                ),
               ),
               const SizedBox(height: 16),
             ],
@@ -740,34 +759,7 @@ class _LoginHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 96,
-                      height: 96,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                      ),
-                      child: const Center(child: MhariPanchayatLogo(size: 60)),
-                    ),
-                    Positioned(
-                      bottom: 2,
-                      right: 2,
-                      child: Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.secondary,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                const _AuthorityFlipBadge(size: 96),
                 const SizedBox(height: 14),
                 Text(
                   'म्हारी पंचायत',
@@ -792,6 +784,81 @@ class _LoginHero extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Circular badge on the login hero that continuously flips between the
+/// HARSAC and Government of Haryana credential marks, seal-style.
+class _AuthorityFlipBadge extends StatefulWidget {
+  const _AuthorityFlipBadge({required this.size});
+
+  final double size;
+
+  @override
+  State<_AuthorityFlipBadge> createState() => _AuthorityFlipBadgeState();
+}
+
+class _AuthorityFlipBadgeState extends State<_AuthorityFlipBadge>
+    with SingleTickerProviderStateMixin {
+  // Each face holds flat and readable, then flips quickly to the other -
+  // not a continuous spin, which left the logo looking skewed/cropped most
+  // of the time.
+  static const _holdMs = 1800;
+  static const _flipMs = 450;
+  static const _cycleMs = 2 * (_holdMs + _flipMs);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: _cycleMs),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  double _thetaFor(double t) {
+    final elapsed = t * _cycleMs;
+    const p1 = _holdMs;
+    const p2 = _holdMs + _flipMs;
+    const p3 = 2 * _holdMs + _flipMs;
+    if (elapsed < p1) return 0;
+    if (elapsed < p2) return math.pi * (elapsed - p1) / _flipMs;
+    if (elapsed < p3) return math.pi;
+    return math.pi + math.pi * (elapsed - p3) / _flipMs;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final front = Image.asset(
+      'assets/images/harsac_logo.png',
+      fit: BoxFit.contain,
+    );
+    final back = SvgPicture.asset(
+      'assets/images/haryana_emblem.svg',
+      fit: BoxFit.contain,
+    );
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final theta = _thetaFor(_controller.value);
+        final frontVisible = theta <= math.pi / 2 || theta >= 3 * math.pi / 2;
+        final displayAngle = frontVisible ? theta : theta - math.pi;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.002)
+            ..rotateY(displayAngle),
+          child: SizedBox(
+            width: widget.size,
+            height: widget.size,
+            child: frontVisible ? front : back,
+          ),
+        );
+      },
     );
   }
 }
