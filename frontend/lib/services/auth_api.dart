@@ -234,6 +234,65 @@ class AuthApi {
     return UserProfile.fromJson(user);
   }
 
+  /// Self-service password change for the logged-in user (any role,
+  /// including CPLO) — no admin action required.
+  static Future<String> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    final session = await AuthService.getSession();
+    if (session == null || !session.isValid) {
+      throw AuthApiException('कृपया पहले लॉगिन करें');
+    }
+
+    late final http.Response response;
+    try {
+      response = await http
+          .post(
+            _uri('/change-password'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ${session.token}',
+            },
+            body: jsonEncode({
+              'current_password': currentPassword,
+              'new_password': newPassword,
+              'new_password_confirmation': newPasswordConfirmation,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw AuthApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      body = const {};
+    }
+
+    if (response.statusCode == 401) {
+      await SessionGuard.handleUnauthorized();
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final errors = body['errors'] as Map<String, dynamic>?;
+      final firstFieldError = errors != null && errors.isNotEmpty
+          ? ((errors.values.first as List<dynamic>?)?.first as String?)
+          : null;
+      throw AuthApiException(
+        firstFieldError ??
+            body['message'] as String? ??
+            'पासवर्ड बदला नहीं जा सका। पुनः प्रयास करें।',
+      );
+    }
+
+    return body['message'] as String? ?? 'Password changed successfully';
+  }
+
   static Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> payload,

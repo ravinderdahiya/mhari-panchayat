@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Mail\RegistrationVerificationMail;
+use App\Models\Block;
 use App\Models\District;
+use App\Models\Panchayat;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -33,6 +35,39 @@ class RegistrationController extends Controller
         return response()->json([
             'success' => true,
             'districts' => District::with('state')->where('is_active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    // Server-filtered by district_id — unlike the admin panel's /api/master/blocks,
+    // which loads all rows client-side for a desktop UI, this stays cheap for
+    // unauthenticated mobile registration.
+    public function blocks(Request $request)
+    {
+        $data = $request->validate([
+            'district_id' => ['required', 'exists:districts,id'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'blocks' => Block::where('district_id', $data['district_id'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(),
+        ]);
+    }
+
+    public function panchayats(Request $request)
+    {
+        $data = $request->validate([
+            'block_id' => ['required', 'exists:blocks,id'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'panchayats' => Panchayat::where('block_id', $data['block_id'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
@@ -445,6 +480,8 @@ HTML;
             'phone_token' => ['required', 'string'],
             'email' => ['required', 'email', 'unique:users,email'],
             'district_id' => ['required', 'exists:districts,id'],
+            'block_id' => ['required', 'exists:blocks,id'],
+            'panchayat_id' => ['required', 'exists:panchayats,id'],
         ];
         if ($role === 'department_officer') {
             $rules['employee_id'] = ['required', 'string', 'max:50'];
@@ -456,6 +493,15 @@ HTML;
             return response()->json(['success' => false, 'message' => 'Phone number is not verified'], 400);
         }
 
+        $block = Block::find($data['block_id']);
+        if (! $block || $block->district_id !== (int) $data['district_id']) {
+            return response()->json(['success' => false, 'message' => 'Selected block does not belong to the selected district'], 422);
+        }
+        $panchayat = Panchayat::find($data['panchayat_id']);
+        if (! $panchayat || $panchayat->block_id !== (int) $data['block_id']) {
+            return response()->json(['success' => false, 'message' => 'Selected panchayat does not belong to the selected block'], 422);
+        }
+
         $emailToken = Str::random(48);
         // Placeholder password — replaced after email verify via set-password.
         $user = User::create([
@@ -464,6 +510,8 @@ HTML;
             'email' => $data['email'],
             'mobile' => $data['mobile'],
             'district_id' => $data['district_id'],
+            'block_id' => $data['block_id'],
+            'panchayat_id' => $data['panchayat_id'],
             'employee_id' => $role === 'surveyor' ? null : ($data['employee_id'] ?? null),
             'role' => $role,
             'is_active' => false,

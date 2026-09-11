@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../navigation/app_navigation.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import 'change_password_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -72,6 +74,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const _SectionLabel('ACCOUNT'),
                     _SettingsGroup(
                       children: [
+                        _NavRow(
+                          icon: Icons.lock_outline_rounded,
+                          title: 'Change password',
+                          onTap: () =>
+                              push(context, const ChangePasswordScreen()),
+                        ),
+                        const _RowDivider(),
                         _NavRow(
                           icon: Icons.phone_iphone_rounded,
                           title: 'Change mobile number',

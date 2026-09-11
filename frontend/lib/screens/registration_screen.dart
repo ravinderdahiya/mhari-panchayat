@@ -69,6 +69,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   List<RegistrationDistrict> _districts = [];
   int? _selectedDistrictId;
 
+  List<RegistrationBlock> _blocks = [];
+  int? _selectedBlockId;
+  bool _loadingBlocks = false;
+
+  List<RegistrationPanchayat> _panchayats = [];
+  int? _selectedPanchayatId;
+  bool _loadingPanchayats = false;
+
   @override
   void initState() {
     super.initState();
@@ -123,6 +131,48 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } catch (_) {}
   }
 
+  Future<void> _onDistrictChanged(int? districtId) async {
+    setState(() {
+      _selectedDistrictId = districtId;
+      _blocks = [];
+      _selectedBlockId = null;
+      _panchayats = [];
+      _selectedPanchayatId = null;
+      _loadingBlocks = districtId != null;
+    });
+    if (districtId == null) return;
+    try {
+      final blocks = await RegistrationApi.getBlocks(districtId);
+      if (!mounted || _selectedDistrictId != districtId) return;
+      setState(() => _blocks = blocks);
+    } catch (_) {
+    } finally {
+      if (mounted && _selectedDistrictId == districtId) {
+        setState(() => _loadingBlocks = false);
+      }
+    }
+  }
+
+  Future<void> _onBlockChanged(int? blockId) async {
+    setState(() {
+      _selectedBlockId = blockId;
+      _panchayats = [];
+      _selectedPanchayatId = null;
+      _loadingPanchayats = blockId != null;
+    });
+    if (blockId == null) return;
+    try {
+      final panchayats = await RegistrationApi.getPanchayats(blockId);
+      if (!mounted || _selectedBlockId != blockId) return;
+      setState(() => _panchayats = panchayats);
+    } catch (_) {
+    } finally {
+      if (mounted && _selectedBlockId == blockId) {
+        setState(() => _loadingPanchayats = false);
+      }
+    }
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     setState(() {
@@ -138,6 +188,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _phoneVerified &&
         emailOk &&
         _selectedDistrictId != null &&
+        _selectedBlockId != null &&
+        _selectedPanchayatId != null &&
         (_role == RegRole.surveyor ||
             _employeeIdController.text.trim().isNotEmpty);
   }
@@ -219,6 +271,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               phoneToken: _phoneToken!,
               email: _emailController.text.trim(),
               districtId: _selectedDistrictId!,
+              blockId: _selectedBlockId!,
+              panchayatId: _selectedPanchayatId!,
             )
           : await RegistrationApi.registerOfficer(
               name: _nameController.text.trim(),
@@ -226,6 +280,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               phoneToken: _phoneToken!,
               email: _emailController.text.trim(),
               districtId: _selectedDistrictId!,
+              blockId: _selectedBlockId!,
+              panchayatId: _selectedPanchayatId!,
               employeeId: _employeeIdController.text.trim(),
             );
       if (!mounted) return;
@@ -435,7 +491,42 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           },
         ),
         const SizedBox(height: 16),
-        _districtDropdown(),
+        _dropdown<int>(
+          label: 'District',
+          icon: Icons.place_outlined,
+          value: _selectedDistrictId,
+          items: _districts.map((d) => (value: d.id, label: d.name)).toList(),
+          hint: _districts.isEmpty ? 'Loading districts…' : 'Select district',
+          onChanged: _onDistrictChanged,
+        ),
+        const SizedBox(height: 16),
+        _dropdown<int>(
+          label: 'Block',
+          icon: Icons.map_outlined,
+          value: _selectedBlockId,
+          items: _blocks.map((b) => (value: b.id, label: b.name)).toList(),
+          hint: _selectedDistrictId == null
+              ? 'Select district first'
+              : (_loadingBlocks ? 'Loading blocks…' : 'Select block'),
+          onChanged: _selectedDistrictId == null ? null : _onBlockChanged,
+        ),
+        const SizedBox(height: 16),
+        _dropdown<int>(
+          label: 'Panchayat',
+          icon: Icons.holiday_village_outlined,
+          value: _selectedPanchayatId,
+          items: _panchayats
+              .map((p) => (value: p.id, label: p.name))
+              .toList(),
+          hint: _selectedBlockId == null
+              ? 'Select block first'
+              : (_loadingPanchayats
+                    ? 'Loading panchayats…'
+                    : 'Select panchayat'),
+          onChanged: _selectedBlockId == null
+              ? null
+              : (value) => setState(() => _selectedPanchayatId = value),
+        ),
         if (_role == RegRole.officer) ...[
           const SizedBox(height: 16),
           _label('Employee ID', required: true),
@@ -554,27 +645,32 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  Widget _districtDropdown() {
+  Widget _dropdown<T>({
+    required String label,
+    required IconData icon,
+    required T? value,
+    required List<({T value, String label})> items,
+    required String hint,
+    required ValueChanged<T?>? onChanged,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label('District', required: true),
+        _label(label, required: true),
         const SizedBox(height: 6),
-        DropdownButtonFormField<int>(
-          initialValue: _selectedDistrictId,
+        DropdownButtonFormField<T>(
+          initialValue: value,
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
             color: _RegColors.muted,
           ),
           style: GoogleFonts.ibmPlexSans(fontSize: 14, color: _RegColors.ink),
           decoration: InputDecoration(
-            prefixIcon: const Icon(
-              Icons.place_outlined,
-              color: _RegColors.muted,
-              size: 20,
-            ),
+            prefixIcon: Icon(icon, color: _RegColors.muted, size: 20),
             filled: true,
-            fillColor: _RegColors.paper,
+            fillColor: onChanged == null
+                ? _RegColors.border.withValues(alpha: 0.4)
+                : _RegColors.paper,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 14,
@@ -598,12 +694,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               borderSide: const BorderSide(color: _RegColors.header, width: 2),
             ),
           ),
-          items: _districts
-              .map((d) => DropdownMenuItem(value: d.id, child: Text(d.name)))
+          items: items
+              .map(
+                (e) =>
+                    DropdownMenuItem(value: e.value, child: Text(e.label)),
+              )
               .toList(),
-          onChanged: (value) => setState(() => _selectedDistrictId = value),
+          onChanged: onChanged,
           hint: Text(
-            _districts.isEmpty ? 'Loading districts…' : 'Select district',
+            hint,
             style: GoogleFonts.notoSansDevanagari(
               fontSize: 13,
               color: _RegColors.placeholder,

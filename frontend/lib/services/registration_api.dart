@@ -26,6 +26,32 @@ class RegistrationDistrict {
       );
 }
 
+class RegistrationBlock {
+  const RegistrationBlock({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory RegistrationBlock.fromJson(Map<String, dynamic> json) =>
+      RegistrationBlock(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+      );
+}
+
+class RegistrationPanchayat {
+  const RegistrationPanchayat({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory RegistrationPanchayat.fromJson(Map<String, dynamic> json) =>
+      RegistrationPanchayat(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+      );
+}
+
 class RegistrationStartResult {
   const RegistrationStartResult({
     required this.userId,
@@ -83,6 +109,24 @@ class RegistrationApi {
     final list = body['districts'] as List<dynamic>? ?? [];
     return list
         .map((e) => RegistrationDistrict.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<RegistrationBlock>> getBlocks(int districtId) async {
+    final body = await _get('/registrations/blocks?district_id=$districtId');
+    final list = body['blocks'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => RegistrationBlock.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<RegistrationPanchayat>> getPanchayats(
+    int blockId,
+  ) async {
+    final body = await _get('/registrations/panchayats?block_id=$blockId');
+    final list = body['panchayats'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => RegistrationPanchayat.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -162,6 +206,8 @@ class RegistrationApi {
     required String phoneToken,
     required String email,
     required int districtId,
+    required int blockId,
+    required int panchayatId,
   }) {
     return _post('/registrations/surveyor', {
       'name': name,
@@ -169,6 +215,8 @@ class RegistrationApi {
       'phone_token': phoneToken,
       'email': email,
       'district_id': districtId,
+      'block_id': blockId,
+      'panchayat_id': panchayatId,
     }).then(_startResult);
   }
 
@@ -178,6 +226,8 @@ class RegistrationApi {
     required String phoneToken,
     required String email,
     required int districtId,
+    required int blockId,
+    required int panchayatId,
     required String employeeId,
   }) {
     return _post('/registrations/officer', {
@@ -186,6 +236,8 @@ class RegistrationApi {
       'phone_token': phoneToken,
       'email': email,
       'district_id': districtId,
+      'block_id': blockId,
+      'panchayat_id': panchayatId,
       'employee_id': employeeId,
     }).then(_startResult);
   }

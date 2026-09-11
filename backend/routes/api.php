@@ -28,6 +28,8 @@ Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswo
 // phone OTP → Sign up (pending_email) → email verify link → set password →
 // pending_review → admin approve → active.
 Route::get('/registrations/districts', [RegistrationController::class, 'districts']);
+Route::get('/registrations/blocks', [RegistrationController::class, 'blocks']);
+Route::get('/registrations/panchayats', [RegistrationController::class, 'panchayats']);
 Route::post('/registrations/phone/send-otp', [RegistrationController::class, 'sendPhoneOtp']);
 Route::post('/registrations/phone/verify-otp', [RegistrationController::class, 'verifyPhoneOtp']);
 Route::post('/registrations/email/send-link', [RegistrationController::class, 'sendEmailLink']);
