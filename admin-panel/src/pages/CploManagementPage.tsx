@@ -276,7 +276,7 @@ export default function CploManagementPage() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div>
       {error && <p className="text-xs text-status-new bg-status-new/10 border border-status-new/20 rounded-lg p-2 mb-3">{error}</p>}
 
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -366,7 +366,7 @@ export default function CploManagementPage() {
         <span className="text-xs text-muted ml-auto">{pagination.total} {activeTab.label.toLowerCase()}(s)</span>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         {isLoading ? (
           <p className="text-sm text-muted p-6 text-center">Loading…</p>
         ) : users.length === 0 ? (
@@ -376,9 +376,8 @@ export default function CploManagementPage() {
               : 'No Gram Sachiv accounts match your filters. Assign the role from the Users page, then set their panchayat here.'}
           </p>
         ) : (
-          <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-xs border-separate border-spacing-0">
-              <thead className="sticky top-0 z-10">
+              <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
                   <th className="text-left p-3 font-bold w-12">S.No</th>
                   <th className="text-left p-3 font-bold">Username</th>
@@ -503,11 +502,10 @@ export default function CploManagementPage() {
                 ))}
               </tbody>
             </table>
-          </div>
         )}
 
         {pagination.total > 0 && (
-          <div className="shrink-0 flex items-center justify-between px-3 py-2.5 border-t border-slate-100 text-xs text-slate-500">
+          <div className="flex items-center justify-between px-3 py-2.5 border-t border-slate-100 text-xs text-slate-500">
             <span>Showing {pagination.from ?? 0}–{pagination.to ?? 0} of {pagination.total}</span>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer">

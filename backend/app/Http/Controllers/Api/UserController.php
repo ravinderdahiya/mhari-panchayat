@@ -58,7 +58,11 @@ class UserController extends Controller
         }
 
         if (! empty($data['panchayat_id'])) {
-            $query->where('panchayat_id', $data['panchayat_id']);
+            $query->where(function ($panchayatQuery) use ($data) {
+                $panchayatQuery
+                    ->where('panchayat_id', $data['panchayat_id'])
+                    ->orWhereHas('panchayats', fn ($assigned) => $assigned->where('panchayats.id', $data['panchayat_id']));
+            });
         }
 
         $status = $data['status'] ?? 'all';

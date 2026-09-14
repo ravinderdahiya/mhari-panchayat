@@ -27,6 +27,14 @@ use Illuminate\Support\Str;
  * generation script for what was skipped and why: vacant posts with no name,
  * and a handful of XEN rows whose office string didn't name a district).
  *
+ * Gram Sachiv (village-level functionary, often holding several Gram
+ * Panchayats under one mobile number) -> role gram_sachiv, panchayat_id,
+ * loaded separately from database/data/gram_sachiv_officials.json (built
+ * directly from "GramSachivList-*.xlsx", whose PanchayatId column is
+ * already the same LGD panchayat code used elsewhere - no geography
+ * matching needed). Every panchayat a Gram Sachiv covers goes into the
+ * user_panchayats pivot, same idea as user_blocks for BDPO.
+ *
  * Accounts are created inactive-for-login (a random, never-shared password) -
  * this only seeds identity + jurisdiction so auto-routing has someone to
  * route to. Getting them an actual login still needs a deliberate invite/
@@ -34,9 +42,11 @@ use Illuminate\Support\Str;
  */
 class ImportHaryanaOfficials extends Command
 {
-    protected $signature = 'officials:import-haryana {--path= : Optional path to haryana_officials.json}';
+    protected $signature = 'officials:import-haryana
+        {--path= : Optional path to haryana_officials.json}
+        {--gram-sachiv-path= : Optional path to gram_sachiv_officials.json}';
 
-    protected $description = 'Import BDPO, DDPO, Executive Engineer and CPLO officials, scoped to their block/district/panchayat';
+    protected $description = 'Import BDPO, DDPO, Executive Engineer, CPLO and Gram Sachiv officials, scoped to their block/district/panchayat';
 
     public function handle(): int
     {
@@ -50,6 +60,11 @@ class ImportHaryanaOfficials extends Command
 
         $data = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
 
+        $gramSachivPath = $this->option('gram-sachiv-path') ?: database_path('data/gram_sachiv_officials.json');
+        $gramSachivRows = is_file($gramSachivPath)
+            ? json_decode(file_get_contents($gramSachivPath), true, 512, JSON_THROW_ON_ERROR)
+            : [];
+
         $blockIdByCode = Block::query()->pluck('id', 'code');
         $districtIdByCode = District::query()->pluck('id', 'code');
         $panchayats = Panchayat::query()->with('block:id,district_id')->get(['id', 'code', 'block_id'])->keyBy('code');
@@ -57,7 +72,7 @@ class ImportHaryanaOfficials extends Command
 
         $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0];
 
-        DB::transaction(function () use ($data, $blockIdByCode, $districtIdByCode, $panchayats, $prDepartmentId, &$stats) {
+        DB::transaction(function () use ($data, $gramSachivRows, $blockIdByCode, $districtIdByCode, $panchayats, $prDepartmentId, &$stats) {
             foreach ($data['bdpo'] ?? [] as $row) {
                 $blockId = $blockIdByCode[$row['block_code']] ?? null;
                 if (! $blockId) {
@@ -114,6 +129,25 @@ class ImportHaryanaOfficials extends Command
                     'department_id' => $prDepartmentId,
                 ], $stats);
             }
+
+            foreach ($gramSachivRows as $row) {
+                $panchayat = $panchayats[$row['panchayat_code']] ?? null;
+                if (! $panchayat) {
+                    $stats['skipped']++;
+                    continue;
+                }
+                // Same "additional charge" pattern as BDPO/blocks above, but at
+                // panchayat granularity - panchayat_id stays whichever panchayat
+                // they were first seen with, every panchayat they cover goes
+                // into the user_panchayats pivot.
+                $user = $this->upsertOfficial($row, 'gram_sachiv', [
+                    'panchayat_id' => $panchayat->id,
+                    'block_id' => $panchayat->block_id,
+                    'district_id' => $panchayat->block?->district_id,
+                    'department_id' => $prDepartmentId,
+                ], $stats, preservePanchayatId: true);
+                $user?->panchayats()->syncWithoutDetaching([$panchayat->id]);
+            }
         });
 
         $this->table(['Result', 'Count'], [
@@ -125,7 +159,7 @@ class ImportHaryanaOfficials extends Command
         return self::SUCCESS;
     }
 
-    private function upsertOfficial(array $row, string $role, array $jurisdiction, array &$stats, bool $preserveBlockId = false): ?User
+    private function upsertOfficial(array $row, string $role, array $jurisdiction, array &$stats, bool $preserveBlockId = false, bool $preservePanchayatId = false): ?User
     {
         $username = $this->usernameFor($row);
         if (! $username) {
@@ -138,10 +172,13 @@ class ImportHaryanaOfficials extends Command
         if ($preserveBlockId && $existing?->block_id) {
             unset($jurisdiction['block_id']);
         }
+        if ($preservePanchayatId && $existing?->panchayat_id) {
+            unset($jurisdiction['panchayat_id']);
+        }
 
         $user = User::updateOrCreate(['username' => $username], [
             'name' => $row['name'],
-            'email' => $row['email'] ?: null,
+            'email' => $row['email'] ?? null ?: null,
             'mobile' => $this->normalizedMobile($row['mobile']),
             'member_id' => $row['member_id'] ?? null,
             'family_id' => $row['family_id'] ?? null,

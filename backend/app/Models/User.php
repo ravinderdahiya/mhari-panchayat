@@ -137,6 +137,12 @@ class User extends Authenticatable
         return $this->belongsTo(Panchayat::class);
     }
 
+    /** Multi-panchayat coverage (a Gram Sachiv holding "additional charge" of other panchayats). */
+    public function panchayats(): BelongsToMany
+    {
+        return $this->belongsToMany(Panchayat::class, 'user_panchayats')->withTimestamps();
+    }
+
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_id');
