@@ -188,9 +188,18 @@ class LocationController extends Controller
 
         $latitude = round((float) $coordinates['latitude'], 6);
         $longitude = round((float) $coordinates['longitude'], 6);
+
+        return response()->json(['location' => $this->lookup($latitude, $longitude)]);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function lookup(float $latitude, float $longitude): ?array
+    {
+        $latitude = round($latitude, 6);
+        $longitude = round($longitude, 6);
         $cacheKey = "reverse-location:v2:{$latitude}:{$longitude}";
 
-        $location = Cache::remember($cacheKey, now()->addDays(30), function () use ($latitude, $longitude) {
+        return Cache::remember($cacheKey, now()->addDays(30), function () use ($latitude, $longitude) {
             try {
                 $response = Http::acceptJson()
                     ->withHeaders([
@@ -243,7 +252,5 @@ class LocationController extends Controller
                 $address['municipality'] ?? $address['city_district'] ?? $villageName,
             );
         });
-
-        return response()->json(['location' => $location]);
     }
 }

@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/survey.dart';
+import '../models/user_role.dart';
+import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../services/fake_location_detector.dart';
 import '../services/location_api.dart';
@@ -61,6 +63,8 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
   int? _assignedPanchayatId;
   String? _assignedPanchayatName;
   bool _outOfAssignedArea = false;
+  bool _assignmentMissing = false;
+  bool _isScopedCplo = false;
 
   @override
   void initState() {
@@ -105,43 +109,103 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
 
   Future<void> _loadOfficerName() async {
     final session = await AuthService.getSession();
+    var assignedId = session?.assignedPanchayatId;
+    var assignedName = session?.assignedPanchayatName;
+    var serverRole = session?.serverRole;
+    var isCplo = FieldStaffCopy.isCplo(serverRole) ||
+        session?.role == UserRole.cplo;
+
+    if (assignedId == null ||
+        (assignedName == null || assignedName.isEmpty) ||
+        serverRole == null) {
+      try {
+        final profile = await AuthApi.getProfile();
+        assignedId ??= profile.panchayatId;
+        assignedName = (assignedName == null || assignedName.isEmpty)
+            ? profile.panchayatName
+            : assignedName;
+        serverRole ??= profile.role;
+        isCplo = FieldStaffCopy.isCplo(serverRole) || isCplo;
+        await AuthService.persistServerRole(profile.role);
+        await AuthService.persistAssignedPanchayat(
+          id: assignedId,
+          name: assignedName,
+        );
+      } catch (_) {}
+    }
+
     if (!mounted) return;
     setState(() {
       _officerName = session?.officerName;
-      _assignedPanchayatId = session?.assignedPanchayatId;
-      _assignedPanchayatName = session?.assignedPanchayatName;
+      _assignedPanchayatId = assignedId;
+      _assignedPanchayatName = assignedName;
+      _isScopedCplo = isCplo || assignedId != null;
+      _assignmentMissing = _isScopedCplo && assignedId == null;
+      if (assignedName != null &&
+          assignedName.isNotEmpty &&
+          (widget.existingSurvey == null ||
+              _gpController.text.trim().isEmpty)) {
+        _gpController.text = assignedName;
+      }
     });
-    // New-asset surveys check the area once their own GPS fix comes in
-    // (_enableGps). An existing survey already has coordinates from when it
-    // was first filed, so check those now instead of waiting for a fix that
-    // won't come.
+    if (_assignmentMissing) {
+      _showOutOfAreaAlert(missingAssignment: true);
+    }
     if (widget.existingSurvey != null && _lat != null && _lng != null) {
       _checkAssignedArea(_lat!, _lng!);
     }
   }
 
-  /// Compares a GPS fix against the signed-in CPLO's assigned panchayat, if
-  /// any. Surveyors with no panchayat assigned aren't scoped to any one area,
-  /// so this is a no-op for them; an inconclusive lookup (offline, no match)
-  /// fails open rather than blocking a legitimate submission.
-  Future<void> _checkAssignedArea(double lat, double lng) async {
+  String _norm(String? value) =>
+      (value ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  /// Compares a GPS fix against the signed-in CPLO's assigned panchayat.
+  /// Unscoped surveyors (no panchayat) are not blocked. For CPLO, an
+  /// inconclusive lookup still warns — they may only survey their panchayat.
+  Future<void> _checkAssignedArea(
+    double lat,
+    double lng, {
+    bool alert = true,
+  }) async {
+    if (!_isScopedCplo && _assignedPanchayatId == null) return;
     final assignedId = _assignedPanchayatId;
-    if (assignedId == null) return;
+    if (assignedId == null) {
+      if (!mounted) return;
+      setState(() {
+        _assignmentMissing = true;
+        _outOfAssignedArea = true;
+      });
+      if (alert) await _showOutOfAreaAlert(missingAssignment: true);
+      return;
+    }
+
     DetectedLocation? location;
     try {
       location = await LocationApi.reverse(latitude: lat, longitude: lng);
     } catch (_) {
-      return;
+      location = null;
     }
+
     final detectedId = location?.panchayatId;
-    if (detectedId == null) return;
-    final outOfArea = detectedId != assignedId;
+    final detectedName = _norm(location?.panchayat);
+    final assignedName = _norm(_assignedPanchayatName);
+    final idMatch = detectedId != null && detectedId == assignedId;
+    final nameMatch =
+        assignedName.isNotEmpty &&
+        detectedName.isNotEmpty &&
+        detectedName == assignedName;
+    final resolved = detectedId != null || detectedName.isNotEmpty;
+    final outOfArea = !resolved || (!idMatch && !nameMatch);
+
     if (!mounted) return;
-    setState(() => _outOfAssignedArea = outOfArea);
-    if (outOfArea) _showOutOfAreaAlert();
+    setState(() {
+      _outOfAssignedArea = outOfArea;
+      _assignmentMissing = false;
+    });
+    if (outOfArea && alert) await _showOutOfAreaAlert();
   }
 
-  Future<void> _showOutOfAreaAlert() async {
+  Future<void> _showOutOfAreaAlert({bool missingAssignment = false}) async {
     if (!mounted) return;
     final area = _assignedPanchayatName;
     await showDialog<void>(
@@ -153,13 +217,15 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
           size: 32,
         ),
         title: Text(
-          'क्षेत्र से बाहर',
+          missingAssignment ? 'पंचायत assigned नहीं' : 'क्षेत्र से बाहर',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
         ),
         content: Text(
-          area != null
-              ? 'आप अपनी निर्धारित पंचायत "$area" के क्षेत्र से बाहर हैं। डेटा संग्रहण और सबमिशन केवल आपके निर्धारित क्षेत्र में ही किया जा सकता है।'
-              : 'आप अपने निर्धारित क्षेत्र से बाहर हैं। डेटा संग्रहण और सबमिशन केवल आपके निर्धारित क्षेत्र में ही किया जा सकता है।',
+          missingAssignment
+              ? 'आपकी पंचायत assigned नहीं है। सर्वे केवल assigned पंचायत में ही किया जा सकता है। कृपया एडमिन से पंचायत assign करवाएँ।'
+              : area != null
+              ? 'आप अपनी निर्धारित पंचायत "$area" के क्षेत्र से बाहर हैं। डेटा संग्रहण और सबमिशन केवल आपकी assigned पंचायत में ही किया जा सकता है।'
+              : 'आप अपने निर्धारित क्षेत्र से बाहर हैं। डेटा संग्रहण और सबमिशन केवल आपकी assigned पंचायत में ही किया जा सकता है।',
           style: GoogleFonts.poppins(fontSize: 13, height: 1.4),
         ),
         actions: [
@@ -289,7 +355,11 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
         if (_villageController.text.trim().isEmpty && detectedVillage != null) {
           _villageController.text = detectedVillage;
         }
-        if (_gpController.text.trim().isEmpty && detectedPanchayat != null) {
+        if (_assignedPanchayatName != null &&
+            _assignedPanchayatName!.trim().isNotEmpty) {
+          _gpController.text = _assignedPanchayatName!;
+        } else if (_gpController.text.trim().isEmpty &&
+            detectedPanchayat != null) {
           _gpController.text = detectedPanchayat;
         }
         if (_districtController.text.trim().isEmpty &&
@@ -354,8 +424,12 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
       return;
     }
 
-    if (_outOfAssignedArea) {
-      _showOutOfAreaAlert();
+    if (_isScopedCplo || _assignedPanchayatId != null) {
+      await _checkAssignedArea(_lat!, _lng!, alert: false);
+    }
+
+    if (_outOfAssignedArea || _assignmentMissing) {
+      await _showOutOfAreaAlert(missingAssignment: _assignmentMissing);
       return;
     }
 
@@ -441,6 +515,13 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
                       dateLabel: _dateLabel,
                       isUpdate: widget.existingSurvey != null,
                     ),
+                    if (_outOfAssignedArea || _assignmentMissing) ...[
+                      const SizedBox(height: 12),
+                      _OutOfAreaBanner(
+                        panchayatName: _assignedPanchayatName,
+                        missingAssignment: _assignmentMissing,
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     _LabeledTextField(
                       label: 'Asset Name *',
@@ -461,7 +542,8 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
                     _LabeledTextField(
                       label: 'Panchayat *',
                       controller: _gpController,
-                      hint: 'Auto-filled from GPS',
+                      hint: _assignedPanchayatName ?? 'Auto-filled from GPS',
+                      readOnly: _assignedPanchayatId != null,
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Required' : null,
                     ),
@@ -541,11 +623,59 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
             ),
             _BottomActions(
               busy: _saving,
+              blocked: _outOfAssignedArea || _assignmentMissing,
               onCancel: () => Navigator.of(context).maybePop(),
               onSubmit: _submit,
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _OutOfAreaBanner extends StatelessWidget {
+  const _OutOfAreaBanner({
+    required this.panchayatName,
+    required this.missingAssignment,
+  });
+
+  final String? panchayatName;
+  final bool missingAssignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = missingAssignment
+        ? 'पंचायत assigned नहीं है। सर्वे नहीं किया जा सकता।'
+        : panchayatName != null
+        ? 'आप assigned पंचायत "$panchayatName" से बाहर हैं। केवल उसी क्षेत्र में सर्वे करें।'
+        : 'आप assigned पंचायत से बाहर हैं। सर्वे सबमिट नहीं हो सकता।';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.rejectedText.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: AppColors.rejectedText),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.notoSansDevanagari(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+                color: AppColors.rejectedText,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -621,12 +751,14 @@ class _LabeledTextField extends StatelessWidget {
     required this.controller,
     required this.hint,
     this.validator,
+    this.readOnly = false,
   });
 
   final String label;
   final TextEditingController controller;
   final String hint;
   final String? Function(String?)? validator;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -644,6 +776,7 @@ class _LabeledTextField extends StatelessWidget {
         TextFormField(
           controller: controller,
           validator: validator,
+          readOnly: readOnly,
           style: GoogleFonts.poppins(fontSize: 13),
           decoration: InputDecoration(
             hintText: hint,
@@ -1027,11 +1160,13 @@ class _SurveyedByRow extends StatelessWidget {
 class _BottomActions extends StatelessWidget {
   const _BottomActions({
     required this.busy,
+    required this.blocked,
     required this.onCancel,
     required this.onSubmit,
   });
 
   final bool busy;
+  final bool blocked;
   final VoidCallback onCancel;
   final VoidCallback onSubmit;
 
@@ -1073,7 +1208,8 @@ class _BottomActions extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: Ink(
                     decoration: BoxDecoration(
-                      gradient: AppGradients.cta,
+                      gradient: blocked ? null : AppGradients.cta,
+                      color: blocked ? AppColors.border : null,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Container(
@@ -1091,7 +1227,9 @@ class _BottomActions extends StatelessWidget {
                           : Text(
                               '☁ Submit',
                               style: GoogleFonts.poppins(
-                                color: Colors.white,
+                                color: blocked
+                                    ? AppColors.secondaryText
+                                    : Colors.white,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),

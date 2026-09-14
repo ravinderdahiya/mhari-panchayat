@@ -6,6 +6,7 @@ class AuthSession {
   const AuthSession({
     required this.token,
     required this.role,
+    this.serverRole,
     this.officerId,
     this.officerName,
     this.staffId,
@@ -16,6 +17,9 @@ class AuthSession {
 
   final String token;
   final UserRole role;
+
+  /// Raw backend role (`cplo`, `surveyor`, …). [role] is only the UI shell.
+  final String? serverRole;
 
   /// Server-side user id, for display/UX only — the backend never trusts
   /// this value from the client, it always derives identity from the JWT.
@@ -43,6 +47,7 @@ class AuthService {
 
   static const _tokenKey = 'auth_token';
   static const _roleKey = 'user_role';
+  static const _serverRoleKey = 'server_role';
   static const _loggedInKey = 'is_logged_in';
   static const _officerIdKey = 'officer_id';
   static const _officerNameKey = 'officer_name';
@@ -64,6 +69,7 @@ class AuthService {
     return AuthSession(
       token: token,
       role: role,
+      serverRole: prefs.getString(_serverRoleKey),
       officerId: prefs.getString(_officerIdKey),
       officerName: prefs.getString(_officerNameKey),
       staffId: prefs.getString(_staffIdKey),
@@ -81,6 +87,7 @@ class AuthService {
   static Future<void> saveLogin({
     required UserRole role,
     required String token,
+    String? serverRole,
     String? officerId,
     String? officerName,
     String? staffId,
@@ -93,6 +100,7 @@ class AuthService {
     await prefs.setBool(_loggedInKey, true);
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_roleKey, role.storageValue);
+    await persistServerRole(serverRole);
 
     if (officerId != null) {
       await prefs.setString(_officerIdKey, officerId);
@@ -131,11 +139,36 @@ class AuthService {
     }
   }
 
+  static Future<void> persistAssignedPanchayat({
+    int? id,
+    String? name,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (id != null) {
+      await prefs.setInt(_assignedPanchayatIdKey, id);
+    }
+    final value = name?.trim();
+    if (value != null && value.isNotEmpty) {
+      await prefs.setString(_assignedPanchayatNameKey, value);
+    }
+  }
+
+  static Future<void> persistServerRole(String? serverRole) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = serverRole?.trim();
+    if (value == null || value.isEmpty) {
+      await prefs.remove(_serverRoleKey);
+    } else {
+      await prefs.setString(_serverRoleKey, value);
+    }
+  }
+
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_loggedInKey);
     await prefs.remove(_tokenKey);
     await prefs.remove(_roleKey);
+    await prefs.remove(_serverRoleKey);
     await prefs.remove(_officerIdKey);
     await prefs.remove(_officerNameKey);
     await prefs.remove(_staffIdKey);

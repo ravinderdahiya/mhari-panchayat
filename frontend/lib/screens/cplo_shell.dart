@@ -1,32 +1,32 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/location_gate.dart';
+import 'asset_survey_screen.dart';
 import 'complaint_map_screen.dart';
 import 'officer_dashboard_screen.dart';
-import 'officer_tasks_screen.dart';
-import 'profile_screen.dart';
+import 'surveyor_profile_screen.dart';
 
-class OfficerShell extends StatefulWidget {
-  const OfficerShell({super.key});
+class CploShell extends StatefulWidget {
+  const CploShell({super.key});
 
   @override
-  State<OfficerShell> createState() => _OfficerShellState();
+  State<CploShell> createState() => _CploShellState();
 }
 
-class _OfficerShellState extends State<OfficerShell> {
+class _CploShellState extends State<CploShell> {
   int _index = 0;
 
   @override
   Widget build(BuildContext context) {
     final screens = [
-      OfficerDashboardScreen(onProfileTap: () => setState(() => _index = 3)),
+      const AssetSurveyScreen(embedded: true),
       const LocationGate(child: ComplaintMapScreen(staffQueue: true)),
-      const OfficerTasksScreen(),
-      const ProfileScreen(showReportsLink: true),
+      OfficerDashboardScreen(onProfileTap: () => setState(() => _index = 3)),
+      const SurveyorProfileScreen(embedded: true),
     ];
 
     return Scaffold(
-      body: screens[_index],
+      body: IndexedStack(index: _index, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),

@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/asset_type.dart';
 import '../models/survey.dart';
 import '../models/survey_department.dart';
+import '../models/user_role.dart';
 import '../navigation/app_navigation.dart';
+import '../services/auth_api.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
@@ -14,7 +16,11 @@ import 'asset_survey_form_screen.dart';
 import 'surveyor_profile_screen.dart';
 
 class AssetSurveyScreen extends StatefulWidget {
-  const AssetSurveyScreen({super.key});
+  const AssetSurveyScreen({super.key, this.embedded = false});
+
+  /// When true, header profile/logout are hidden — the CPLO shell tabs
+  /// already expose Profile and logout.
+  final bool embedded;
 
   @override
   State<AssetSurveyScreen> createState() => _AssetSurveyScreenState();
@@ -32,11 +38,21 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
   String? _selectedId;
   String _existingQuery = '';
   String? _infoMessage;
+  String? _serverRole;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDepartments());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFieldRole();
+      _loadDepartments();
+    });
+  }
+
+  Future<void> _loadFieldRole() async {
+    final role = await AuthApi.resolvedFieldRole();
+    if (!mounted) return;
+    setState(() => _serverRole = role);
   }
 
   Future<void> _loadDepartments() async {
@@ -189,23 +205,26 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
       body: Column(
         children: [
           GradientHeader(
-            title: 'Asset Survey',
-            subtitle: 'Survey new or existing assets · Live GPS',
+            title: FieldStaffCopy.surveyTitle(_serverRole),
+            subtitle: FieldStaffCopy.surveySubtitle(_serverRole),
             actions: [
               const Padding(
                 padding: EdgeInsets.only(right: 8),
                 child: _LiveBadge(),
               ),
-              IconButton(
-                icon: const Icon(Icons.account_circle_rounded),
-                tooltip: 'Profile',
-                onPressed: () => push(context, const SurveyorProfileScreen()),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded),
-                tooltip: 'Logout',
-                onPressed: () => handleLogout(context),
-              ),
+              if (!widget.embedded) ...[
+                IconButton(
+                  icon: const Icon(Icons.account_circle_rounded),
+                  tooltip: 'Profile',
+                  onPressed: () =>
+                      push(context, const SurveyorProfileScreen()),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded),
+                  tooltip: 'Logout',
+                  onPressed: () => handleLogout(context),
+                ),
+              ],
             ],
           ),
           Expanded(

@@ -56,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     final nextScreen = session != null && session.isValid
-        ? dashboardForRole(session.role)
+        ? dashboardForSession(session)
         : const LoginScreen();
     pushReplacement(context, nextScreen);
   }

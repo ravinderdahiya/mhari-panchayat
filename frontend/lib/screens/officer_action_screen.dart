@@ -37,7 +37,7 @@ class _NextAction {
 /// straight to the field-inspection stage.
 const Map<ComplaintStatus, List<_NextAction>> _officerActions = {
   ComplaintStatus.assigned: [
-    _NextAction(label: 'Start Inspection', status: 'INSPECTION'),
+    _NextAction(label: 'Inspect', status: 'INSPECTION'),
     _NextAction(
       label: 'Reject',
       status: 'REJECTED',
@@ -46,7 +46,7 @@ const Map<ComplaintStatus, List<_NextAction>> _officerActions = {
     ),
   ],
   ComplaintStatus.inspection: [
-    _NextAction(label: 'Start Work', status: 'WORK_STARTED'),
+    _NextAction(label: 'Work', status: 'WORK_STARTED'),
     _NextAction(
       label: 'Reject',
       status: 'REJECTED',

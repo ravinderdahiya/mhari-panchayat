@@ -87,6 +87,77 @@ class AssetSurveyController extends Controller
         }
     }
 
+    /** @return list<int> */
+    private function allowedPanchayatIds($user): array
+    {
+        $ids = $user->panchayats()->pluck('panchayats.id')->all();
+        if ($user->panchayat_id) {
+            $ids[] = (int) $user->panchayat_id;
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    private function normalizePanchayatName(?string $value): string
+    {
+        $value = mb_strtolower(trim((string) $value));
+
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
+    }
+
+    private function ensureAssignedPanchayat(Request $request, array $data): void
+    {
+        $user = $request->user();
+        $allowed = $this->allowedPanchayatIds($user);
+        if ($allowed === []) {
+            if ($user->role === 'cplo') {
+                throw ValidationException::withMessages([
+                    'panchayat' => 'आपकी पंचायत assigned नहीं है। सर्वे केवल assigned पंचायत में ही किया जा सकता है।',
+                ]);
+            }
+
+            return;
+        }
+
+        $assigned = Panchayat::query()->whereIn('id', $allowed)->get(['id', 'name']);
+        $submitted = $this->normalizePanchayatName($data['panchayat'] ?? null);
+        $nameOk = $assigned->contains(
+            fn ($panchayat) => $this->normalizePanchayatName($panchayat->name) === $submitted
+        );
+        if ($submitted !== '' && ! $nameOk) {
+            throw ValidationException::withMessages([
+                'panchayat' => 'Survey allowed only in your assigned panchayat: '.$assigned->pluck('name')->join(', '),
+            ]);
+        }
+
+        $latitude = isset($data['latitude']) ? (float) $data['latitude'] : null;
+        $longitude = isset($data['longitude']) ? (float) $data['longitude'] : null;
+        if ($latitude === null || $longitude === null) {
+            throw ValidationException::withMessages([
+                'panchayat' => 'GPS लोकेशन अनिवार्य है। सर्वे केवल assigned पंचायत में ही किया जा सकता है।',
+            ]);
+        }
+
+        $detected = app(LocationController::class)->lookup($latitude, $longitude);
+        $detectedId = is_array($detected) && isset($detected['panchayatId'])
+            ? (int) $detected['panchayatId']
+            : 0;
+        $detectedName = $this->normalizePanchayatName(
+            is_array($detected) ? ($detected['panchayat'] ?? null) : null
+        );
+        $idMatch = $detectedId > 0 && in_array($detectedId, $allowed, true);
+        $detectedNameOk = $detectedName !== '' && $assigned->contains(
+            fn ($panchayat) => $this->normalizePanchayatName($panchayat->name) === $detectedName
+        );
+        $resolved = $detectedId > 0 || $detectedName !== '';
+
+        if (! $resolved || (! $idMatch && ! $detectedNameOk)) {
+            throw ValidationException::withMessages([
+                'panchayat' => 'आप अपनी निर्धारित पंचायत ('.$assigned->pluck('name')->join(', ').') के क्षेत्र से बाहर हैं। सर्वे केवल assigned पंचायत में ही किया जा सकता है।',
+            ]);
+        }
+    }
+
     private function rules(bool $creating): array
     {
         $required = $creating ? 'required' : 'sometimes';
@@ -329,6 +400,7 @@ class AssetSurveyController extends Controller
     {
         $data = $request->validate($this->rules(true));
         $this->ensureSurveyScope($request, (int) $data['departmentId'], (int) $data['assetTypeId']);
+        $this->ensureAssignedPanchayat($request, $data);
         $photoPaths = $this->storePhotos($request);
 
         $survey = DB::transaction(function () use ($request, $data, $photoPaths) {
@@ -379,6 +451,11 @@ class AssetSurveyController extends Controller
         $departmentId = (int) ($data['departmentId'] ?? $survey->department_id);
         $assetTypeId = (int) ($data['assetTypeId'] ?? $survey->asset_type_id);
         $this->ensureSurveyScope($request, $departmentId, $assetTypeId);
+        $this->ensureAssignedPanchayat($request, [
+            'panchayat' => $data['panchayat'] ?? $survey->panchayat,
+            'latitude' => $data['latitude'] ?? $survey->latitude,
+            'longitude' => $data['longitude'] ?? $survey->longitude,
+        ]);
 
         $fieldMap = [
             'departmentId' => 'department_id', 'assetTypeId' => 'asset_type_id',

@@ -32,7 +32,7 @@ class _PanchayatAppState extends State<PanchayatApp> {
 
   void _onSplashComplete(AuthSession? session) {
     final nextScreen = session != null && session.isValid
-        ? dashboardForRole(session.role)
+        ? dashboardForSession(session)
         : const LoginScreen();
 
     final navigator = rootNavigatorKey.currentState;

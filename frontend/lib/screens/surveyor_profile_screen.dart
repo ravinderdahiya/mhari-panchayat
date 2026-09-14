@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/user_role.dart';
 import '../navigation/app_navigation.dart';
+import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
+import 'settings_screen.dart';
+
+String _formatMobile(String? mobile) {
+  if (mobile == null || mobile.length != 10) return mobile ?? '—';
+  return '+91 ${mobile.substring(0, 5)} ${mobile.substring(5)}';
+}
 
 class SurveyorProfileScreen extends StatefulWidget {
-  const SurveyorProfileScreen({super.key});
+  const SurveyorProfileScreen({super.key, this.embedded = false});
+
+  /// Hides the close button when this screen is a bottom-nav tab.
+  final bool embedded;
 
   @override
   State<SurveyorProfileScreen> createState() => _SurveyorProfileScreenState();
@@ -17,7 +28,10 @@ class SurveyorProfileScreen extends StatefulWidget {
 class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
   String? _name;
   String? _staffId;
+  String? _serverRole;
+  UserProfile? _profile;
   int? _surveyCount;
+  bool _loading = true;
 
   @override
   void initState() {
@@ -31,7 +45,32 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
       setState(() {
         _name = session?.officerName;
         _staffId = session?.staffId;
+        _serverRole = session?.serverRole;
       });
+    }
+
+    try {
+      final profile = await AuthApi.getProfile();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _name = profile.name ?? _name;
+          _staffId = profile.staffId ?? _staffId;
+          _serverRole = profile.role;
+          _loading = false;
+        });
+      }
+      await AuthService.persistServerRole(profile.role);
+    } catch (_) {
+      final fieldRole = await AuthApi.resolvedFieldRole();
+      if (mounted) {
+        setState(() {
+          if (fieldRole != null && fieldRole.isNotEmpty) {
+            _serverRole = fieldRole;
+          }
+          _loading = false;
+        });
+      }
     }
 
     try {
@@ -42,6 +81,82 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
     }
   }
 
+  List<_InfoRowData> get _rows {
+    final profile = _profile;
+    final rows = <_InfoRowData>[
+      if ((profile?.name ?? _name ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.person_rounded,
+          label: 'Name',
+          value: profile?.name ?? _name!,
+        ),
+      _InfoRowData(
+        icon: Icons.badge_rounded,
+        label: 'Staff ID',
+        value: profile?.staffId ?? _staffId ?? '—',
+      ),
+      if ((profile?.mobile ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.phone_rounded,
+          label: 'Mobile',
+          value: _formatMobile(profile!.mobile),
+        ),
+      if ((profile?.email ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.email_rounded,
+          label: 'Email',
+          value: profile!.email!,
+        ),
+      _InfoRowData(
+        icon: Icons.verified_user_rounded,
+        label: 'Role',
+        value: FieldStaffCopy.roleLabel(profile?.role ?? _serverRole),
+      ),
+      if ((profile?.departmentName ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.account_balance_rounded,
+          label: 'Department',
+          value: profile!.departmentName!,
+        ),
+      if ((profile?.districtName ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.location_city_rounded,
+          label: 'District',
+          value: profile!.districtName!,
+        ),
+      if ((profile?.blockName ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.map_rounded,
+          label: 'Block',
+          value: profile!.blockName!,
+        ),
+      if ((profile?.panchayatName ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.home_work_rounded,
+          label: 'Panchayat',
+          value: profile!.panchayatName!,
+        ),
+      if ((profile?.memberId ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.credit_card_rounded,
+          label: 'Member ID',
+          value: profile!.memberId!,
+        ),
+      if ((profile?.familyId ?? '').isNotEmpty)
+        _InfoRowData(
+          icon: Icons.groups_rounded,
+          label: 'Family ID',
+          value: profile!.familyId!,
+        ),
+      _InfoRowData(
+        icon: Icons.fact_check_rounded,
+        label: 'Total Surveys Submitted',
+        value: _surveyCount?.toString() ?? '—',
+      ),
+    ];
+    return rows;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,7 +164,11 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _ProfileHeader(name: _name),
+            _ProfileHeader(
+              name: _name,
+              serverRole: _serverRole,
+              showClose: !widget.embedded,
+            ),
             Transform.translate(
               offset: const Offset(0, -28),
               child: Padding(
@@ -58,24 +177,36 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
                 ),
                 child: Column(
                   children: [
-                    _InfoCard(
-                      rows: [
-                        _InfoRowData(
-                          icon: Icons.badge_rounded,
-                          label: 'Staff ID',
-                          value: _staffId ?? '—',
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: CircularProgressIndicator(),
+                      )
+                    else
+                      _InfoCard(rows: _rows),
+                    const SizedBox(height: AppSpacing.screen),
+                    Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppColors.orangeTint,
+                          foregroundColor: AppColors.primary,
+                          child: Icon(Icons.settings_rounded, size: 19),
                         ),
-                        const _InfoRowData(
-                          icon: Icons.verified_user_rounded,
-                          label: 'Role',
-                          value: 'Surveyor',
+                        title: Text(
+                          'Settings',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF212121),
+                          ),
                         ),
-                        _InfoRowData(
-                          icon: Icons.fact_check_rounded,
-                          label: 'Total Surveys Submitted',
-                          value: _surveyCount?.toString() ?? '—',
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF9E9E9E),
                         ),
-                      ],
+                        onTap: () => push(context, const SettingsScreen()),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -108,9 +239,15 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.name});
+  const _ProfileHeader({
+    required this.name,
+    this.serverRole,
+    this.showClose = true,
+  });
 
   final String? name;
+  final String? serverRole;
+  final bool showClose;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +273,7 @@ class _ProfileHeader extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                name ?? 'Surveyor',
+                name ?? FieldStaffCopy.profileFallbackName(serverRole),
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 16,
@@ -145,7 +282,7 @@ class _ProfileHeader extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Field Asset Survey',
+                FieldStaffCopy.profileSubtitle(serverRole),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   color: const Color(0xFFFFF3E0),
@@ -154,18 +291,19 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: IconTheme(
-              data: const IconThemeData(color: Colors.white),
-              child: IconButton(
-                tooltip: 'Back',
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.close_rounded),
+          if (showClose)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconTheme(
+                data: const IconThemeData(color: Colors.white),
+                child: IconButton(
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

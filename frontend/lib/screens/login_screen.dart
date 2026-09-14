@@ -160,17 +160,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isSubmitting = true);
     try {
       final result = await AuthApi.staffLogin(staffId, password);
-      final roleKey = result.role.toLowerCase();
-      final serverRole =
-          (roleKey == 'engineer' || roleKey == 'surveyor')
-          ? UserRole.survey
-          : roleKey == 'citizen'
-          ? UserRole.citizen
-          : roleKey == 'gram_sachiv'
-          ? UserRole.gramSachiv
-          : UserRole.officer;
+      final uiRole = UserRoleStorage.fromServerRole(result.role);
       await AuthService.saveLogin(
-        role: serverRole,
+        role: uiRole,
+        serverRole: result.role,
         token: result.token,
         officerId: result.id,
         officerName: result.name,
@@ -180,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
         assignedPanchayatName: result.assignedPanchayatName,
       );
       if (!mounted) return;
-      pushReplacement(context, dashboardForRole(serverRole));
+      pushReplacement(context, dashboardForRole(uiRole));
     } on AuthApiException catch (e) {
       _showMessage(e.message);
     } finally {

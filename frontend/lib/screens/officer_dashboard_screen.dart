@@ -13,11 +13,15 @@ import 'notification_screen.dart';
 import 'officer_action_screen.dart';
 
 class OfficerDashboardScreen extends StatefulWidget {
-  const OfficerDashboardScreen({super.key, this.onProfileTap});
+  const OfficerDashboardScreen({super.key, this.onProfileTap, this.onSurveyTap});
 
   /// Switches OfficerShell's bottom nav to its Profile tab. Null when this
   /// screen is hosted somewhere without that tab.
   final VoidCallback? onProfileTap;
+
+  /// Opens the GPS/photo asset-survey flow. Set for CPLO so field collection
+  /// stays one tap away from the complaint home.
+  final VoidCallback? onSurveyTap;
 
   @override
   State<OfficerDashboardScreen> createState() => _OfficerDashboardScreenState();
@@ -188,6 +192,10 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                               ],
                             ),
                             const SizedBox(height: AppSpacing.screen),
+                            if (widget.onSurveyTap != null) ...[
+                              _SurveyEntryCard(onTap: widget.onSurveyTap!),
+                              const SizedBox(height: AppSpacing.screen),
+                            ],
                             Text(
                               'Complaint Queue',
                               style: GoogleFonts.poppins(
@@ -315,6 +323,60 @@ class _OfficerHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SurveyEntryCard extends StatelessWidget {
+  const _SurveyEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.greenTint,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.white,
+                child: Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Asset Survey',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF212121),
+                      ),
+                    ),
+                    Text(
+                      'GPS / photo records · पंचायत स्तर',
+                      style: GoogleFonts.notoSansDevanagari(
+                        fontSize: 12,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF9E9E9E)),
+            ],
+          ),
+        ),
       ),
     );
   }

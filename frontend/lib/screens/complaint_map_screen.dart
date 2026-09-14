@@ -19,7 +19,11 @@ import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
 
 class ComplaintMapScreen extends StatefulWidget {
-  const ComplaintMapScreen({super.key});
+  const ComplaintMapScreen({super.key, this.staffQueue = false});
+
+  /// When true, load the signed-in staff queue instead of the citizen's
+  /// own complaints (CPLO / officer Map tab).
+  final bool staffQueue;
 
   @override
   State<ComplaintMapScreen> createState() => _ComplaintMapScreenState();
@@ -69,7 +73,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   Future<void> _loadComplaints() async {
     setState(() => _loading = true);
     try {
-      final complaints = await ComplaintApi.getMine();
+      final complaints = widget.staffQueue
+          ? await ComplaintApi.getOfficerQueue()
+          : await ComplaintApi.getMine();
       if (!mounted) return;
       setState(() => _complaints = complaints);
     } on ComplaintApiException catch (_) {

@@ -72,9 +72,14 @@ class UserProfile {
     this.name,
     required this.role,
     this.email,
+    this.departmentName,
     this.districtName,
     this.blockName,
     this.panchayatName,
+    this.panchayatId,
+    this.employeeId,
+    this.memberId,
+    this.familyId,
   });
 
   final String id;
@@ -83,6 +88,7 @@ class UserProfile {
   final String? name;
   final String role;
   final String? email;
+  final String? departmentName;
 
   // Jurisdiction the account is scoped to, if any (district-level staff
   // carry only districtName; a CPLO/Gram Sachiv carries all three since
@@ -90,24 +96,45 @@ class UserProfile {
   final String? districtName;
   final String? blockName;
   final String? panchayatName;
+  final int? panchayatId;
+  final String? employeeId;
+  final String? memberId;
+  final String? familyId;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    String? asString(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
     String? relationName(String key) =>
-        (json[key] as Map<String, dynamic>?)?['name'] as String?;
+        asString((json[key] as Map<String, dynamic>?)?['name']);
+
+    int? relationId(String key) {
+      final nested = json[key] as Map<String, dynamic>?;
+      return int.tryParse(nested?['id']?.toString() ?? '') ??
+          int.tryParse(json['${key}_id']?.toString() ?? '');
+    }
 
     return UserProfile(
       id: json['id']?.toString() ?? '',
-      mobile: json['mobile'] as String?,
+      mobile: asString(json['mobile']),
       staffId:
-          json['username'] as String? ??
-          json['staffId'] as String? ??
-          json['employee_id'] as String?,
-      name: json['name'] as String?,
-      role: json['role'] as String? ?? 'citizen',
-      email: json['email'] as String?,
+          asString(json['username']) ??
+          asString(json['staffId']) ??
+          asString(json['employee_id']),
+      name: asString(json['name']),
+      role: asString(json['role']) ?? 'citizen',
+      email: asString(json['email']),
+      departmentName: relationName('department'),
       districtName: relationName('district'),
       blockName: relationName('block'),
       panchayatName: relationName('panchayat'),
+      panchayatId: relationId('panchayat'),
+      employeeId: asString(json['employee_id']),
+      memberId: asString(json['member_id']),
+      familyId: asString(json['family_id']),
     );
   }
 }
@@ -164,8 +191,8 @@ class AuthApi {
   }
 
   /// Staff login against mhari-panchayat `POST /api/auth/login`
-  /// (username + password). Roles like `engineer` map to survey in the UI;
-  /// other non-citizen staff map to officer.
+  /// (username + password). Surveyor/CPLO/engineer map to the asset-survey
+  /// UI; gram sachiv to verification; other non-citizen staff to officer.
   static Future<StaffLoginResult> staffLogin(
     String staffId,
     String password,
@@ -188,7 +215,7 @@ class AuthApi {
       role: role,
       name: user['name'] as String?,
       officerProfileId: user['id']?.toString(),
-      assignedPanchayatId: (panchayat?['id'] as num?)?.toInt(),
+      assignedPanchayatId: int.tryParse(panchayat?['id']?.toString() ?? ''),
       assignedPanchayatName: panchayat?['name'] as String?,
     );
   }
@@ -232,6 +259,23 @@ class AuthApi {
 
     final user = body['user'] as Map<String, dynamic>? ?? const {};
     return UserProfile.fromJson(user);
+  }
+
+  /// Backend role for field-app labels. Uses the value stored at login,
+  /// and fills it from `/me` when an older session only has the UI shell.
+  static Future<String?> resolvedFieldRole() async {
+    final session = await AuthService.getSession();
+    final stored = session?.serverRole?.trim();
+    if (stored != null && stored.isNotEmpty) return stored;
+    try {
+      final profile = await getProfile();
+      final role = profile.role.trim();
+      if (role.isNotEmpty) {
+        await AuthService.persistServerRole(role);
+        return role;
+      }
+    } catch (_) {}
+    return stored;
   }
 
   /// Self-service password change for the logged-in user (any role,
