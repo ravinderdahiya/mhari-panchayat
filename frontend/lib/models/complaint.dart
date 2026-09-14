@@ -49,6 +49,7 @@ class Complaint {
     required this.panchayat,
     this.district = '',
     this.tehsil = '',
+    this.block = '',
     this.priority,
     this.department,
     this.assetType,
@@ -83,6 +84,7 @@ class Complaint {
   final String panchayat;
   final String district;
   final String tehsil;
+  final String block;
   final String? priority;
   final String? department;
   final String? assetType;
@@ -120,6 +122,7 @@ class Complaint {
     return [
       village,
       panchayat,
+      block,
       tehsil,
       district,
     ].where((value) => value.trim().isNotEmpty).toSet().join(', ');

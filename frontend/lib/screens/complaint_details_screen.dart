@@ -105,6 +105,15 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                     ComplaintStatusRow(complaint: complaint),
                   ],
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  complaint.displayCode,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mutedText,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 ComplaintAssetMetaRow(complaint: complaint),
                 const SizedBox(height: AppSpacing.screen),

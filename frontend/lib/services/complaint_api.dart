@@ -248,10 +248,21 @@ class ComplaintApi {
         .toList();
   }
 
-  /// Officer-only: assigns/reassigns a complaint to the given officer.
-  static Future<Complaint> assign(String id, String officerId) async {
-    final body = await _patch(_uri('/$id/assign'), {
-      'officerId': officerId,
+  /// Officer-only: self-accepts a Pending/Reopened complaint (the queue's
+  /// "Accept" button). Backend route: PATCH /complaints/{id}/acknowledge.
+  static Future<Complaint> acknowledge(String id, String assignedToId) async {
+    final body = await _patch(_uri('/$id/acknowledge'), {
+      'assigned_to_id': assignedToId,
+    }, 'शिकायत स्वीकार नहीं हो पाई। पुनः प्रयास करें।');
+    final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
+    return _fromJson(complaint);
+  }
+
+  /// Officer-only: reassigns an already-accepted complaint to a different
+  /// officer. Backend route: PATCH /complaints/{id}/transfer.
+  static Future<Complaint> transfer(String id, String toUserId) async {
+    final body = await _patch(_uri('/$id/transfer'), {
+      'to_user_id': toUserId,
     }, 'शिकायत असाइन नहीं हो पाई। पुनः प्रयास करें।');
     final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
     return _fromJson(complaint);
@@ -479,6 +490,7 @@ class ComplaintApi {
           json['panchayat']?.toString() ?? asset['panchayat'] as String? ?? '',
       district: district is Map ? district['name']?.toString() ?? '' : '',
       tehsil: tehsil is Map ? tehsil['name']?.toString() ?? '' : '',
+      block: json['location_block']?.toString() ?? '',
       priority: priority is Map ? priority['name']?.toString() : null,
       department: department is Map ? department['name']?.toString() : null,
       assetType: assetType is Map ? assetType['name']?.toString() : null,

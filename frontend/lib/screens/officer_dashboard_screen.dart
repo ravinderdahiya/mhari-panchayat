@@ -98,7 +98,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
     final officerProfileId = _officerProfileId;
     if (officerProfileId == null) return;
     try {
-      await ComplaintApi.assign(complaint.id, officerProfileId);
+      await ComplaintApi.acknowledge(complaint.id, officerProfileId);
       if (!mounted) return;
       _loadComplaints();
     } on ComplaintApiException catch (e) {
@@ -415,6 +415,15 @@ class _OfficerTaskCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 StatusChip(status: complaint.status),
               ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              complaint.displayCode,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.mutedText,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
