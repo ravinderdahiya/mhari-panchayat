@@ -31,19 +31,19 @@ class _NextAction {
 }
 
 /// Legal next steps an officer can take, keyed by the complaint's current
-/// status — mirrors the backend's transition table exactly.
+/// status — mirrors the backend's transition table exactly. There is no
+/// separate "accept" step server-side: acknowledging (the queue's Accept
+/// button) already means accepted, so the next action from `assigned` goes
+/// straight to the field-inspection stage.
 const Map<ComplaintStatus, List<_NextAction>> _officerActions = {
   ComplaintStatus.assigned: [
-    _NextAction(label: 'Accept', status: 'ACCEPTED'),
+    _NextAction(label: 'Start Inspection', status: 'INSPECTION'),
     _NextAction(
       label: 'Reject',
       status: 'REJECTED',
       destructive: true,
       needsReason: true,
     ),
-  ],
-  ComplaintStatus.accepted: [
-    _NextAction(label: 'Start Inspection', status: 'INSPECTION'),
   ],
   ComplaintStatus.inspection: [
     _NextAction(label: 'Start Work', status: 'WORK_STARTED'),
@@ -142,12 +142,44 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
 
     setState(() => _submitting = true);
     try {
-      final updated = await ComplaintApi.updateStatus(
-        _complaint.id,
-        status: action.status,
-        reason: _remarksController.text.trim(),
-        resolutionPhotos: action.needsPhoto ? _resolutionPhotos : const [],
-      );
+      final notes = _remarksController.text.trim();
+      final Complaint updated;
+      switch (action.status) {
+        case 'REJECTED':
+          updated = await ComplaintApi.reject(_complaint.id, reason: notes);
+          break;
+        case 'INSPECTION':
+          updated = await ComplaintApi.survey(
+            _complaint.id,
+            stage: 'Before',
+            notes: notes.isEmpty ? null : notes,
+          );
+          break;
+        case 'WORK_STARTED':
+          updated = await ComplaintApi.survey(
+            _complaint.id,
+            stage: 'During',
+            notes: notes.isEmpty ? null : notes,
+          );
+          break;
+        case 'RESOLVED':
+          // Records the after-fix photo against the field survey, then
+          // marks the complaint resolved — two backend actions behind one
+          // "Mark Resolved" button (resolve() itself carries no photo).
+          await ComplaintApi.survey(
+            _complaint.id,
+            stage: 'After',
+            notes: notes.isEmpty ? null : notes,
+            photo: _resolutionPhotos.first,
+          );
+          updated = await ComplaintApi.resolve(
+            _complaint.id,
+            notes: notes.isEmpty ? null : notes,
+          );
+          break;
+        default:
+          throw ComplaintApiException('Unsupported action: ${action.status}');
+      }
       if (!mounted) return;
       if (action.status == 'RESOLVED' ||
           _officerActions[updated.status] == null) {

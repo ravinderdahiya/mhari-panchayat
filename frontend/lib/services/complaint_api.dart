@@ -275,55 +275,49 @@ class ComplaintApi {
   ///
   /// When [status] is `RESOLVED`, [resolutionPhotos] must contain at least
   /// one image (multipart upload of the officer's after-fix evidence).
-  static Future<Complaint> updateStatus(
+  /// Officer-only: submits one field-inspection stage. Backend route:
+  /// PATCH /complaints/{id}/survey. `stage` is 'Before' (Acknowledged ->
+  /// Surveyed), 'During' or 'After' (-> In_Progress); the matching photo
+  /// field (before/during/after_photo) is attached when [photo] is given.
+  static Future<Complaint> survey(
     String id, {
-    required String status,
-    String? reason,
-    List<Uint8List> resolutionPhotos = const [],
+    required String stage,
+    String? notes,
+    Uint8List? photo,
   }) async {
     final session = await AuthService.getSession();
     if (session == null || !session.isValid) {
       throw ComplaintApiException('कृपया पहले लॉगिन करें');
     }
 
+    final photoField = switch (stage) {
+      'Before' => 'before_photo',
+      'During' => 'during_photo',
+      _ => 'after_photo',
+    };
+
     late final http.Response response;
     try {
-      if (resolutionPhotos.isNotEmpty || status == 'RESOLVED') {
-        final request = http.MultipartRequest('PATCH', _uri('/$id/status'))
-          ..headers['Authorization'] = 'Bearer ${session.token}'
-          ..fields['status'] = status;
-        if (reason != null && reason.isNotEmpty) {
-          request.fields['reason'] = reason;
-        }
-        for (var i = 0; i < resolutionPhotos.length; i++) {
-          request.files.add(
-            http.MultipartFile.fromBytes(
-              'resolutionPhotos',
-              resolutionPhotos[i],
-              filename: 'resolution_photo_$i.jpg',
-              contentType: MediaType('image', 'jpeg'),
-            ),
-          );
-        }
-        final streamed = await request.send().timeout(
-          const Duration(seconds: 30),
-        );
-        response = await http.Response.fromStream(streamed);
-      } else {
-        response = await http
-            .patch(
-              _uri('/$id/status'),
-              headers: {
-                'Authorization': 'Bearer ${session.token}',
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode({
-                'status': status,
-                if (reason != null && reason.isNotEmpty) 'reason': reason,
-              }),
-            )
-            .timeout(const Duration(seconds: 20));
+      final request = http.MultipartRequest('PATCH', _uri('/$id/survey'))
+        ..headers['Authorization'] = 'Bearer ${session.token}'
+        ..fields['stage'] = stage;
+      if (notes != null && notes.isNotEmpty) {
+        request.fields['notes'] = notes;
       }
+      if (photo != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            photoField,
+            photo,
+            filename: '$photoField.jpg',
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      }
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      response = await http.Response.fromStream(streamed);
     } catch (_) {
       throw ComplaintApiException(
         'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
@@ -334,8 +328,53 @@ class ComplaintApi {
     await _throwIfError(
       response,
       body,
-      'स्टेटस अपडेट नहीं हो पाया। पुनः प्रयास करें।',
+      'फील्ड सर्वे सबमिट नहीं हो पाया। पुनः प्रयास करें।',
     );
+    final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
+    return _fromJson(complaint);
+  }
+
+  /// Officer-only: marks an In_Progress/Surveyed complaint Resolved.
+  /// Backend route: PATCH /complaints/{id}/resolve.
+  static Future<Complaint> resolve(String id, {String? notes}) async {
+    final body = await _patch(_uri('/$id/resolve'), {
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    }, 'शिकायत हल के रूप में चिह्नित नहीं हो पाई। पुनः प्रयास करें।');
+    final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
+    return _fromJson(complaint);
+  }
+
+  /// Rejects a complaint at any non-terminal status. Backend route:
+  /// PATCH /complaints/{id}/reject.
+  static Future<Complaint> reject(String id, {required String reason}) async {
+    final body = await _patch(_uri('/$id/reject'), {
+      'reason': reason,
+    }, 'शिकायत अस्वीकार नहीं हो पाई। पुनः प्रयास करें।');
+    final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
+    return _fromJson(complaint);
+  }
+
+  /// Citizen-only: rates and closes a Resolved complaint. Backend route:
+  /// PATCH /complaints/{id}/rate.
+  static Future<Complaint> rate(
+    String id, {
+    required int rating,
+    String? feedback,
+  }) async {
+    final body = await _patch(_uri('/$id/rate'), {
+      'rating': rating,
+      if (feedback != null && feedback.isNotEmpty) 'feedback': feedback,
+    }, 'रेटिंग सबमिट नहीं हो पाई। पुनः प्रयास करें।');
+    final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
+    return _fromJson(complaint);
+  }
+
+  /// Citizen-only: reopens a Closed complaint. Backend route:
+  /// PATCH /complaints/{id}/reopen.
+  static Future<Complaint> reopen(String id, {required String reason}) async {
+    final body = await _patch(_uri('/$id/reopen'), {
+      'reason': reason,
+    }, 'शिकायत फिर से नहीं खुल पाई। पुनः प्रयास करें।');
     final complaint = body['complaint'] as Map<String, dynamic>? ?? const {};
     return _fromJson(complaint);
   }

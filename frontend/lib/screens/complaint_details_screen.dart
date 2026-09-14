@@ -51,14 +51,57 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     );
   }
 
-  Future<void> _verify(String status) async {
+  /// Citizen confirms the officer's fix — closes the complaint. The
+  /// verification card is a plain yes/no confirmation with no star picker,
+  /// so a confirmed fix is recorded as a full (5-star) rating.
+  Future<void> _confirmResolved() async {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
-      final updated = await ComplaintApi.updateStatus(
-        _complaint.id,
-        status: status,
-      );
+      final updated = await ComplaintApi.rate(_complaint.id, rating: 5);
+      if (!mounted) return;
+      setState(() => _complaint = updated);
+    } on ComplaintApiException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// Citizen disputes the fix — asks for a reason, then reopens.
+  Future<void> _reopen() async {
+    if (_submitting) return;
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Why reopen this complaint?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Describe what is still wrong...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Reopen'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || reason.isEmpty) return;
+
+    setState(() => _submitting = true);
+    try {
+      final updated = await ComplaintApi.reopen(_complaint.id, reason: reason);
       if (!mounted) return;
       setState(() => _complaint = updated);
     } on ComplaintApiException catch (e) {
@@ -169,8 +212,8 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                   const SizedBox(height: AppSpacing.screen),
                   _VerificationCard(
                     submitting: _submitting,
-                    onConfirm: () => _verify('CLOSED'),
-                    onReopen: () => _verify('WORK_STARTED'),
+                    onConfirm: _confirmResolved,
+                    onReopen: _reopen,
                   ),
                 ],
                 const SizedBox(height: AppSpacing.screen),
