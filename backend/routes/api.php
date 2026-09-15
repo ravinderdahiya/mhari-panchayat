@@ -30,6 +30,7 @@ Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswo
 Route::get('/registrations/districts', [RegistrationController::class, 'districts']);
 Route::get('/registrations/blocks', [RegistrationController::class, 'blocks']);
 Route::get('/registrations/panchayats', [RegistrationController::class, 'panchayats']);
+Route::get('/registrations/departments', [RegistrationController::class, 'departments']);
 Route::post('/registrations/phone/send-otp', [RegistrationController::class, 'sendPhoneOtp']);
 Route::post('/registrations/phone/verify-otp', [RegistrationController::class, 'verifyPhoneOtp']);
 Route::post('/registrations/email/send-link', [RegistrationController::class, 'sendEmailLink']);

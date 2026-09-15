@@ -52,6 +52,19 @@ class RegistrationPanchayat {
       );
 }
 
+class RegistrationDepartment {
+  const RegistrationDepartment({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory RegistrationDepartment.fromJson(Map<String, dynamic> json) =>
+      RegistrationDepartment(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+      );
+}
+
 class RegistrationStartResult {
   const RegistrationStartResult({
     required this.userId,
@@ -127,6 +140,14 @@ class RegistrationApi {
     final list = body['panchayats'] as List<dynamic>? ?? [];
     return list
         .map((e) => RegistrationPanchayat.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<RegistrationDepartment>> getDepartments() async {
+    final body = await _get('/registrations/departments');
+    final list = body['departments'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => RegistrationDepartment.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -208,6 +229,8 @@ class RegistrationApi {
     required int districtId,
     required int blockId,
     required int panchayatId,
+    required String familyId,
+    required int departmentId,
   }) {
     return _post('/registrations/surveyor', {
       'name': name,
@@ -217,6 +240,8 @@ class RegistrationApi {
       'district_id': districtId,
       'block_id': blockId,
       'panchayat_id': panchayatId,
+      'family_id': familyId,
+      'department_id': departmentId,
     }).then(_startResult);
   }
 

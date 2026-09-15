@@ -54,6 +54,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _mobileController = TextEditingController();
   final _emailController = TextEditingController();
   final _employeeIdController = TextEditingController();
+  final _familyIdController = TextEditingController();
   final _otpController = TextEditingController();
 
   final _nameFocus = FocusNode();
@@ -61,6 +62,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _otpFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _employeeIdFocus = FocusNode();
+  final _familyIdFocus = FocusNode();
 
   bool _otpRequested = false;
   bool _phoneVerified = false;
@@ -77,15 +79,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   int? _selectedPanchayatId;
   bool _loadingPanchayats = false;
 
+  List<RegistrationDepartment> _departments = [];
+  int? _selectedDepartmentId;
+
   @override
   void initState() {
     super.initState();
     RegistrationScreen.isAnyInstanceMounted = true;
     _loadDistricts();
+    if (_role == RegRole.surveyor) _loadDepartments();
     for (final c in [
       _nameController,
       _emailController,
       _employeeIdController,
+      _familyIdController,
     ]) {
       c.addListener(() => setState(() {}));
     }
@@ -98,12 +105,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _mobileController.dispose();
     _emailController.dispose();
     _employeeIdController.dispose();
+    _familyIdController.dispose();
     _otpController.dispose();
     _nameFocus.dispose();
     _mobileFocus.dispose();
     _otpFocus.dispose();
     _emailFocus.dispose();
     _employeeIdFocus.dispose();
+    _familyIdFocus.dispose();
     super.dispose();
   }
 
@@ -114,6 +123,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (_otpRequested && !_phoneVerified) _otpFocus,
       if (_phoneVerified) _emailFocus,
       if (_phoneVerified && _role == RegRole.officer) _employeeIdFocus,
+      if (_phoneVerified && _role == RegRole.surveyor) _familyIdFocus,
     ];
     final i = chain.indexOf(current);
     if (i >= 0 && i < chain.length - 1) {
@@ -128,6 +138,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final districts = await RegistrationApi.getDistricts();
       if (!mounted) return;
       setState(() => _districts = districts);
+    } catch (_) {}
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      final departments = await RegistrationApi.getDepartments();
+      if (!mounted) return;
+      setState(() {
+        _departments = departments;
+        // Only one department is active for field registration today
+        // (Panchayati Raj) — pre-select it instead of making the surveyor
+        // pick from a list of one.
+        if (departments.length == 1) {
+          _selectedDepartmentId = departments.first.id;
+        }
+      });
     } catch (_) {}
   }
 
@@ -190,8 +216,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _selectedDistrictId != null &&
         _selectedBlockId != null &&
         _selectedPanchayatId != null &&
-        (_role == RegRole.surveyor ||
-            _employeeIdController.text.trim().isNotEmpty);
+        (_role != RegRole.officer ||
+            _employeeIdController.text.trim().isNotEmpty) &&
+        (_role != RegRole.surveyor ||
+            (_familyIdController.text.trim().isNotEmpty &&
+                _selectedDepartmentId != null));
   }
 
   Future<void> _sendPhoneOtp() async {
@@ -273,6 +302,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               districtId: _selectedDistrictId!,
               blockId: _selectedBlockId!,
               panchayatId: _selectedPanchayatId!,
+              familyId: _familyIdController.text.trim(),
+              departmentId: _selectedDepartmentId!,
             )
           : await RegistrationApi.registerOfficer(
               name: _nameController.text.trim(),
@@ -490,6 +521,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             }
           },
         ),
+        if (_role == RegRole.surveyor) ...[
+          const SizedBox(height: 16),
+          _dropdown<int>(
+            label: 'Department',
+            icon: Icons.account_balance_outlined,
+            value: _selectedDepartmentId,
+            items: _departments
+                .map((d) => (value: d.id, label: d.name))
+                .toList(),
+            hint: _departments.isEmpty
+                ? 'Loading departments…'
+                : 'Select department',
+            onChanged: (value) =>
+                setState(() => _selectedDepartmentId = value),
+          ),
+        ],
         const SizedBox(height: 16),
         _dropdown<int>(
           label: 'District',
@@ -539,6 +586,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             focusNode: _employeeIdFocus,
             textInputAction: TextInputAction.done,
             onNext: () => _employeeIdFocus.unfocus(),
+          ),
+        ],
+        if (_role == RegRole.surveyor) ...[
+          const SizedBox(height: 16),
+          _label('Family ID', required: true),
+          const SizedBox(height: 6),
+          _plainField(
+            _familyIdController,
+            'Parivar Pehchan Patra family ID',
+            Icons.family_restroom_outlined,
+            key: const ValueKey('reg-family-id'),
+            focusNode: _familyIdFocus,
+            textInputAction: TextInputAction.done,
+            onNext: () => _familyIdFocus.unfocus(),
           ),
         ],
         const SizedBox(height: 12),

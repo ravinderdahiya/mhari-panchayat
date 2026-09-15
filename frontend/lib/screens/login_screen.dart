@@ -447,7 +447,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: TextButton(
           onPressed: () => push(
             context,
-            const RegistrationScreen(initialRole: RegRole.officer),
+            const RegistrationScreen(initialRole: RegRole.surveyor),
           ),
           child: Text(
             _t('नया रजिस्ट्रेशन करें', 'New here? Register'),

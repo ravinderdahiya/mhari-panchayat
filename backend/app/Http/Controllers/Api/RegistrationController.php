@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\RegistrationVerificationMail;
 use App\Models\Block;
+use App\Models\Department;
 use App\Models\District;
 use App\Models\Panchayat;
 use App\Models\User;
@@ -35,6 +36,16 @@ class RegistrationController extends Controller
         return response()->json([
             'success' => true,
             'districts' => District::with('state')->where('is_active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    // Field-registration only offers departments flagged active for self
+    // sign-up (today: just Panchayati Raj) — not the full master-data list.
+    public function departments()
+    {
+        return response()->json([
+            'success' => true,
+            'departments' => Department::where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -486,6 +497,10 @@ HTML;
         if ($role === 'department_officer') {
             $rules['employee_id'] = ['required', 'string', 'max:50'];
         }
+        if ($role === 'surveyor') {
+            $rules['family_id'] = ['required', 'string', 'max:50'];
+            $rules['department_id'] = ['required', 'exists:departments,id'];
+        }
 
         $data = $request->validate($rules);
 
@@ -512,7 +527,9 @@ HTML;
             'district_id' => $data['district_id'],
             'block_id' => $data['block_id'],
             'panchayat_id' => $data['panchayat_id'],
+            'department_id' => $data['department_id'] ?? null,
             'employee_id' => $role === 'surveyor' ? null : ($data['employee_id'] ?? null),
+            'family_id' => $data['family_id'] ?? null,
             'role' => $role,
             'is_active' => false,
             'registration_status' => 'pending_email',
