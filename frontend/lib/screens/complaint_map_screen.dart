@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -32,10 +34,19 @@ class ComplaintMapScreen extends StatefulWidget {
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   final _mapController = MapController();
 
-  /// Same origin as the admin dashboard map (Haryana, zoom 8) so the
-  /// district boundary layer is visible at the service's minScale.
+  /// Same center as the admin dashboard map, but zoomed out a step further
+  /// - the dashboard is a wide desktop map, while a phone's narrower
+  /// portrait viewport needs a lower zoom for the full Haryana boundary to
+  /// fit on screen instead of running off the left/right edges.
+  /// Same center as the admin dashboard map, zoomed out one step for a
+  /// phone's narrower portrait viewport. Can't go lower than this: the GIS
+  /// district-boundary service (see GisMapImageLayer) has a minScale cutoff
+  /// and stops rendering the boundary layer entirely below roughly zoom 7.6
+  /// - confirmed 7.5 already loses it, 7.7 keeps it. That's the tightest
+  /// zoom-out the boundary layer tolerates, so the full state doesn't quite
+  /// fit edge-to-edge on a narrow screen without losing the boundaries.
   static const _haryanaCenter = LatLng(29.0588, 76.0856);
-  static const _haryanaZoom = 8.0;
+  static const _haryanaZoom = 7.7;
 
   static const _myLocationZoom = 15.0;
   static const _imageryTiles =
@@ -487,47 +498,56 @@ class _MapLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border, width: 0.5),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Legend',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF212121),
-            ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: AppColors.background.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: AppColors.border, width: 0.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          _legendRow(
-            const Color(0xFFD32F2F),
-            'Pending',
-            ComplaintBucket.pending,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'STATUS',
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: AppColors.mutedText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _legendRow(
+                const Color(0xFFD32F2F),
+                'Pending',
+                ComplaintBucket.pending,
+              ),
+              _legendRow(
+                const Color(0xFFF9A825),
+                'In Progress',
+                ComplaintBucket.inProgress,
+              ),
+              _legendRow(
+                const Color(0xFF2E7D32),
+                'Resolved',
+                ComplaintBucket.resolved,
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          _legendRow(
-            const Color(0xFFF9A825),
-            'In Progress',
-            ComplaintBucket.inProgress,
-          ),
-          const SizedBox(height: 6),
-          _legendRow(
-            const Color(0xFF2E7D32),
-            'Resolved',
-            ComplaintBucket.resolved,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -541,7 +561,8 @@ class _MapLegend extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: () => onSelect(bucket),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           decoration: BoxDecoration(
             color: isSelected ? color.withValues(alpha: 0.12) : null,
             borderRadius: BorderRadius.circular(8),
@@ -549,13 +570,27 @@ class _MapLegend extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.location_on, color: color, size: 18),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.5),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: GoogleFonts.poppins(
                   fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected ? color : const Color(0xFF424242),
                 ),
               ),
