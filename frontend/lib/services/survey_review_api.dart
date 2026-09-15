@@ -16,9 +16,10 @@ class SurveyReviewApiException implements Exception {
   String toString() => message;
 }
 
-/// Gram Sachiv side of `/api/surveys` - the panchayat-scoped verification
-/// queue (backend auto-scopes `gram_sachiv` callers to their own
-/// `panchayat_id`, so this never has to pass a panchayat filter itself).
+/// Verification side of `/api/surveys` - the escalation-chain queue shared
+/// by Gram Sachiv, BDPO, DDPO, XEN-PR and CEO-ZP (backend auto-scopes each
+/// caller to their own jurisdiction - panchayat/block/district - so this
+/// never has to pass a location filter itself).
 class SurveyReviewApi {
   SurveyReviewApi._();
 
@@ -102,6 +103,76 @@ class SurveyReviewApi {
     try {
       response = await http
           .post(_uri('/$surveyId/return'), headers: headers, body: {'reason': reason})
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// BDPO's positive action - sends a gram-sachiv-verified survey on to DDPO.
+  static Future<Survey> forward(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/forward'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// DDPO's positive action - sends technical asset types on to XEN-PR and
+  /// everything else straight to CEO-ZP.
+  static Future<Survey> approve(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/approve'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// XEN-PR's technical sign-off, only reachable for asset types that
+  /// require it - sends the survey on to CEO-ZP.
+  static Future<Survey> technicalReview(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/technical-review'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// CEO-ZP's final sign-off, closing the verification chain.
+  static Future<Survey> finalApprove(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/final-approve'), headers: headers)
           .timeout(const Duration(seconds: 20));
     } catch (_) {
       throw SurveyReviewApiException(

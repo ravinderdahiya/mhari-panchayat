@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/survey.dart';
+import '../models/user_role.dart';
+import '../services/auth_service.dart';
 import '../services/survey_review_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
@@ -20,8 +22,18 @@ class SurveyReviewDetailScreen extends StatefulWidget {
 
 class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   late Survey _survey = widget.survey;
+  String? _serverRole;
   bool _submitting = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService.getSession().then((session) {
+      if (!mounted) return;
+      setState(() => _serverRole = session?.serverRole);
+    });
+  }
 
   Color _conditionColor(SurveyCondition condition) {
     return switch (condition) {
@@ -41,14 +53,25 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
     return '$day ${months[date.month - 1]} ${date.year}';
   }
 
-  Future<void> _verify() async {
+  /// Applies whichever positive action this role owns at the survey's
+  /// current stage - verify (Gram Sachiv), forward (BDPO), approve (DDPO),
+  /// technical review (XEN-PR), or final approve (CEO-ZP).
+  Future<void> _performAction(SurveyReviewActionKind kind) async {
     if (_submitting) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
-      final updated = await SurveyReviewApi.verify(_survey.id);
+      final updated = await switch (kind) {
+        SurveyReviewActionKind.verify => SurveyReviewApi.verify(_survey.id),
+        SurveyReviewActionKind.forward => SurveyReviewApi.forward(_survey.id),
+        SurveyReviewActionKind.approve => SurveyReviewApi.approve(_survey.id),
+        SurveyReviewActionKind.technicalReview =>
+          SurveyReviewApi.technicalReview(_survey.id),
+        SurveyReviewActionKind.finalApprove =>
+          SurveyReviewApi.finalApprove(_survey.id),
+      };
       if (!mounted) return;
       setState(() => _survey = updated);
       Navigator.of(context).pop(true);
@@ -122,7 +145,21 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final survey = _survey;
-    final isPending = (survey.reviewStatus ?? 'pending') == 'pending';
+    final status = survey.reviewStatus ?? 'pending';
+    final role = (_serverRole ?? '').trim().toLowerCase();
+    final isGramSachiv = role == 'gram_sachiv';
+    final action = SurveyReviewAction.forStage(
+      serverRole: _serverRole,
+      reviewStatus: status,
+      requiresTechnicalReview: survey.requiresTechnicalReview,
+    );
+    final canReject = SurveyReviewAction.canReject(
+      serverRole: _serverRole,
+      reviewStatus: status,
+      requiresTechnicalReview: survey.requiresTechnicalReview,
+    );
+    final canReturn = isGramSachiv && status == 'pending';
+    final showActionRow = action != null || canReject;
 
     return AppScaffold(
       title: survey.assetName.trim().isNotEmpty
@@ -132,7 +169,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
       body: Column(
         children: [
           Expanded(child: _buildBody(context, survey)),
-          if (isPending)
+          if (showActionRow)
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screen,
@@ -154,43 +191,53 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                   ],
                   Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _submitting ? null : _reject,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.rejectedText,
-                            side: const BorderSide(
-                              color: AppColors.rejectedText,
+                      if (canReject)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _submitting ? null : _reject,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.rejectedText,
+                              side: const BorderSide(
+                                color: AppColors.rejectedText,
+                              ),
+                              minimumSize: const Size.fromHeight(48),
                             ),
-                            minimumSize: const Size.fromHeight(48),
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            label: const Text('Reject'),
                           ),
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          label: const Text('Reject'),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _submitting ? null : _returnForCorrection,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.pendingText,
-                            side: const BorderSide(
-                              color: AppColors.pendingText,
+                      if (canReject && canReturn) const SizedBox(width: 8),
+                      if (canReturn)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _submitting
+                                ? null
+                                : _returnForCorrection,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.pendingText,
+                              side: const BorderSide(
+                                color: AppColors.pendingText,
+                              ),
+                              minimumSize: const Size.fromHeight(48),
                             ),
-                            minimumSize: const Size.fromHeight(48),
+                            icon: const Icon(Icons.undo_rounded, size: 18),
+                            label: const Text('Return'),
                           ),
-                          icon: const Icon(Icons.undo_rounded, size: 18),
-                          label: const Text('Return'),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GradientButton(
-                          onPressed: _submitting ? null : _verify,
-                          label: _submitting ? 'कृपया प्रतीक्षा करें...' : 'Verify',
-                          icon: Icons.check_rounded,
+                      if ((canReject || canReturn) && action != null)
+                        const SizedBox(width: 12),
+                      if (action != null)
+                        Expanded(
+                          child: GradientButton(
+                            onPressed: _submitting
+                                ? null
+                                : () => _performAction(action.kind),
+                            label: _submitting
+                                ? 'कृपया प्रतीक्षा करें...'
+                                : action.label,
+                            icon: Icons.check_rounded,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],

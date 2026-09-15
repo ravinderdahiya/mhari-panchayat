@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'name_hi', 'icon_key', 'sort_order', 'is_active'])]
+#[Fillable(['name', 'name_hi', 'icon_key', 'sort_order', 'is_active', 'requires_technical_review'])]
 class AssetType extends Model
 {
     protected function casts(): array
@@ -15,6 +15,7 @@ class AssetType extends Model
         return [
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'requires_technical_review' => 'boolean',
         ];
     }
 

@@ -57,6 +57,7 @@ class Survey {
     this.reviewStatus,
     this.panchayatId,
     this.rejectionReason,
+    this.requiresTechnicalReview = true,
   });
 
   final String id;
@@ -82,6 +83,10 @@ class Survey {
   final String? reviewStatus;
   final int? panchayatId;
   final String? rejectionReason;
+
+  /// Drives the "XEN-PR (if technical)" branch of the verification chain -
+  /// when false, a ddpo_approved survey goes straight to CEO-ZP.
+  final bool requiresTechnicalReview;
 
   factory Survey.fromJson(Map<String, dynamic> json) {
     final photos = json['photoUrls'] as List<dynamic>? ?? const [];
@@ -115,6 +120,8 @@ class Survey {
       reviewStatus: json['reviewStatus'] as String?,
       panchayatId: (json['panchayatId'] as num?)?.toInt(),
       rejectionReason: json['rejectionReason'] as String?,
+      requiresTechnicalReview:
+          json['requiresTechnicalReview'] as bool? ?? true,
     );
   }
 }

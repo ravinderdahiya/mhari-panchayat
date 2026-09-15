@@ -18,32 +18,58 @@ class AssetSurveyController extends Controller
     private const WITH = [
         'surveyor:id,name,username,email,mobile,employee_id,role',
         'department:id,name,code',
-        'assetType:id,name,icon_key',
+        'assetType:id,name,icon_key,requires_technical_review',
         'reviewedBy:id,name,username',
     ];
 
     private const REVIEW_STATUSES = [
-        'pending', 'returned', 'gram_sachiv_approved', 'bdpo_forwarded', 'approved', 'rejected',
+        'pending', 'returned', 'gram_sachiv_approved', 'bdpo_forwarded',
+        'ddpo_approved', 'xen_forwarded', 'approved', 'rejected',
     ];
 
-    // Gram Sachiv -> BDPO -> DDPO approval chain. `reject`'s role is
-    // resolved dynamically (whichever role currently owns the survey's
-    // stage may reject it), so it has no fixed 'role' entry here.
+    // Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset types only) ->
+    // CEO-ZP final approval chain. `reject`'s role is resolved dynamically
+    // (whichever role currently owns the survey's stage may reject it), so
+    // it has no fixed 'role' entry here. `finalApprove` accepts either
+    // 'ddpo_approved' (non-technical asset types skip XEN-PR) or
+    // 'xen_forwarded' (technical ones) - see stageOwnerRole()/
+    // ensureStageActor() for the branch enforcement itself.
     private const TRANSITIONS = [
         'verify' => ['from' => 'pending', 'to' => 'gram_sachiv_approved', 'role' => 'gram_sachiv'],
         'return' => ['from' => 'pending', 'to' => 'returned', 'role' => 'gram_sachiv'],
         'forward' => ['from' => 'gram_sachiv_approved', 'to' => 'bdpo_forwarded', 'role' => 'bdpo'],
-        'approve' => ['from' => 'bdpo_forwarded', 'to' => 'approved', 'role' => 'ddpo'],
-        'reject' => ['from' => ['pending', 'gram_sachiv_approved', 'bdpo_forwarded'], 'to' => 'rejected', 'role' => null],
+        'approve' => ['from' => 'bdpo_forwarded', 'to' => 'ddpo_approved', 'role' => 'ddpo'],
+        'technicalReview' => ['from' => 'ddpo_approved', 'to' => 'xen_forwarded', 'role' => 'xen_pr'],
+        'finalApprove' => ['from' => ['ddpo_approved', 'xen_forwarded'], 'to' => 'approved', 'role' => 'ceo_zp'],
+        'reject' => ['from' => ['pending', 'gram_sachiv_approved', 'bdpo_forwarded', 'ddpo_approved', 'xen_forwarded'], 'to' => 'rejected', 'role' => null],
     ];
 
     // The role that owns each in-flight status, used to resolve `reject`'s
     // actor requirement dynamically from the survey's current stage.
+    // 'ddpo_approved' is intentionally absent - its owner depends on the
+    // asset type (see stageOwnerRole()), not a fixed role.
     private const STAGE_OWNER = [
         'pending' => 'gram_sachiv',
         'gram_sachiv_approved' => 'bdpo',
         'bdpo_forwarded' => 'ddpo',
+        'xen_forwarded' => 'ceo_zp',
     ];
+
+    private function requiresTechnicalReview(AssetSurvey $survey): bool
+    {
+        return (bool) ($survey->assetType?->requires_technical_review ?? true);
+    }
+
+    // 'ddpo_approved' branches: XEN-PR owns it for asset types that need
+    // technical review, CEO-ZP owns it directly for ones that don't.
+    private function stageOwnerRole(AssetSurvey $survey): ?string
+    {
+        if ($survey->review_status === 'ddpo_approved') {
+            return $this->requiresTechnicalReview($survey) ? 'xen_pr' : 'ceo_zp';
+        }
+
+        return self::STAGE_OWNER[$survey->review_status] ?? null;
+    }
 
     public function options(): JsonResponse
     {
@@ -244,6 +270,7 @@ class AssetSurveyController extends Controller
                 'iconKey' => $survey->assetType->icon_key,
             ] : null,
             'reviewStatus' => $survey->review_status,
+            'requiresTechnicalReview' => $this->requiresTechnicalReview($survey),
             'reviewedByName' => $survey->reviewedBy?->name ?: $survey->reviewedBy?->username,
             'reviewedAt' => $survey->reviewed_at?->toISOString(),
             'rejectionReason' => $survey->rejection_reason,
@@ -289,6 +316,17 @@ class AssetSurveyController extends Controller
             }
             $query->whereIn('block_id', $blockIds ?: [0]);
         } elseif ($user->role === 'ddpo') {
+            $query->where('district_id', $user->district_id ?: 0);
+        } elseif ($user->role === 'xen_pr') {
+            // Only ever actionable on 'ddpo_approved' surveys whose asset
+            // type actually needs technical review - other statuses (their
+            // own forwarded/history) still show regardless.
+            $query->where('district_id', $user->district_id ?: 0)
+                ->where(function ($jurisdiction) {
+                    $jurisdiction->where('review_status', '!=', 'ddpo_approved')
+                        ->orWhereHas('assetType', fn ($assetType) => $assetType->where('requires_technical_review', true));
+                });
+        } elseif ($user->role === 'ceo_zp') {
             $query->where('district_id', $user->district_id ?: 0);
         }
 
@@ -389,7 +427,7 @@ class AssetSurveyController extends Controller
             abort(403, 'You can only view surveys from your own block.');
         }
 
-        if ($user->role === 'ddpo' && $survey->district_id !== $user->district_id) {
+        if (in_array($user->role, ['ddpo', 'xen_pr', 'ceo_zp'], true) && $survey->district_id !== $user->district_id) {
             abort(403, 'You can only view surveys from your own district.');
         }
 
@@ -536,7 +574,8 @@ class AssetSurveyController extends Controller
         ]);
     }
 
-    // DDPO gives the final approval.
+    // DDPO approves, sending technical-review asset types on to XEN-PR and
+    // everything else straight to CEO-ZP for final approval.
     public function approve(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
@@ -546,6 +585,37 @@ class AssetSurveyController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Survey approved.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // XEN-PR (Executive Engineer, Panchayati Raj) signs off on the technical
+    // aspects of a DDPO-approved survey, for asset types that require it,
+    // before CEO-ZP's final approval.
+    public function technicalReview(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::with('assetType')->findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'technicalReview');
+        $this->applyTransition($request, $survey, 'technicalReview');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Technical review completed.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // CEO-ZP (Chief Executive Officer, Zila Parishad) gives the final
+    // sign-off, closing the verification chain.
+    public function finalApprove(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::with('assetType')->findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'finalApprove');
+        $this->applyTransition($request, $survey, 'finalApprove');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey given final approval.',
             'survey' => $this->mapSurvey($request, $survey->fresh()),
         ]);
     }
@@ -601,14 +671,21 @@ class AssetSurveyController extends Controller
             return;
         }
 
-        $requiredRole = self::TRANSITIONS[$action]['role'] ?? self::STAGE_OWNER[$survey->review_status] ?? null;
+        if ($action === 'technicalReview' && ! $this->requiresTechnicalReview($survey)) {
+            abort(422, 'This asset type does not require technical review - it goes straight to CEO-ZP for final approval.');
+        }
+        if ($action === 'finalApprove' && $survey->review_status === 'ddpo_approved' && $this->requiresTechnicalReview($survey)) {
+            abort(422, 'This survey needs XEN-PR technical review before final approval.');
+        }
+
+        $requiredRole = self::TRANSITIONS[$action]['role'] ?? $this->stageOwnerRole($survey);
 
         $allowed = $requiredRole !== null && $user->role === $requiredRole && match ($requiredRole) {
             'gram_sachiv' => (bool) $user->panchayat_id && $survey->panchayat_id === $user->panchayat_id,
             'bdpo' => (bool) $survey->block_id && (
                 $survey->block_id === $user->block_id || $user->blocks()->whereKey($survey->block_id)->exists()
             ),
-            'ddpo' => (bool) $user->district_id && $survey->district_id === $user->district_id,
+            'ddpo', 'xen_pr', 'ceo_zp' => (bool) $user->district_id && $survey->district_id === $user->district_id,
             default => false,
         };
 
@@ -629,6 +706,8 @@ class AssetSurveyController extends Controller
             'return' => 'returned',
             'forward' => 'forwarded',
             'approve' => 'approved',
+            'technicalReview' => 'technically reviewed',
+            'finalApprove' => 'given final approval',
             'reject' => 'rejected',
         };
         if (! in_array($survey->review_status, $from, true)) {

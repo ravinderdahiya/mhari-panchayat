@@ -69,6 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/surveys/{id}/return', [AssetSurveyController::class, 'returnForCorrection']);
     Route::post('/surveys/{id}/forward', [AssetSurveyController::class, 'forward']);
     Route::post('/surveys/{id}/approve', [AssetSurveyController::class, 'approve']);
+    Route::post('/surveys/{id}/technical-review', [AssetSurveyController::class, 'technicalReview']);
+    Route::post('/surveys/{id}/final-approve', [AssetSurveyController::class, 'finalApprove']);
     Route::post('/surveys/{id}/reject', [AssetSurveyController::class, 'reject']);
     Route::delete('/surveys/{id}', [AssetSurveyController::class, 'destroy']);
 

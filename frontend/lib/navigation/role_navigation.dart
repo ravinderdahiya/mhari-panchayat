@@ -5,6 +5,7 @@ import '../screens/citizen_shell.dart';
 import '../screens/cplo_shell.dart';
 import '../screens/gram_sachiv_shell.dart';
 import '../screens/officer_shell.dart';
+import '../screens/verifier_shell.dart';
 import '../services/auth_service.dart';
 
 Widget dashboardForRole(UserRole role) {
@@ -13,6 +14,7 @@ Widget dashboardForRole(UserRole role) {
     UserRole.officer => const OfficerShell(),
     UserRole.survey || UserRole.cplo => const CploShell(),
     UserRole.gramSachiv => const GramSachivShell(),
+    UserRole.verifier => const VerifierShell(),
   };
 }
 

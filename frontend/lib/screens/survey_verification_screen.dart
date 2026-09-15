@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/survey.dart';
+import '../models/user_role.dart';
+import '../services/auth_service.dart';
 import '../services/survey_review_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
 import '../widgets/common_widgets.dart';
 import 'survey_review_detail_screen.dart';
 
-/// Gram Sachiv's queue of CPLO-submitted surveys for their own panchayat -
-/// the backend already scopes `/api/surveys` to `panchayat_id` for this
-/// role, so this screen only has to pick the review_status tab.
+/// Verification queue for any of the five escalation-chain stages - Gram
+/// Sachiv, BDPO, DDPO, XEN-PR, CEO-ZP. The backend already scopes
+/// `/api/surveys` to the signed-in reviewer's own jurisdiction (panchayat/
+/// block/district), so this screen only has to pick the review_status tab
+/// appropriate for whichever of the five is signed in.
 class SurveyVerificationScreen extends StatefulWidget {
   const SurveyVerificationScreen({super.key});
 
@@ -20,6 +24,7 @@ class SurveyVerificationScreen extends StatefulWidget {
 }
 
 class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
+  String? _serverRole;
   String _status = 'pending';
   bool _loading = true;
   String? _error;
@@ -28,7 +33,17 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
+  }
+
+  Future<void> _init() async {
+    final session = await AuthService.getSession();
+    if (!mounted) return;
+    setState(() {
+      _serverRole = session?.serverRole;
+      _status = VerifierCopy.inboxStatus(_serverRole);
+    });
+    _load();
   }
 
   Future<void> _load() async {
@@ -59,20 +74,27 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
   }
 
   Color _statusColor(String status) => switch (status) {
-    'gram_sachiv_approved' => AppColors.resolvedText,
+    'gram_sachiv_approved' || 'bdpo_forwarded' || 'ddpo_approved' ||
+    'xen_forwarded' || 'approved' => AppColors.resolvedText,
     'rejected' => AppColors.rejectedText,
     _ => AppColors.pendingText,
   };
 
   @override
   Widget build(BuildContext context) {
+    final roleLabel = VerifierCopy.roleLabel(_serverRole);
+    final roleSubtitle = VerifierCopy.roleSubtitle(_serverRole);
+    final isGramSachiv = (_serverRole ?? '').trim().toLowerCase() == 'gram_sachiv';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           GradientHeader(
-            title: 'Survey Verification',
-            subtitle: 'CPLO सर्वे सत्यापित करें · अपनी पंचायत',
+            title: isGramSachiv ? 'Survey Verification' : '$roleLabel Verification',
+            subtitle: isGramSachiv
+                ? 'CPLO सर्वे सत्यापित करें · अपनी पंचायत'
+                : roleSubtitle,
           ),
           Expanded(
             child: Transform.translate(
@@ -92,12 +114,7 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            for (final s in const [
-                              ('pending', 'Pending'),
-                              ('returned', 'Returned'),
-                              ('gram_sachiv_approved', 'Verified'),
-                              ('rejected', 'Rejected'),
-                            ])
+                            for (final s in VerifierCopy.statusTabs(_serverRole))
                               Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: _StatusChip(
