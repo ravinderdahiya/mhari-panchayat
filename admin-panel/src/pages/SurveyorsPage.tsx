@@ -177,12 +177,11 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
     setIsLoading(true);
     try {
       const [{ users }, { complaints }, deptRes] = await Promise.all([
-        api.getUsers(),
+        api.getUsers({ role: 'surveyor' }),
         api.getComplaints(),
         api.masterApi('departments').list(),
       ]);
-      const engineers = users.filter((u) => u.role === 'surveyor');
-      setSurveyors(engineers);
+      setSurveyors(users);
       setComplaints(complaints);
       setDepartments(deptRes.items || []);
     } catch (err) {
