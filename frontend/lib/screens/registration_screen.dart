@@ -81,6 +81,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   List<RegistrationDepartment> _departments = [];
   int? _selectedDepartmentId;
+  bool _loadingDepartments = false;
 
   @override
   void initState() {
@@ -142,6 +143,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _loadDepartments() async {
+    setState(() => _loadingDepartments = true);
     try {
       final departments = await RegistrationApi.getDepartments();
       if (!mounted) return;
@@ -154,7 +156,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           _selectedDepartmentId = departments.first.id;
         }
       });
-    } catch (_) {}
+    } catch (_) {
+      // Swallowed: a flaky first-request network blip on cold start
+      // otherwise leaves the dropdown stuck on "Loading departments..."
+      // forever with no way to recover — the retry affordance below
+      // covers that instead of surfacing this as a hard error.
+    } finally {
+      if (mounted) setState(() => _loadingDepartments = false);
+    }
   }
 
   Future<void> _onDistrictChanged(int? districtId) async {
@@ -530,11 +539,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             items: _departments
                 .map((d) => (value: d.id, label: d.name))
                 .toList(),
-            hint: _departments.isEmpty
+            hint: _loadingDepartments
                 ? 'Loading departments…'
+                : _departments.isEmpty
+                ? 'टैप करके फिर कोशिश करें'
                 : 'Select department',
             onChanged: (value) =>
                 setState(() => _selectedDepartmentId = value),
+            onRetry: (!_loadingDepartments && _departments.isEmpty)
+                ? _loadDepartments
+                : null,
           ),
         ],
         const SizedBox(height: 16),
@@ -713,6 +727,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     required List<({T value, String label})> items,
     required String hint,
     required ValueChanged<T?>? onChanged,
+    VoidCallback? onRetry,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -728,6 +743,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           style: GoogleFonts.ibmPlexSans(fontSize: 14, color: _RegColors.ink),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: _RegColors.muted, size: 20),
+            suffixIcon: onRetry == null
+                ? null
+                : IconButton(
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: _RegColors.header,
+                    ),
+                    onPressed: onRetry,
+                  ),
             filled: true,
             fillColor: onChanged == null
                 ? _RegColors.border.withValues(alpha: 0.4)
