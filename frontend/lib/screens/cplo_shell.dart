@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../widgets/location_gate.dart';
 import 'asset_survey_screen.dart';
 import 'complaint_map_screen.dart';
-import 'officer_dashboard_screen.dart';
 import 'surveyor_profile_screen.dart';
 
+/// CPLO handles field asset surveys only, never complaints - Home is the
+/// survey form, Map is the asset-survey map with complaints switched off
+/// entirely (no complaint markers, legend, or status filter), and there is
+/// deliberately no Tasks/complaint-queue tab.
 class CploShell extends StatefulWidget {
   const CploShell({super.key});
 
@@ -18,11 +21,12 @@ class _CploShellState extends State<CploShell> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      const AssetSurveyScreen(embedded: true),
-      const LocationGate(child: ComplaintMapScreen(staffQueue: true)),
-      OfficerDashboardScreen(onProfileTap: () => setState(() => _index = 3)),
-      const SurveyorProfileScreen(embedded: true),
+    final screens = const [
+      AssetSurveyScreen(embedded: true),
+      LocationGate(
+        child: ComplaintMapScreen(staffQueue: true, showComplaints: false),
+      ),
+      SurveyorProfileScreen(embedded: true),
     ];
 
     return Scaffold(
@@ -40,11 +44,6 @@ class _CploShellState extends State<CploShell> {
             icon: Icon(Icons.map_outlined, size: 24),
             selectedIcon: Icon(Icons.map_rounded, size: 24),
             label: 'Map',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.task_outlined, size: 24),
-            selectedIcon: Icon(Icons.task_rounded, size: 24),
-            label: 'Tasks',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline, size: 24),

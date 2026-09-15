@@ -21,11 +21,20 @@ import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
 
 class ComplaintMapScreen extends StatefulWidget {
-  const ComplaintMapScreen({super.key, this.staffQueue = false});
+  const ComplaintMapScreen({
+    super.key,
+    this.staffQueue = false,
+    this.showComplaints = true,
+  });
 
   /// When true, load the signed-in staff queue instead of the citizen's
   /// own complaints (CPLO / officer Map tab).
   final bool staffQueue;
+
+  /// CPLO's Map tab is asset-survey only - they don't handle complaints at
+  /// all, so this skips the complaints fetch/markers/legend/status-filter
+  /// entirely and shows just the asset-survey layer.
+  final bool showComplaints;
 
   @override
   State<ComplaintMapScreen> createState() => _ComplaintMapScreenState();
@@ -77,7 +86,11 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyLocation());
-    _loadComplaints();
+    if (widget.showComplaints) {
+      _loadComplaints();
+    } else {
+      _loading = false;
+    }
     _loadAssets();
   }
 
@@ -207,20 +220,21 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                           push(context, AssetDetailsScreen(assetId: asset.id)),
                     ),
                   ),
-                for (final complaint in _geoComplaints)
-                  Marker(
-                    point: LatLng(complaint.latitude!, complaint.longitude!),
-                    width: 44,
-                    height: 52,
-                    alignment: Alignment.topCenter,
-                    child: _TeardropMarker(
-                      color: _markerColor(complaint.status),
-                      onTap: () => push(
-                        context,
-                        ComplaintDetailsScreen(complaint: complaint),
+                if (widget.showComplaints)
+                  for (final complaint in _geoComplaints)
+                    Marker(
+                      point: LatLng(complaint.latitude!, complaint.longitude!),
+                      width: 44,
+                      height: 52,
+                      alignment: Alignment.topCenter,
+                      child: _TeardropMarker(
+                        color: _markerColor(complaint.status),
+                        onTap: () => push(
+                          context,
+                          ComplaintDetailsScreen(complaint: complaint),
+                        ),
                       ),
                     ),
-                  ),
                 if (_myLocation != null)
                   Marker(
                     point: _myLocation!,
@@ -235,11 +249,12 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         ),
         _buildSearchBar(context),
         _buildBasemapToggle(),
-        Positioned(
-          left: AppSpacing.screen,
-          bottom: AppSpacing.screen,
-          child: _MapLegend(selected: _statusFilter, onSelect: _toggleFilter),
-        ),
+        if (widget.showComplaints)
+          Positioned(
+            left: AppSpacing.screen,
+            bottom: AppSpacing.screen,
+            child: _MapLegend(selected: _statusFilter, onSelect: _toggleFilter),
+          ),
         if (_loading)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 68,
@@ -357,7 +372,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     errorBorder: InputBorder.none,
                     focusedErrorBorder: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
-                    hintText: 'Search location or complaint',
+                    hintText: widget.showComplaints
+                        ? 'Search location or complaint'
+                        : 'Search location',
                     hintStyle: GoogleFonts.ibmPlexSans(
                       fontSize: 14,
                       color: AppColors.navInactive,
