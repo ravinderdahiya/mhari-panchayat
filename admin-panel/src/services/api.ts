@@ -256,6 +256,22 @@ export const rejectRegistration = (id: number, reason: string) =>
 // sarpanch/secretary/etc too.
 export const getAssignableUsers = () => request<{ success: boolean; users: AssignableUser[] }>('/api/users/assignable');
 
+// Local CPLO/Gram Sachiv assignment for one panchayat (by its LGD code, i.e.
+// Panchayat.code) - fills in the dashboard's panchayat popup when HARSAC's
+// own GIS layer has that panchayat's cplo_name blank, and adds Gram Sachiv
+// (a role that layer doesn't carry at all).
+export interface PanchayatOfficial {
+  id: number;
+  name: string;
+  role: string;
+  mobile: string | null;
+  email: string | null;
+}
+export const getPanchayatOfficials = (code: string) =>
+  request<{ success: boolean; cplo: PanchayatOfficial | null; gram_sachiv: PanchayatOfficial | null }>(
+    `/api/panchayats/${encodeURIComponent(code)}/officials`,
+  );
+
 // HARSAC's Panchayat/district boundary MapServer, reverse-proxied by our own
 // backend (gis.harsac.in doesn't send CORS headers, so the browser can't hit
 // it directly, and the real GIS credentials stay server-side either way).

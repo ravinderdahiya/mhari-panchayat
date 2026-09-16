@@ -1,10 +1,13 @@
 import type { CSSProperties, ComponentType } from 'react';
-import { MapPin, Phone, PhoneCall, Mail, UserRound, Building2, Landmark } from 'lucide-react';
+import { MapPin, Phone, PhoneCall, Mail, UserRound, UserCheck, Building2, Landmark } from 'lucide-react';
+import type { PanchayatOfficial } from '../services/api';
 
 // Attributes as returned by the HARSAC panchayat boundary MapServer's
-// panchayat_bnd layer (id 1, "GP_append_1") - see GisController. Officer
-// contact details (CPLO/BDPO/DDPO) live directly on this GIS layer, so this
-// popup needs no round-trip to our own backend.
+// panchayat_bnd layer (id 1, "GP_append_1") - see GisController. CPLO/BDPO/
+// DDPO contact fields live directly on this GIS layer, but cplo_name is
+// blank for a lot of panchayats in HARSAC's source data, and the layer has
+// no Gram Sachiv fields at all - both are backfilled from our own
+// panchayats/officials lookup instead (see `localOfficials` below).
 export interface PanchayatFeatureAttributes {
   district_name?: string | null;
   block_name?: string | null;
@@ -25,6 +28,11 @@ export interface PanchayatFeatureAttributes {
   ddpo_office_address?: string | null;
 }
 
+export interface LocalOfficials {
+  cplo: PanchayatOfficial | null;
+  gram_sachiv: PanchayatOfficial | null;
+}
+
 // Blank cells come back as empty strings; phone numbers on this GIS layer
 // are typed esriFieldTypeDouble (bdpo/ddpo/cplo mobile, bdpo landline) while
 // others are strings - normalise both to a trimmed string or null.
@@ -35,9 +43,9 @@ const clean = (value?: string | number | null) => {
 };
 
 // One accent per role, reusing the existing status palette (index.css) so
-// this doesn't introduce new colors to the design system - green/gold/blue
-// double as a rough "seniority" ramp from field (CPLO) to district (DDPO).
+// this doesn't introduce new colors to the design system.
 const ROLE_STYLE: Record<string, { icon: ComponentType<{ className?: string; style?: CSSProperties }>; color: string; tint: string }> = {
+  'Gram Sachiv': { icon: UserCheck, color: 'var(--color-status-new)', tint: 'color-mix(in srgb, var(--color-status-new) 8%, white)' },
   CPLO: { icon: UserRound, color: 'var(--color-status-closed)', tint: 'color-mix(in srgb, var(--color-status-closed) 8%, white)' },
   BDPO: { icon: Building2, color: 'var(--color-accent)', tint: 'color-mix(in srgb, var(--color-accent) 10%, white)' },
   DDPO: { icon: Landmark, color: 'var(--color-status-rejected)', tint: 'color-mix(in srgb, var(--color-status-rejected) 8%, white)' },
@@ -102,8 +110,20 @@ function OfficerBlock({
   );
 }
 
-export default function PanchayatPopupCard({ attributes }: { attributes: PanchayatFeatureAttributes }) {
+export default function PanchayatPopupCard({
+  attributes,
+  localOfficials,
+}: {
+  attributes: PanchayatFeatureAttributes;
+  // Undefined while the lookup is still in flight, null once it's resolved
+  // to nothing - both render fine, this just means "nothing to backfill".
+  localOfficials?: LocalOfficials | null;
+}) {
   const location = [attributes.block_name, attributes.district_name].filter(Boolean).join(', ');
+
+  const gisCplo = clean(attributes.cplo_name);
+  const dbCplo = localOfficials?.cplo;
+  const dbGramSachiv = localOfficials?.gram_sachiv;
 
   return (
     <div className="w-72 -mx-1 -mt-0.5">
@@ -116,11 +136,18 @@ export default function PanchayatPopupCard({ attributes }: { attributes: Panchay
 
       <div className="space-y-2">
         <OfficerBlock
-          role="CPLO"
-          name={clean(attributes.cplo_name)}
-          mobile={clean(attributes.cplo_mob_no)}
+          role="Gram Sachiv"
+          name={dbGramSachiv?.name ?? null}
+          mobile={clean(dbGramSachiv?.mobile)}
           landline={null}
-          email={clean(attributes.cplo_mail_id)}
+          email={clean(dbGramSachiv?.email)}
+        />
+        <OfficerBlock
+          role="CPLO"
+          name={gisCplo ?? dbCplo?.name ?? null}
+          mobile={gisCplo ? clean(attributes.cplo_mob_no) : clean(dbCplo?.mobile)}
+          landline={null}
+          email={gisCplo ? clean(attributes.cplo_mail_id) : clean(dbCplo?.email)}
         />
         <OfficerBlock
           role="BDPO"

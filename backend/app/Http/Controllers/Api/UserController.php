@@ -136,6 +136,35 @@ class UserController extends Controller
         return response()->json(['success' => true, 'users' => $users]);
     }
 
+    /**
+     * CPLO/Gram Sachiv assigned in our own system for one panchayat, keyed by
+     * its LGD code (Panchayat.code) - the same code HARSAC's GIS boundary
+     * layer exposes as local_body_code. The dashboard's panchayat popup
+     * calls this to fill in a name when that GIS layer's own cplo_name cell
+     * is blank, which happens for a lot of panchayats in the source data.
+     */
+    public function panchayatOfficials(string $code)
+    {
+        $panchayat = Panchayat::where('code', $code)->first();
+        if (! $panchayat) {
+            return response()->json(['success' => true, 'cplo' => null, 'gram_sachiv' => null]);
+        }
+
+        $officials = User::where('is_active', true)
+            ->whereIn('role', ['cplo', 'surveyor', 'gram_sachiv'])
+            ->where(function ($query) use ($panchayat) {
+                $query->where('panchayat_id', $panchayat->id)
+                    ->orWhereHas('panchayats', fn ($assigned) => $assigned->where('panchayats.id', $panchayat->id));
+            })
+            ->get(['id', 'name', 'role', 'mobile', 'email']);
+
+        return response()->json([
+            'success' => true,
+            'cplo' => $officials->firstWhere('role', 'cplo') ?? $officials->firstWhere('role', 'surveyor'),
+            'gram_sachiv' => $officials->firstWhere('role', 'gram_sachiv'),
+        ]);
+    }
+
     public function update(Request $request, int $id)
     {
         $user = User::findOrFail($id);

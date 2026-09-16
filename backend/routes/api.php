@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
     Route::get('/users/assignable', [UserController::class, 'assignable']);
+    Route::get('/panchayats/{code}/officials', [UserController::class, 'panchayatOfficials']);
     Route::get('/survey-departments', [AssetTypeController::class, 'departments']);
     Route::get('/asset-types', [AssetTypeController::class, 'index']);
     Route::get('/survey-options', [AssetSurveyController::class, 'options']);

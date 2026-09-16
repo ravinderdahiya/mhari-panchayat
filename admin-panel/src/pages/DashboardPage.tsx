@@ -168,7 +168,24 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
               const container = document.createElement('div');
               const root = createRoot(container);
               popupRootRef.current = { root, container };
-              root.render(<PanchayatPopupCard attributes={event.graphic.attributes} />);
+              const attributes = event.graphic.attributes;
+              root.render(<PanchayatPopupCard attributes={attributes} />);
+
+              // GIS cplo_name is blank for a lot of panchayats, and the
+              // layer has no Gram Sachiv fields at all - backfill both from
+              // our own users table, keyed by the LGD code both sides share.
+              const code = attributes.local_body_code;
+              if (code) {
+                void api.getPanchayatOfficials(String(code))
+                  .then((result) => {
+                    if (popupRootRef.current?.container !== container) return; // popup moved on
+                    root.render(<PanchayatPopupCard attributes={attributes} localOfficials={{ cplo: result.cplo, gram_sachiv: result.gram_sachiv }} />);
+                  })
+                  .catch(() => {
+                    if (popupRootRef.current?.container !== container) return;
+                    root.render(<PanchayatPopupCard attributes={attributes} localOfficials={null} />);
+                  });
+              }
               return container;
             },
           },
