@@ -716,26 +716,30 @@ class _AssetTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 12, 6, 8),
-            child: Column(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    borderRadius: BorderRadius.circular(12),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: badgeBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      assetTypeIcon(assetType.iconKey),
+                      color: iconColor,
+                      size: 24,
+                    ),
                   ),
-                  child: Icon(
-                    assetTypeIcon(assetType.iconKey),
-                    color: iconColor,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Text(
+                  const SizedBox(height: 8),
+                  Text(
                     assetType.name,
                     textAlign: TextAlign.center,
                     maxLines: 2,
@@ -747,8 +751,8 @@ class _AssetTile extends StatelessWidget {
                       height: 1.2,
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
 
-/// HARSAC and Government of Haryana credential marks - each spins slowly and
-/// continuously, the classic "seal" treatment for a partner/authority logo.
+/// HARSAC and Government of Haryana credential marks, shown static as the
+/// classic "seal" treatment for a partner/authority logo.
 /// Shown on the splash screen and the login screen.
 class PartnerLogosRow extends StatelessWidget {
   const PartnerLogosRow({super.key});
@@ -46,39 +46,15 @@ class PartnerLogosRow extends StatelessWidget {
   }
 }
 
-/// Rotates [child] in place, on an endless loop.
-class SpinningLogo extends StatefulWidget {
+/// Renders [child] at the logo's fixed size, without any rotation.
+class SpinningLogo extends StatelessWidget {
   const SpinningLogo({super.key, required this.child});
 
   final Widget child;
   static const double size = 46;
 
   @override
-  State<SpinningLogo> createState() => _SpinningLogoState();
-}
-
-class _SpinningLogoState extends State<SpinningLogo>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 9),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return RotationTransition(
-      turns: _controller,
-      child: SizedBox(
-        width: SpinningLogo.size,
-        height: SpinningLogo.size,
-        child: widget.child,
-      ),
-    );
+    return SizedBox(width: size, height: size, child: child);
   }
 }
