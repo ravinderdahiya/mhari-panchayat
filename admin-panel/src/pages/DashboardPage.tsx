@@ -17,6 +17,7 @@ import { useLatestRef } from '../map/useLatestRef';
 import { ListChecks, Hourglass, Wrench } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
+import PanchayatPopupCard from '../components/PanchayatPopupCard';
 import type { Complaint, ComplaintReports, ComplaintStatus } from '../types';
 
 ChartJS.register(ArcElement, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
@@ -154,13 +155,33 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const boundaryLayerRef = useRef<MapImageLayer | null>(null);
   useEffect(() => {
     if (!view?.map) return undefined;
-    const layer = new MapImageLayer({ url: api.gisPanchayatMapServerUrl });
+    const layer = new MapImageLayer({
+      url: api.gisPanchayatMapServerUrl,
+      sublayers: [
+        { id: 0, popupEnabled: false }, // dist_bn - no officer data, would just add a redundant tab
+        {
+          id: 1, // panchayat_bnd (GP_append_1) - carries CPLO/BDPO/DDPO contact fields directly
+          popupTemplate: {
+            title: '{localbodyname}',
+            content: (event) => {
+              unmountPopupRoot();
+              const container = document.createElement('div');
+              const root = createRoot(container);
+              popupRootRef.current = { root, container };
+              root.render(<PanchayatPopupCard attributes={event.graphic.attributes} />);
+              return container;
+            },
+          },
+        },
+      ],
+    });
     view.map.add(layer, 0);
     boundaryLayerRef.current = layer;
     return () => {
       if (view.map) view.map.remove(layer);
       boundaryLayerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
   // Register the popup's "View Details" action handler once per view, and
