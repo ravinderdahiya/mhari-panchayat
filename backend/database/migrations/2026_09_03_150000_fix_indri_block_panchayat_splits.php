@@ -34,6 +34,14 @@ return new class extends Migration
         DB::transaction(function () {
             $blockId = DB::table('blocks')->where('code', self::INDRI_BLOCK_CODE)->value('id');
 
+            // This data patch assumes the full Haryana LGD hierarchy is already
+            // imported (as it is in production). A fresh/local DB seeded only via
+            // DatabaseSeeder has no Indri block yet — skip instead of crashing on
+            // the NOT NULL block_id constraint below.
+            if (! $blockId) {
+                return;
+            }
+
             foreach (self::SPLITS as $split) {
                 $panchayatId = DB::table('panchayats')->where('code', $split['panchayat_code'])->value('id');
 
