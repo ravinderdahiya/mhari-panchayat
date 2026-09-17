@@ -41,6 +41,134 @@ class AuthController extends Controller
         ], 201);
     }
 
+    private function staffResetOtpKey(int $userId): string
+    {
+        return "staff_pwreset_otp:{$userId}";
+    }
+
+    private function staffResetOtpAttemptsKey(int $userId): string
+    {
+        return "staff_pwreset_otp_attempts:{$userId}";
+    }
+
+    private function staffResetOtpResendKey(int $userId): string
+    {
+        return "staff_pwreset_otp_resend_at:{$userId}";
+    }
+
+    /** Same lookup as login() - mobile, Emp ID, email or username. */
+    private function findStaffUser(string $identifier): ?User
+    {
+        return User::query()
+            ->where('username', $identifier)
+            ->orWhere('employee_id', $identifier)
+            ->orWhere('mobile', $identifier)
+            ->orWhere('email', $identifier)
+            ->where('role', '!=', 'citizen')
+            ->first();
+    }
+
+    /**
+     * Step 1 of staff "forgot password": OTP goes to the mobile number
+     * already on file for the account, never one typed by the requester -
+     * otherwise anyone could take over an account by just supplying their
+     * own number. Response shape/timers stay identical whether or not the
+     * account exists, so timing can't be used to enumerate accounts.
+     */
+    public function staffForgotPasswordSendOtp(Request $request)
+    {
+        $data = $request->validate(['identifier' => ['required', 'string']]);
+        $user = $this->findStaffUser($data['identifier']);
+        $genericMessage = 'यदि यह खाता मौजूद है और उसमें मोबाइल नंबर दर्ज है, तो OTP भेज दिया गया है।';
+
+        if (! $user || ! filled($user->mobile)) {
+            return response()->json([
+                'success' => true,
+                'message' => $genericMessage,
+                'smsSent' => false,
+                'expiresIn' => self::CITIZEN_OTP_TTL_MINUTES * 60,
+                'resendAfter' => self::CITIZEN_OTP_RESEND_COOLDOWN_SECONDS,
+            ]);
+        }
+
+        $resendAvailableAt = (int) Cache::get($this->staffResetOtpResendKey($user->id), 0);
+        $retryAfter = max(0, $resendAvailableAt - now()->timestamp);
+        if ($retryAfter > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Please wait {$retryAfter} seconds before requesting another OTP.",
+                'retryAfter' => $retryAfter,
+            ], 429);
+        }
+
+        $otp = (string) random_int(1000, 9999);
+        Cache::put($this->staffResetOtpKey($user->id), $otp, now()->addMinutes(self::CITIZEN_OTP_TTL_MINUTES));
+        Cache::put($this->staffResetOtpAttemptsKey($user->id), 0, now()->addMinutes(self::CITIZEN_OTP_TTL_MINUTES));
+        $nextResendAt = now()->addSeconds(self::CITIZEN_OTP_RESEND_COOLDOWN_SECONDS);
+        Cache::put($this->staffResetOtpResendKey($user->id), $nextResendAt->timestamp, $nextResendAt);
+
+        $smsSent = $this->sendOtpSms($user->mobile, $otp);
+
+        $response = [
+            'success' => true,
+            'message' => $genericMessage,
+            'smsSent' => $smsSent,
+            'expiresIn' => self::CITIZEN_OTP_TTL_MINUTES * 60,
+            'resendAfter' => self::CITIZEN_OTP_RESEND_COOLDOWN_SECONDS,
+            // Last 2 digits only - enough for the user to recognise which
+            // number it went to without exposing the full mobile to anyone
+            // who guessed a valid identifier for someone else's account.
+            'mobileHint' => 'xxxxxxxx'.substr($user->mobile, -2),
+        ];
+        if (! app()->environment('production')) {
+            $response['devOtp'] = $otp;
+        }
+
+        return response()->json($response);
+    }
+
+    /** Step 2: verify the OTP from staffForgotPasswordSendOtp() and set the new password. */
+    public function staffForgotPasswordVerifyAndReset(Request $request)
+    {
+        $data = $request->validate([
+            'identifier' => ['required', 'string'],
+            'otp' => ['required', 'string', 'regex:/^\d{4}$/'],
+            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $this->findStaffUser($data['identifier']);
+        $invalidResponse = response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 400);
+
+        if (! $user) {
+            return $invalidResponse;
+        }
+
+        $attempts = Cache::increment($this->staffResetOtpAttemptsKey($user->id));
+        if ($attempts > self::CITIZEN_OTP_MAX_ATTEMPTS) {
+            Cache::forget($this->staffResetOtpKey($user->id));
+            Cache::forget($this->staffResetOtpAttemptsKey($user->id));
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Too many incorrect attempts. Request a new OTP.',
+            ], 429);
+        }
+
+        $cachedOtp = Cache::get($this->staffResetOtpKey($user->id));
+        if (! is_string($cachedOtp) || ! hash_equals($cachedOtp, $data['otp'])) {
+            return $invalidResponse;
+        }
+
+        $user->password = $data['new_password'];
+        $user->save();
+
+        Cache::forget($this->staffResetOtpKey($user->id));
+        Cache::forget($this->staffResetOtpAttemptsKey($user->id));
+        Cache::forget($this->staffResetOtpResendKey($user->id));
+
+        return response()->json(['success' => true, 'message' => 'Password reset successfully']);
+    }
+
     private function citizenOtpKey(string $mobile): string
     {
         return "citizen_login_otp:{$mobile}";

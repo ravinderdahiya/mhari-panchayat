@@ -575,7 +575,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.info_outline_rounded,
                         size: 16,
                         color: AppColors.inProgressText,

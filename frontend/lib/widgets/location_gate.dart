@@ -122,7 +122,7 @@ class _LocationBlockedView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.location_off_rounded,
                 size: 56,
                 color: AppColors.rejectedText,

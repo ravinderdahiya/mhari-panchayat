@@ -211,7 +211,7 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        icon: const Icon(
+        icon: Icon(
           Icons.location_off_rounded,
           color: AppColors.rejectedText,
           size: 32,
@@ -662,7 +662,7 @@ class _OutOfAreaBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.rejectedText),
+          Icon(Icons.warning_amber_rounded, color: AppColors.rejectedText),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -878,7 +878,7 @@ class _GpsCoordinateField extends StatelessWidget {
                 )
               : Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.warning_amber_rounded,
                       size: 18,
                       color: AppColors.pendingText,
@@ -1101,7 +1101,7 @@ class _PhotosSection extends StatelessWidget {
                       child: InkWell(
                         onTap: () => onRemove(i),
                         child: Container(
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: AppColors.rejectedText,
                             shape: BoxShape.circle,
                           ),
@@ -1141,7 +1141,7 @@ class _SurveyedByRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.badge_rounded, size: 18, color: AppColors.mutedText),
+          Icon(Icons.badge_rounded, size: 18, color: AppColors.mutedText),
           const SizedBox(width: 8),
           Text(
             'Surveyed by: ${officerName ?? '—'}',
@@ -1176,7 +1176,7 @@ class _BottomActions extends StatelessWidget {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.background,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
@@ -1187,7 +1187,7 @@ class _BottomActions extends StatelessWidget {
                 onPressed: busy ? null : onCancel,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.secondaryText,
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: AppColors.border),
                   minimumSize: const Size.fromHeight(46),
                 ),
                 child: Text(

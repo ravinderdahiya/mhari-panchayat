@@ -1,43 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'theme_controller.dart';
+
 // Palette ported from the basmati-survey-app sibling project's Fraunces/IBM
 // Plex Sans, paddy-green/husk/soil/gold design. Existing token names (primary,
 // secondary, pendingBg, brandBlue, etc.) are kept as-is and now point at these
 // new values, so every existing screen re-themes automatically without
 // touching each of the ~22 call-site files.
-class AppColors {
-  AppColors._();
+//
+// Brand colors (primary/secondary/brandBlue/splashGradientEnd) stay fixed
+// across light and dark - only surface/neutral/status tokens flip, via
+// [_LightPalette]/[_DarkPalette] below. `AppColors.*` reads whichever one
+// matches [ThemeController]'s current value.
+class _LightPalette {
+  _LightPalette._();
 
-  static const primary = Color(0xFF1F4A38); // paddy
-  static const secondary = Color(0xFFC68A1F); // gold
   static const background = Color(0xFFFFFDF7); // paper
   static const border = Color(0xFFDAD3BE); // line
-
-  /// Brand color used on the splash/login screens (Mhari Panchayat branding).
-  static const brandBlue = Color(0xFF1F4A38); // paddy
-  static const brandBlueTint = Color(0xFFE3EAE4); // soft paddy tint
-
   static const greyBg = Color(0xFFF6F1E3); // husk
   static const orangeTint = Color(0xFFF3E7CE); // soft gold tint
   static const greenTint = Color(0xFFE3EAE4); // soft paddy tint
   static const blueTint = Color(0xFFE3EEFA); // soft actionBlue tint
+  static const brandBlueTint = Color(0xFFE3EAE4); // soft paddy tint
 
-  static const pendingBg = Color(0xFFF3E7CE); // soft gold tint
-  static const pendingText = Color(0xFFC68A1F); // gold
-  static const inProgressBg = Color(0xFFE3EEFA); // soft actionBlue tint
-  static const inProgressText = Color(0xFF1565C0); // actionBlue (unchanged)
-  static const resolvedBg = Color(0xFFE3EAE4); // soft paddy tint
-  static const resolvedText = Color(0xFF1F4A38); // paddy
-  static const rejectedBg = Color(0xFFF3E3DC); // soft soil tint
-  static const rejectedText = Color(0xFFB5502E); // soil
-
-  static const splashGradientEnd = Color(0xFF153228); // paddyDark
+  static const pendingBg = Color(0xFFF3E7CE);
+  static const pendingText = Color(0xFFC68A16);
+  static const inProgressBg = Color(0xFFE3EEFA);
+  static const inProgressText = Color(0xFF1565C0);
+  static const resolvedBg = Color(0xFFE3EAE4);
+  static const resolvedText = Color(0xFF1F4A38);
+  static const rejectedBg = Color(0xFFF3E3DC);
+  static const rejectedText = Color(0xFFB5502E);
 
   static const mutedText = Color(0xFF5B6357); // inkSoft
-  static const secondaryText = Color(0xFF5B6357); // inkSoft
-  static const inputBorder = Color(0xFFDAD3BE); // line
-  static const navInactive = Color(0xFFA8ADA0); // lighter inkSoft
+  static const navInactive = Color(0xFFA8ADA0);
+  static const ink = Color(0xFF22281F);
+}
+
+class _DarkPalette {
+  _DarkPalette._();
+
+  static const background = Color(0xFF151915);
+  static const border = Color(0xFF333A2F);
+  static const greyBg = Color(0xFF1E241E);
+  static const orangeTint = Color(0xFF3A2F17);
+  static const greenTint = Color(0xFF1E2A22);
+  static const blueTint = Color(0xFF1A2733);
+  static const brandBlueTint = Color(0xFF1E2A22);
+
+  static const pendingBg = Color(0xFF3A2F17);
+  static const pendingText = Color(0xFFE0AE55);
+  static const inProgressBg = Color(0xFF1A2733);
+  static const inProgressText = Color(0xFF6FA8E0);
+  static const resolvedBg = Color(0xFF1E2A22);
+  static const resolvedText = Color(0xFF6FBE9A);
+  static const rejectedBg = Color(0xFF3A241D);
+  static const rejectedText = Color(0xFFE08A66);
+
+  static const mutedText = Color(0xFFA9B0A3);
+  static const navInactive = Color(0xFF7C8377);
+  static const ink = Color(0xFFEDEFEA);
+}
+
+class AppColors {
+  AppColors._();
+
+  static bool get _isDark => ThemeController.instance.value;
+
+  // Brand colors - unchanged across light/dark.
+  static const primary = Color(0xFF1F4A38); // paddy
+  static const secondary = Color(0xFFC68A1F); // gold
+  static const brandBlue = Color(0xFF1F4A38); // paddy
+  static const splashGradientEnd = Color(0xFF153228); // paddyDark
+
+  // Surface/neutral/status tokens - flip with the current theme.
+  static Color get background =>
+      _isDark ? _DarkPalette.background : _LightPalette.background;
+  static Color get border => _isDark ? _DarkPalette.border : _LightPalette.border;
+  static Color get greyBg => _isDark ? _DarkPalette.greyBg : _LightPalette.greyBg;
+  static Color get orangeTint =>
+      _isDark ? _DarkPalette.orangeTint : _LightPalette.orangeTint;
+  static Color get greenTint =>
+      _isDark ? _DarkPalette.greenTint : _LightPalette.greenTint;
+  static Color get blueTint => _isDark ? _DarkPalette.blueTint : _LightPalette.blueTint;
+  static Color get brandBlueTint =>
+      _isDark ? _DarkPalette.brandBlueTint : _LightPalette.brandBlueTint;
+
+  static Color get pendingBg => _isDark ? _DarkPalette.pendingBg : _LightPalette.pendingBg;
+  static Color get pendingText =>
+      _isDark ? _DarkPalette.pendingText : _LightPalette.pendingText;
+  static Color get inProgressBg =>
+      _isDark ? _DarkPalette.inProgressBg : _LightPalette.inProgressBg;
+  static Color get inProgressText =>
+      _isDark ? _DarkPalette.inProgressText : _LightPalette.inProgressText;
+  static Color get resolvedBg =>
+      _isDark ? _DarkPalette.resolvedBg : _LightPalette.resolvedBg;
+  static Color get resolvedText =>
+      _isDark ? _DarkPalette.resolvedText : _LightPalette.resolvedText;
+  static Color get rejectedBg =>
+      _isDark ? _DarkPalette.rejectedBg : _LightPalette.rejectedBg;
+  static Color get rejectedText =>
+      _isDark ? _DarkPalette.rejectedText : _LightPalette.rejectedText;
+
+  static Color get mutedText => _isDark ? _DarkPalette.mutedText : _LightPalette.mutedText;
+  static Color get secondaryText =>
+      _isDark ? _DarkPalette.mutedText : _LightPalette.mutedText;
+  static Color get ink => _isDark ? _DarkPalette.ink : _LightPalette.ink;
+  static Color get inputBorder => _isDark ? _DarkPalette.border : _LightPalette.border;
+  static Color get navInactive =>
+      _isDark ? _DarkPalette.navInactive : _LightPalette.navInactive;
 }
 
 class AppGradients {
@@ -76,30 +148,57 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData? _cachedLight;
+  static ThemeData? _cachedDark;
 
-  static ThemeData light() => _cachedLight ??= _buildLight();
+  static ThemeData light() => _cachedLight ??= _build(
+        brightness: Brightness.light,
+        background: _LightPalette.background,
+        border: _LightPalette.border,
+        ink: _LightPalette.ink,
+        muted: _LightPalette.mutedText,
+        navInactive: _LightPalette.navInactive,
+        orangeTint: _LightPalette.orangeTint,
+        error: _LightPalette.rejectedText,
+      );
 
-  static ThemeData _buildLight() {
-    const colorScheme = ColorScheme(
-      brightness: Brightness.light,
+  static ThemeData dark() => _cachedDark ??= _build(
+        brightness: Brightness.dark,
+        background: _DarkPalette.background,
+        border: _DarkPalette.border,
+        ink: _DarkPalette.ink,
+        muted: _DarkPalette.mutedText,
+        navInactive: _DarkPalette.navInactive,
+        orangeTint: _DarkPalette.orangeTint,
+        error: _DarkPalette.rejectedText,
+      );
+
+  static ThemeData _build({
+    required Brightness brightness,
+    required Color background,
+    required Color border,
+    required Color ink,
+    required Color muted,
+    required Color navInactive,
+    required Color orangeTint,
+    required Color error,
+  }) {
+    final colorScheme = ColorScheme(
+      brightness: brightness,
       primary: AppColors.primary,
       onPrimary: Colors.white,
       secondary: AppColors.secondary,
       onSecondary: Colors.white,
-      error: AppColors.rejectedText,
+      error: error,
       onError: Colors.white,
-      surface: AppColors.background,
-      onSurface: Color(0xFF22281F), // ink
+      surface: background,
+      onSurface: ink,
     );
 
     final plexSans = GoogleFonts.ibmPlexSansTextTheme();
     final notoDevanagari = GoogleFonts.notoSansDevanagariTextTheme();
     const headingWeight = FontWeight.w600;
 
-    final bodyBase = plexSans.apply(
-      bodyColor: const Color(0xFF22281F),
-      displayColor: const Color(0xFF22281F),
-    );
+    final bodyBase = plexSans.apply(bodyColor: ink, displayColor: ink);
     final textTheme = bodyBase.copyWith(
       displayLarge: GoogleFonts.fraunces(
         textStyle: bodyBase.displayLarge,
@@ -132,21 +231,21 @@ class AppTheme {
     );
 
     // Avoid GoogleFonts.* inside WidgetState resolvers (nav rebuilds often).
-    const navSelected = TextStyle(
+    final navSelected = TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w600,
       color: AppColors.primary,
     );
-    const navUnselected = TextStyle(
+    final navUnselected = TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w600,
-      color: AppColors.navInactive,
+      color: navInactive,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: background,
       textTheme: textTheme,
       primaryTextTheme: notoDevanagari,
       appBarTheme: AppBarTheme(
@@ -162,13 +261,13 @@ class AppTheme {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.background,
+        color: background,
         elevation: 1,
         shadowColor: Colors.black12,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border, width: 0.5),
+          side: BorderSide(color: border, width: 0.5),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -187,8 +286,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.secondaryText,
-          side: const BorderSide(color: AppColors.inputBorder, width: 1.5),
+          foregroundColor: muted,
+          side: BorderSide(color: border, width: 1.5),
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -204,36 +303,30 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.background,
+        fillColor: background,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(
-            color: AppColors.inputBorder,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: border, width: 1.5),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(
-            color: AppColors.inputBorder,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: border, width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        labelStyle: GoogleFonts.ibmPlexSans(color: AppColors.secondaryText),
-        hintStyle: GoogleFonts.ibmPlexSans(color: AppColors.mutedText),
+        labelStyle: GoogleFonts.ibmPlexSans(color: muted),
+        hintStyle: GoogleFonts.ibmPlexSans(color: muted),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 64,
-        backgroundColor: AppColors.background,
-        indicatorColor: AppColors.orangeTint,
+        backgroundColor: background,
+        indicatorColor: orangeTint,
         labelPadding: const EdgeInsets.only(top: 4, bottom: 4),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
@@ -244,7 +337,7 @@ class AppTheme {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
             size: 24,
-            color: selected ? AppColors.primary : AppColors.navInactive,
+            color: selected ? AppColors.primary : navInactive,
           );
         }),
       ),
@@ -254,13 +347,15 @@ class AppTheme {
             if (states.contains(WidgetState.selected)) {
               return AppColors.primary;
             }
-            return AppColors.greyBg;
+            return background == _LightPalette.background
+                ? _LightPalette.greyBg
+                : _DarkPalette.greyBg;
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return Colors.white;
             }
-            return const Color(0xFF5B6357);
+            return muted;
           }),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
@@ -272,10 +367,7 @@ class AppTheme {
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: Colors.white,
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.border,
-        thickness: 0.5,
-      ),
+      dividerTheme: DividerThemeData(color: border, thickness: 0.5),
     );
   }
 }

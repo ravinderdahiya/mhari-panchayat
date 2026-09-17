@@ -23,6 +23,10 @@ Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp'])->middlewar
 Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
 Route::post('/auth/forgot-password/request', [AuthController::class, 'forgotPasswordRequest'])->middleware('throttle:forgot-password');
 Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswordReset']);
+// Staff (Department login) "forgot password" - OTP to the mobile on file,
+// same throttle classes as the citizen login OTP endpoints.
+Route::post('/auth/forgot-password/staff/send-otp', [AuthController::class, 'staffForgotPasswordSendOtp'])->middleware('throttle:otp-send');
+Route::post('/auth/forgot-password/staff/verify-reset', [AuthController::class, 'staffForgotPasswordVerifyAndReset'])->middleware('throttle:otp-verify');
 
 // Surveyor/Officer registration — basmati-survey-app lifecycle:
 // phone OTP → Sign up (pending_email) → email verify link → set password →

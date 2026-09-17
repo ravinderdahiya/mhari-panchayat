@@ -10,9 +10,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/user_role.dart';
 import '../navigation/app_navigation.dart';
 import '../navigation/role_navigation.dart';
+import '../services/app_preferences.dart';
 import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import 'forgot_password_screen.dart';
 import 'registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -50,6 +52,14 @@ class _LoginScreenState extends State<LoginScreen> {
     for (final node in _otpFocusNodes) {
       node.addListener(() => setState(() {}));
     }
+    AppPreferences.getIsEnglish().then((value) {
+      if (mounted) setState(() => _isEnglish = value);
+    });
+  }
+
+  void _setLanguage(bool english) {
+    setState(() => _isEnglish = english);
+    AppPreferences.setIsEnglish(english);
   }
 
   @override
@@ -277,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               _LoginHero(
                 isEnglish: _isEnglish,
-                onLanguageChanged: (value) => setState(() => _isEnglish = value),
+                onLanguageChanged: _setLanguage,
                 subtitle: _t('ग्राम पंचायत, हरियाणा', 'Gram Panchayat, Haryana'),
               ),
               Padding(
@@ -413,12 +423,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Align(
         alignment: Alignment.centerRight,
         child: TextButton(
-          onPressed: () => _showMessage(
-            _t(
-              'यह सुविधा जल्द ही उपलब्ध होगी',
-              'This feature will be available soon',
-            ),
-          ),
+          onPressed: () => push(context, const ForgotPasswordScreen()),
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             minimumSize: const Size(0, 32),
@@ -541,7 +546,7 @@ class _LoginScreenState extends State<LoginScreen> {
               contentPadding: EdgeInsets.zero,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
+                borderSide: BorderSide(
                   color: AppColors.border,
                   width: 1.5,
                 ),
@@ -677,11 +682,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+              borderSide: BorderSide(color: AppColors.border, width: 1.5),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+              borderSide: BorderSide(color: AppColors.border, width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
@@ -722,7 +727,7 @@ class _LoginHero extends StatelessWidget {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

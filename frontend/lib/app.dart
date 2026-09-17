@@ -7,6 +7,7 @@ import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/deep_link_service.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_controller.dart';
 
 class PanchayatApp extends StatefulWidget {
   const PanchayatApp({super.key});
@@ -51,12 +52,19 @@ class _PanchayatAppState extends State<PanchayatApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: rootNavigatorKey,
-      title: 'Mhari Panchayat',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      home: SplashScreen(onComplete: _onSplashComplete),
+    return ValueListenableBuilder<bool>(
+      valueListenable: ThemeController.instance,
+      builder: (context, isDark, _) {
+        return MaterialApp(
+          navigatorKey: rootNavigatorKey,
+          title: 'Mhari Panchayat',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+          home: SplashScreen(onComplete: _onSplashComplete),
+        );
+      },
     );
   }
 }

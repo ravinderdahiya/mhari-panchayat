@@ -478,7 +478,7 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
                                     : () => _performAction(actions[i]),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.rejectedText,
-                                  side: const BorderSide(
+                                  side: BorderSide(
                                     color: AppColors.rejectedText,
                                   ),
                                   minimumSize: const Size.fromHeight(48),
@@ -551,7 +551,7 @@ class _AssignedOfficerRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.badge_rounded,
             size: 18,
             color: AppColors.inProgressText,
@@ -585,11 +585,11 @@ class _CitizenInfoCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 26,
               backgroundColor: AppColors.orangeTint,
               foregroundColor: AppColors.primary,
-              child: Icon(Icons.person_rounded, size: 28),
+              child: const Icon(Icons.person_rounded, size: 28),
             ),
             const SizedBox(width: 12),
             Expanded(

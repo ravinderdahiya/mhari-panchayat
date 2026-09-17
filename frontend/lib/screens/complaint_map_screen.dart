@@ -247,8 +247,8 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
             ),
           ],
         ),
-        _buildSearchBar(context),
         _buildBasemapToggle(),
+        _buildZoomControls(),
         if (widget.showComplaints)
           Positioned(
             left: AppSpacing.screen,
@@ -325,67 +325,49 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     );
   }
 
-  Widget _buildSearchBar(BuildContext context) {
+  void _zoomBy(double delta) {
+    final camera = _mapController.camera;
+    final next = (camera.zoom + delta).clamp(5.0, 18.0);
+    _mapController.move(camera.center, next);
+  }
+
+  Widget _buildZoomControls() {
     return Positioned(
-      top: MediaQuery.paddingOf(context).top + 10,
-      left: AppSpacing.screen,
+      top: MediaQuery.paddingOf(context).top + 134,
       right: AppSpacing.screen,
       child: Material(
         color: AppColors.background,
         elevation: 3,
         shadowColor: Colors.black26,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.85)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.search_rounded,
-                size: 22,
-                color: AppColors.mutedText,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 14,
-                    color: const Color(0xFF22281F),
-                    height: 1.2,
-                  ),
-                  cursorColor: AppColors.primary,
-                  textAlignVertical: TextAlignVertical.center,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: false,
-                    fillColor: Colors.transparent,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    hintText: widget.showComplaints
-                        ? 'Search location or complaint'
-                        : 'Search location',
-                    hintStyle: GoogleFonts.ibmPlexSans(
-                      fontSize: 14,
-                      color: AppColors.navInactive,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ZoomButton(icon: Icons.add_rounded, onTap: () => _zoomBy(1)),
+            Divider(height: 1, color: AppColors.border),
+            _ZoomButton(icon: Icons.remove_rounded, onTap: () => _zoomBy(-1)),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _ZoomButton extends StatelessWidget {
+  const _ZoomButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Icon(icon, size: 22, color: AppColors.mutedText),
       ),
     );
   }

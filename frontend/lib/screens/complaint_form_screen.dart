@@ -412,7 +412,7 @@ class _ReadOnlyLocationFields extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.lock_outline_rounded,
               size: 18,
               color: AppColors.mutedText,
@@ -500,7 +500,7 @@ class _ReadOnlyField extends StatelessWidget {
         prefixIcon: Icon(icon, size: 19),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.button),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.border),
         ),
         filled: true,
         fillColor: AppColors.greenTint,

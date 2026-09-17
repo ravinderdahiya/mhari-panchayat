@@ -197,7 +197,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                             onPressed: _submitting ? null : _reject,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.rejectedText,
-                              side: const BorderSide(
+                              side: BorderSide(
                                 color: AppColors.rejectedText,
                               ),
                               minimumSize: const Size.fromHeight(48),
@@ -215,7 +215,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                                 : _returnForCorrection,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.pendingText,
-                              side: const BorderSide(
+                              side: BorderSide(
                                 color: AppColors.pendingText,
                               ),
                               minimumSize: const Size.fromHeight(48),
@@ -367,7 +367,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                         width: 92,
                         height: 92,
                         color: AppColors.greyBg,
-                        child: const Icon(
+                        child: Icon(
                           Icons.broken_image_rounded,
                           color: AppColors.mutedText,
                         ),

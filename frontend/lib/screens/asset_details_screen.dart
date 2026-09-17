@@ -261,7 +261,7 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
                         width: 92,
                         height: 92,
                         color: AppColors.greyBg,
-                        child: const Icon(
+                        child: Icon(
                           Icons.broken_image_rounded,
                           color: AppColors.mutedText,
                         ),

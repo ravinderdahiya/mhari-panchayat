@@ -436,7 +436,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                           color: AppColors.mutedText,
                                           fontSize: 13,
                                         ),
-                                        prefixIcon: const Icon(
+                                        prefixIcon: Icon(
                                           Icons.search_rounded,
                                           color: AppColors.mutedText,
                                         ),
@@ -444,7 +444,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                           borderRadius: BorderRadius.circular(
                                             24,
                                           ),
-                                          borderSide: const BorderSide(
+                                          borderSide: BorderSide(
                                             color: AppColors.border,
                                           ),
                                         ),
@@ -452,7 +452,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                           borderRadius: BorderRadius.circular(
                                             24,
                                           ),
-                                          borderSide: const BorderSide(
+                                          borderSide: BorderSide(
                                             color: AppColors.border,
                                           ),
                                         ),
@@ -645,7 +645,7 @@ class _PlaceholderCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.assignment_outlined,
             size: 36,
             color: AppColors.mutedText,

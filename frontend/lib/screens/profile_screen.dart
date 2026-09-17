@@ -152,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.rejectedText,
-                          side: const BorderSide(color: AppColors.rejectedText),
+                          side: BorderSide(color: AppColors.rejectedText),
                           minimumSize: const Size.fromHeight(48),
                         ),
                         icon: const Icon(Icons.logout_rounded, size: 18),
@@ -251,7 +251,7 @@ class _InfoCard extends StatelessWidget {
         child: Column(
           children: [
             for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) const Divider(height: 1, color: AppColors.border),
+              if (i > 0) Divider(height: 1, color: AppColors.border),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(
@@ -271,7 +271,7 @@ class _InfoCard extends StatelessWidget {
                             rows[i].label,
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: const Color(0xFF9E9E9E),
+                              color: AppColors.mutedText,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -280,7 +280,7 @@ class _InfoCard extends StatelessWidget {
                             style: GoogleFonts.poppins(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF212121),
+                              color: AppColors.ink,
                             ),
                           ),
                         ],
@@ -320,7 +320,7 @@ class _NavCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: AppColors.border),
+            if (i > 0) Divider(height: 1, color: AppColors.border),
             ListTile(
               leading: CircleAvatar(
                 radius: 18,
@@ -333,12 +333,12 @@ class _NavCard extends StatelessWidget {
                 style: GoogleFonts.notoSansDevanagari(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF212121),
+                  color: AppColors.ink,
                 ),
               ),
-              trailing: const Icon(
+              trailing: Icon(
                 Icons.chevron_right_rounded,
-                color: Color(0xFF9E9E9E),
+                color: AppColors.mutedText,
               ),
               onTap: items[i].onTap,
             ),

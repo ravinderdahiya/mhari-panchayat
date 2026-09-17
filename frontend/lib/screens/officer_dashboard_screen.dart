@@ -135,9 +135,9 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
               offset: const Offset(0, -20),
               child: Container(
                 clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.background,
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),

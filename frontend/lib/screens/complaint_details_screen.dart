@@ -351,7 +351,7 @@ class _VerificationCard extends StatelessWidget {
                   onPressed: submitting ? null : onReopen,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.rejectedText,
-                    side: const BorderSide(color: AppColors.rejectedText),
+                    side: BorderSide(color: AppColors.rejectedText),
                   ),
                   child: const Text('Not Fixed, Reopen'),
                 ),
@@ -459,7 +459,7 @@ class _OfficerFooter extends StatelessWidget {
         horizontal: AppSpacing.screen,
         vertical: 14,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
       ),

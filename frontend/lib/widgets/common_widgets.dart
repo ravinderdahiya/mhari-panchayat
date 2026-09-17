@@ -55,9 +55,9 @@ class AppScaffold extends StatelessWidget {
               offset: const Offset(0, -20),
               child: Container(
                 clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.background,
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -172,7 +172,7 @@ List<Widget> defaultHeaderActions(BuildContext context) {
       onSelected: (value) {
         if (value == 'logout') handleLogout(context);
       },
-      itemBuilder: (context) => const [
+      itemBuilder: (context) => [
         PopupMenuItem(
           value: 'logout',
           child: Row(
@@ -182,8 +182,8 @@ List<Widget> defaultHeaderActions(BuildContext context) {
                 size: 20,
                 color: AppColors.secondaryText,
               ),
-              SizedBox(width: 12),
-              Text('Logout'),
+              const SizedBox(width: 12),
+              const Text('Logout'),
             ],
           ),
         ),

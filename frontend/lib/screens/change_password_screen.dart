@@ -117,9 +117,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               offset: const Offset(0, -20),
               child: Container(
                 clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.greyBg,
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),

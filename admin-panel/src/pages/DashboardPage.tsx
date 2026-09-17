@@ -14,7 +14,7 @@ import { dotSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Hourglass, Wrench } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import PanchayatPopupCard from '../components/PanchayatPopupCard';
@@ -321,69 +321,73 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
               ))}
             </div>
 
-            <div className="absolute top-4 right-4 z-20 flex flex-col gap-3 w-[230px]">
-              <div className="bg-paper rounded-lg shadow-lg p-3">
-                <div className="flex gap-2">
+            <div className="absolute top-4 right-4 z-20 w-[230px] bg-paper/95 backdrop-blur-sm rounded-2xl shadow-xl border border-line/70 overflow-hidden">
+              <div className="p-3">
+                <div className="flex gap-1 bg-cream rounded-full p-1">
                   <button
                     onClick={() => setMapLayer('streets')}
-                    className={`flex-1 h-14 rounded-md flex items-end justify-center pb-1.5 text-[10.5px] font-semibold text-white cursor-pointer ${mapLayer === 'streets' ? 'outline outline-2 outline-accent outline-offset-1' : ''}`}
-                    style={{ background: 'linear-gradient(135deg,#DDD3B2,#C9BE96)' }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-full text-[11px] font-semibold cursor-pointer transition-colors ${mapLayer === 'streets' ? 'text-white shadow-sm' : 'text-muted hover:text-ink'}`}
+                    style={mapLayer === 'streets' ? { background: 'linear-gradient(135deg,#C9BE96,#A8976A)' } : undefined}
                   >
+                    <MapIcon className="w-3.5 h-3.5" />
                     Map
                   </button>
                   <button
                     onClick={() => setMapLayer('imagery')}
-                    className={`flex-1 h-14 rounded-md flex items-end justify-center pb-1.5 text-[10.5px] font-semibold text-white cursor-pointer ${mapLayer === 'imagery' ? 'outline outline-2 outline-accent outline-offset-1' : ''}`}
-                    style={{ background: 'linear-gradient(135deg,#5A6E4C,#3F5233)' }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-full text-[11px] font-semibold cursor-pointer transition-colors ${mapLayer === 'imagery' ? 'text-white shadow-sm' : 'text-muted hover:text-ink'}`}
+                    style={mapLayer === 'imagery' ? { background: 'linear-gradient(135deg,#5A6E4C,#3F5233)' } : undefined}
                   >
+                    <Satellite className="w-3.5 h-3.5" />
                     Satellite
                   </button>
                 </div>
               </div>
 
-              <div className="bg-paper rounded-lg shadow-lg p-3.5">
-                <div className="flex gap-4 mb-3 border-b border-line pb-2">
+              <div className="border-t border-line" />
+
+              <div className="p-3.5 pt-3">
+                <div className="flex gap-1 bg-cream rounded-full p-1 mb-3">
                   <button
                     onClick={() => setFilterTab('status')}
-                    className={`text-[11px] font-bold tracking-wide cursor-pointer ${filterTab === 'status' ? 'text-ink border-b-2 border-accent pb-2 -mb-2' : 'text-muted'}`}
+                    className={`flex-1 h-7 rounded-full text-[10.5px] font-bold tracking-wide cursor-pointer transition-colors ${filterTab === 'status' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                   >
                     STATUS
                   </button>
                   <button
                     onClick={() => setFilterTab('category')}
-                    className={`text-[11px] font-bold tracking-wide cursor-pointer ${filterTab === 'category' ? 'text-ink border-b-2 border-accent pb-2 -mb-2' : 'text-muted'}`}
+                    className={`flex-1 h-7 rounded-full text-[10.5px] font-bold tracking-wide cursor-pointer transition-colors ${filterTab === 'category' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                   >
                     CATEGORY
                   </button>
                 </div>
 
                 {filterTab === 'status' ? (
-                  <div className="space-y-2">
+                  <div className="space-y-0.5">
                     {MAP_LEGEND.map(({ label, color }) => (
-                      <label key={label} className="flex items-center gap-2 text-[12.5px] cursor-pointer">
+                      <label key={label} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
                         <input
                           type="checkbox"
                           checked={!excludedGroups.has(label)}
                           onChange={() => toggleSetMember(excludedGroups, setExcludedGroups, label)}
                           className="accent-accent w-3.5 h-3.5"
                         />
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                        {label}
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white shadow-sm" style={{ backgroundColor: color }} />
+                        <span className="text-ink/85">{label}</span>
                       </label>
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-0.5 max-h-48 overflow-y-auto">
                     {mapCategories.length === 0 && <p className="text-xs text-muted">No categories yet.</p>}
                     {mapCategories.map((name) => (
-                      <label key={name} className="flex items-center gap-2 text-[12.5px] cursor-pointer">
+                      <label key={name} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
                         <input
                           type="checkbox"
                           checked={!excludedCategories.has(name)}
                           onChange={() => toggleSetMember(excludedCategories, setExcludedCategories, name)}
                           className="accent-accent w-3.5 h-3.5"
                         />
-                        {name}
+                        <span className="text-ink/85">{name}</span>
                       </label>
                     ))}
                   </div>

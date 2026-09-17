@@ -36,6 +36,22 @@ class OtpVerifyResult {
   final String mobile;
 }
 
+class StaffResetOtpResult {
+  const StaffResetOtpResult({
+    required this.message,
+    required this.smsSent,
+    required this.expiresInSeconds,
+    required this.resendAfterSeconds,
+    this.mobileHint,
+  });
+
+  final String message;
+  final bool smsSent;
+  final int expiresInSeconds;
+  final int resendAfterSeconds;
+  final String? mobileHint;
+}
+
 class StaffLoginResult {
   const StaffLoginResult({
     required this.token,
@@ -218,6 +234,40 @@ class AuthApi {
       assignedPanchayatId: int.tryParse(panchayat?['id']?.toString() ?? ''),
       assignedPanchayatName: panchayat?['name'] as String?,
     );
+  }
+
+  /// Step 1 of staff "forgot password" - OTP goes to the mobile number on
+  /// file for the account (mirrors `sendOtp` for citizens), not whatever the
+  /// requester types, so the response never reveals whether [identifier]
+  /// actually matched an account.
+  static Future<StaffResetOtpResult> sendStaffPasswordResetOtp(
+    String identifier,
+  ) async {
+    final body = await _post('/forgot-password/staff/send-otp', {
+      'identifier': identifier,
+    });
+    return StaffResetOtpResult(
+      message: body['message'] as String? ?? 'OTP भेजा गया है',
+      smsSent: body['smsSent'] as bool? ?? false,
+      expiresInSeconds: (body['expiresIn'] as num?)?.toInt() ?? 600,
+      resendAfterSeconds: (body['resendAfter'] as num?)?.toInt() ?? 30,
+      mobileHint: body['mobileHint'] as String?,
+    );
+  }
+
+  /// Step 2: verify the OTP from [sendStaffPasswordResetOtp] and set the
+  /// new password in one call.
+  static Future<void> verifyStaffPasswordReset({
+    required String identifier,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _post('/forgot-password/staff/verify-reset', {
+      'identifier': identifier,
+      'otp': otp,
+      'new_password': newPassword,
+      'new_password_confirmation': newPassword,
+    });
   }
 
   static Future<UserProfile> getProfile() async {

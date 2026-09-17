@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
-  Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, MapPinned,
+  Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut,
   ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation,
 } from 'lucide-react';
 import type { User } from '../types';
@@ -68,7 +68,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'reports', label: 'Reports', icon: FileBarChart },
   { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, section: 'operations' },
   { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['surveyor'], section: 'operations' },
-  { id: 'village-assets', label: 'Village Assets', icon: MapPinned, section: 'operations' },
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
   { id: 'cplo-management', label: 'Surveyor (CPLO) / Gram Sachiv', icon: UserCheck, adminOnly: true, section: 'operations' },
   { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, section: 'operations',
