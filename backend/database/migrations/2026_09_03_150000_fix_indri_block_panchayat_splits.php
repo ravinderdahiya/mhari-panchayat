@@ -34,6 +34,18 @@ return new class extends Migration
         DB::transaction(function () {
             $blockId = DB::table('blocks')->where('code', self::INDRI_BLOCK_CODE)->value('id');
 
+            // This data patch assumes the full Haryana LGD hierarchy is already
+            // imported (as it is in production). Fail loudly and clearly here
+            // instead of letting a null $blockId hit the panchayats.block_id
+            // NOT NULL constraint below with a cryptic SQL error.
+            if (! $blockId) {
+                throw new \RuntimeException(
+                    'Indri block (code '.self::INDRI_BLOCK_CODE.') not found. '.
+                    'Run `php artisan geography:import-haryana` to import the full '.
+                    'Haryana LGD hierarchy before this migration.'
+                );
+            }
+
             foreach (self::SPLITS as $split) {
                 $panchayatId = DB::table('panchayats')->where('code', $split['panchayat_code'])->value('id');
 
