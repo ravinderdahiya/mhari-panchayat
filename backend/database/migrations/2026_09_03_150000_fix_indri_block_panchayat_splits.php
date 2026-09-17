@@ -35,11 +35,15 @@ return new class extends Migration
             $blockId = DB::table('blocks')->where('code', self::INDRI_BLOCK_CODE)->value('id');
 
             // This data patch assumes the full Haryana LGD hierarchy is already
-            // imported (as it is in production). A fresh/local DB seeded only via
-            // DatabaseSeeder has no Indri block yet — skip instead of crashing on
-            // the NOT NULL block_id constraint below.
+            // imported (as it is in production). Fail loudly and clearly here
+            // instead of letting a null $blockId hit the panchayats.block_id
+            // NOT NULL constraint below with a cryptic SQL error.
             if (! $blockId) {
-                return;
+                throw new \RuntimeException(
+                    'Indri block (code '.self::INDRI_BLOCK_CODE.') not found. '.
+                    'Run `php artisan geography:import-haryana` to import the full '.
+                    'Haryana LGD hierarchy before this migration.'
+                );
             }
 
             foreach (self::SPLITS as $split) {
