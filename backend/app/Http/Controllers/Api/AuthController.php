@@ -456,6 +456,22 @@ class AuthController extends Controller
         return response()->json(['success' => true, 'user' => $user->toAuthArray()]);
     }
 
+    public function updateProfile(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'mobile' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:150'],
+        ]);
+
+        $user = $request->user();
+        $user->fill($data);
+        $user->save();
+        $user->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
+
+        return response()->json(['success' => true, 'user' => $user->toAuthArray()]);
+    }
+
     public function changePassword(Request $request)
     {
         $request->validate([

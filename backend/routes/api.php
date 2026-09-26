@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AssetSurveyController;
 use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\CitizenController;
+use App\Http\Controllers\Api\ElectedRepresentativeController;
 use App\Http\Controllers\Api\GisController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
@@ -56,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/reverse', [LocationController::class, 'reverse']);
     Route::get('/location/resolve', [LocationController::class, 'resolve']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
     Route::get('/users/assignable', [UserController::class, 'assignable']);
     Route::get('/panchayats/{code}/officials', [UserController::class, 'panchayatOfficials']);
@@ -104,6 +106,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);
         Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'update']);
         Route::get('/users', [UserController::class, 'index']);
+        Route::get('/elected-representatives', [ElectedRepresentativeController::class, 'index']);
         Route::get('/citizens', [CitizenController::class, 'index']);
         Route::delete('/citizens/{citizen}', [CitizenController::class, 'destroy']);
         Route::patch('/users/{id}', [UserController::class, 'update']);

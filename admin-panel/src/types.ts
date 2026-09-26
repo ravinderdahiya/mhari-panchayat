@@ -241,6 +241,21 @@ export interface CitizenProfile {
   complaints: CitizenComplaintSummary[];
 }
 
+export type ElectedRepresentativeTier = 'zp' | 'ps' | 'panch';
+
+export interface ElectedRepresentative {
+  id: number;
+  tier: ElectedRepresentativeTier;
+  district: NamedEntity | null;
+  block: NamedEntity | null;
+  panchayat: NamedEntity | null;
+  ward_no: string | null;
+  name: string;
+  father_name: string | null;
+  mobile: string | null;
+  gender: string | null;
+}
+
 export interface CitizenStats {
   registeredCitizens: number;
   activeCitizens: number;

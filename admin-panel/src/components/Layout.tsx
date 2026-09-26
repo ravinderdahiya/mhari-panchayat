@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
-  Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut,
+  Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, Vote,
   ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'profile';
+  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'profile';
 
 interface LayoutProps {
   currentUser: User;
@@ -81,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   ] },
   { id: 'asset-types', label: 'Asset Types', icon: Layers3, adminOnly: true, section: 'operations' },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true, section: 'operations' },
+  { id: 'elected-representatives', label: 'Elected Representatives', icon: Vote, adminOnly: true, section: 'operations' },
   { id: 'citizens', label: 'Citizens', icon: UserRound, adminOnly: true, section: 'operations' },
   { id: 'roles', label: 'Roles', icon: ShieldCheck, adminOnly: true, section: 'operations' },
   { id: 'project-meeting', label: 'Project Meeting', icon: Presentation, adminOnly: true, section: 'system' },
@@ -100,6 +101,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   'asset-surveys': 'Review field asset surveys submitted from the mobile app',
   'asset-types': 'Map infrastructure assets to departments for mobile surveys',
   users: 'Manage admin users and access',
+  'elected-representatives': 'Zila Parishad, Panchayat Samiti and Panch directory',
   citizens: 'Mobile app citizen registrations',
   roles: 'Configure role-based permissions',
   'project-meeting': 'Slide-style project overview, workflows and next actions',

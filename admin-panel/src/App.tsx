@@ -12,6 +12,7 @@ import SurveyorsPage from './pages/SurveyorsPage';
 import CploManagementPage from './pages/CploManagementPage';
 import RolesPage from './pages/RolesPage';
 import UsersPage from './pages/UsersPage';
+import ElectedRepresentativesPage from './pages/ElectedRepresentativesPage';
 import CitizensPage from './pages/CitizensPage';
 import VillageAssetsPage from './pages/VillageAssetsPage';
 import AssetTypesPage from './pages/AssetTypesPage';
@@ -116,9 +117,10 @@ export default function App() {
       {activeView === 'village-assets' && <VillageAssetsPage />}
       {activeView === 'roles' && <RolesPage />}
       {activeView === 'users' && <UsersPage currentUser={currentUser} />}
+      {activeView === 'elected-representatives' && <ElectedRepresentativesPage />}
       {activeView === 'citizens' && <CitizensPage />}
       {activeView === 'project-meeting' && <ProjectMeetingPage />}
-      {activeView === 'profile' && <ProfilePage currentUser={currentUser} />}
+      {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>
   );

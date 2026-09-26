@@ -1,4 +1,4 @@
-import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, RolePermissionMatrix, User, VillageAsset } from '../types';
+import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, ElectedRepresentative, RolePermissionMatrix, User, VillageAsset } from '../types';
 
 // 127.0.0.1, not localhost - on this machine "localhost" resolves to ::1
 // first, and the dev server only listens on IPv4, so every request pays a
@@ -62,6 +62,9 @@ export const login = (username: string, password: string) =>
   jsonRequest<{ success: boolean; token: string; user: User }>('/api/auth/login', 'POST', { username, password });
 
 export const getMe = () => request<{ success: boolean; user: User }>('/api/auth/me');
+
+export const updateProfile = (fields: { name?: string | null; mobile?: string | null; email?: string | null }) =>
+  jsonRequest<{ success: boolean; user: User }>('/api/auth/profile', 'PUT', fields);
 
 export const changePassword = (current_password: string, new_password: string, new_password_confirmation: string) =>
   jsonRequest<{ success: boolean; message: string }>('/api/auth/change-password', 'POST', {
@@ -191,6 +194,33 @@ export const getUsers = (options: {
     `/api/users${qs ? `?${qs}` : ''}`,
   );
 };
+export const getElectedRepresentatives = (options: {
+  tier: 'zp' | 'ps' | 'panch';
+  page?: number;
+  perPage?: number;
+  q?: string;
+  districtId?: number;
+  blockId?: number;
+  panchayatId?: number;
+}) => {
+  const params = new URLSearchParams();
+  params.set('tier', options.tier);
+  if (options.page) params.set('page', String(options.page));
+  if (options.perPage) params.set('per_page', String(options.perPage));
+  if (options.q?.trim()) params.set('q', options.q.trim());
+  if (options.districtId) params.set('district_id', String(options.districtId));
+  if (options.blockId) params.set('block_id', String(options.blockId));
+  if (options.panchayatId) params.set('panchayat_id', String(options.panchayatId));
+  const qs = params.toString();
+
+  return request<{
+    success: boolean;
+    representatives: ElectedRepresentative[];
+    pagination: MasterPagination;
+    counts: Record<string, number>;
+  }>(`/api/elected-representatives?${qs}`);
+};
+
 export const getCitizens = (options: {
   page?: number;
   perPage?: number;
