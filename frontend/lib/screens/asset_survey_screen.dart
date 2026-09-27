@@ -761,6 +761,31 @@ class _AssetTile extends StatelessWidget {
   }
 }
 
+/// Label + colour for a submitted survey's place in the Gram Sachiv -> BDPO
+/// -> DDPO -> XEN-PR -> CEO-ZP review chain - mirrors the admin panel's
+/// REVIEW_LABEL/REVIEW_BADGE (AssetSurveysPage.tsx) so a CPLO/surveyor sees
+/// the same status here that reviewers and the web dashboard use.
+class _ReviewStatusMeta {
+  const _ReviewStatusMeta(this.label, this.color);
+
+  final String label;
+  final Color color;
+}
+
+_ReviewStatusMeta _reviewStatusMeta(String? status) {
+  return switch (status) {
+    'pending' => _ReviewStatusMeta('Pending review', AppColors.pendingText),
+    'returned' => _ReviewStatusMeta('Returned for correction', AppColors.rejectedText),
+    'gram_sachiv_approved' => _ReviewStatusMeta('Verified by Gram Sachiv', AppColors.inProgressText),
+    'bdpo_forwarded' => _ReviewStatusMeta('Forwarded by BDPO', AppColors.inProgressText),
+    'ddpo_approved' => _ReviewStatusMeta('Approved by DDPO', AppColors.primary),
+    'xen_forwarded' => _ReviewStatusMeta('Reviewed by XEN-PR', AppColors.primary),
+    'approved' => _ReviewStatusMeta('Final approved', AppColors.resolvedText),
+    'rejected' => _ReviewStatusMeta('Rejected', AppColors.rejectedText),
+    _ => _ReviewStatusMeta('—', AppColors.mutedText),
+  };
+}
+
 class _ExistingAssetCard extends StatelessWidget {
   const _ExistingAssetCard({required this.survey, required this.onTap});
 
@@ -774,6 +799,9 @@ class _ExistingAssetCard extends StatelessWidget {
     final name = survey.assetName.trim().isNotEmpty
         ? survey.assetName
         : typeName;
+    final status = _reviewStatusMeta(survey.reviewStatus);
+    final showReason = (survey.reviewStatus == 'returned' || survey.reviewStatus == 'rejected') &&
+        (survey.rejectionReason?.trim().isNotEmpty ?? false);
 
     return Card(
       child: ListTile(
@@ -790,13 +818,46 @@ class _ExistingAssetCard extends StatelessWidget {
           name,
           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
         ),
-        subtitle: Text(
-          'Type: $typeName\nLocation: $location',
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            color: AppColors.mutedText,
-            height: 1.35,
-          ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 2),
+            Text(
+              'Type: $typeName\nLocation: $location',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: AppColors.mutedText,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: status.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.chip),
+              ),
+              child: Text(
+                status.label,
+                style: TextStyle(
+                  color: status.color,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (showReason) ...[
+              const SizedBox(height: 4),
+              Text(
+                'कारण: ${survey.rejectionReason}',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: AppColors.rejectedText,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ],
         ),
         isThreeLine: true,
         trailing: const Icon(Icons.chevron_right_rounded),
