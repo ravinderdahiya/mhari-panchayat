@@ -10,6 +10,8 @@ const REVIEW_BADGE: Record<AssetSurveyReviewStatus, string> = {
   returned: 'bg-orange-50 text-orange-700 border-orange-200',
   gram_sachiv_approved: 'bg-sky-50 text-sky-700 border-sky-200',
   bdpo_forwarded: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  ddpo_approved: 'bg-violet-50 text-violet-700 border-violet-200',
+  xen_forwarded: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
@@ -19,7 +21,9 @@ const REVIEW_LABEL: Record<AssetSurveyReviewStatus, string> = {
   returned: 'Returned for correction',
   gram_sachiv_approved: 'Verified by Gram Sachiv',
   bdpo_forwarded: 'Forwarded by BDPO',
-  approved: 'Approved',
+  ddpo_approved: 'Approved by DDPO',
+  xen_forwarded: 'Reviewed by XEN-PR',
+  approved: 'Final approved',
   rejected: 'Rejected',
 };
 
@@ -35,6 +39,8 @@ const ACTION_PAST_TENSE: Record<string, string> = {
   returned: 'Returned for correction',
   forwarded: 'Forwarded',
   approved: 'Approved',
+  'technically reviewed': 'Technically reviewed',
+  'given final approval': 'Given final approval',
   rejected: 'Rejected',
 };
 
@@ -45,7 +51,8 @@ const EMPTY_PAGINATION: AssetSurveyPagination = {
 const EMPTY_STATS: AssetSurveyStats = {
   totalSurveys: 0, activeSurveyors: 0, poorDamaged: 0,
   statusCounts: {
-    pending: 0, returned: 0, gram_sachiv_approved: 0, bdpo_forwarded: 0, approved: 0, rejected: 0,
+    pending: 0, returned: 0, gram_sachiv_approved: 0, bdpo_forwarded: 0,
+    ddpo_approved: 0, xen_forwarded: 0, approved: 0, rejected: 0,
   },
 };
 
@@ -55,7 +62,9 @@ const STATUS_FILTERS: Array<{ id: 'all' | AssetSurveyReviewStatus; label: string
   { id: 'returned', label: 'Returned' },
   { id: 'gram_sachiv_approved', label: 'Verified' },
   { id: 'bdpo_forwarded', label: 'Forwarded' },
-  { id: 'approved', label: 'Approved' },
+  { id: 'ddpo_approved', label: 'DDPO approved' },
+  { id: 'xen_forwarded', label: 'XEN-PR reviewed' },
+  { id: 'approved', label: 'Final approved' },
   { id: 'rejected', label: 'Rejected' },
 ];
 

@@ -412,9 +412,19 @@ export const returnAssetSurvey = (id: string, reason: string) =>
 export const forwardAssetSurvey = (id: string) =>
   jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/forward`, 'POST');
 
-// DDPO gives the final approval.
+// DDPO approves a bdpo-forwarded survey, sending it on to XEN-PR (technical
+// asset types) or straight to CEO-ZP.
 export const approveAssetSurvey = (id: string) =>
   jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/approve`, 'POST');
+
+// XEN-PR's technical sign-off on a ddpo-approved survey that requires it,
+// sending it on to CEO-ZP.
+export const technicalReviewAssetSurvey = (id: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/technical-review`, 'POST');
+
+// CEO-ZP's final approval, closing the verification chain.
+export const finalApproveAssetSurvey = (id: string) =>
+  jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/final-approve`, 'POST');
 
 export const rejectAssetSurvey = (id: string, reason: string) =>
   jsonRequest<{ success: boolean; survey: AssetSurvey }>(`/api/surveys/${id}/reject`, 'POST', { reason });

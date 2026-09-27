@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class AssetController extends Controller
 {
-    private const WITH = ['assetType:id,name,icon_key', 'department:id,name,code'];
+    private const WITH = ['assetType:id,name,icon_key', 'department:id,name,code', 'block:id,name'];
 
     private function summary(AssetSurvey $survey): array
     {
@@ -76,7 +76,7 @@ class AssetController extends Controller
         return response()->json(['success' => true, 'asset' => [
             ...$this->summary($survey),
             'district' => $survey->district,
-            'block' => $survey->department?->name ?? '',
+            'block' => $survey->block?->name ?? '',
             'panchayat' => $survey->panchayat,
             'village' => $survey->village,
             'photoUrls' => $photoUrls,

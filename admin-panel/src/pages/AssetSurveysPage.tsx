@@ -10,6 +10,8 @@ const CHILD_TO_REVIEW_STATUS: Record<string, ReviewStatus> = {
   returned: 'returned',
   'gram-sachiv-approved': 'gram_sachiv_approved',
   'bdpo-forwarded': 'bdpo_forwarded',
+  'ddpo-approved': 'ddpo_approved',
+  'xen-forwarded': 'xen_forwarded',
   approved: 'approved',
   rejected: 'rejected',
 };
@@ -19,6 +21,8 @@ const REVIEW_BADGE: Record<ReviewStatus, string> = {
   returned: 'bg-orange-50 text-orange-700 border-orange-200',
   gram_sachiv_approved: 'bg-sky-50 text-sky-700 border-sky-200',
   bdpo_forwarded: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  ddpo_approved: 'bg-violet-50 text-violet-700 border-violet-200',
+  xen_forwarded: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
@@ -28,22 +32,30 @@ const REVIEW_LABEL: Record<ReviewStatus, string> = {
   returned: 'Returned for correction',
   gram_sachiv_approved: 'Verified by Gram Sachiv',
   bdpo_forwarded: 'Forwarded by BDPO',
-  approved: 'Approved',
+  ddpo_approved: 'Approved by DDPO',
+  xen_forwarded: 'Reviewed by XEN-PR',
+  approved: 'Final approved',
   rejected: 'Rejected',
 };
 
 // The role that owns each in-flight status - matches the backend's
-// AssetSurveyController::STAGE_OWNER. Terminal statuses (returned, approved,
-// rejected) have no owner since no further stage action applies.
+// AssetSurveyController::STAGE_OWNER/stageOwnerRole(). Terminal statuses
+// (returned, approved, rejected) have no owner since no further stage action
+// applies. 'ddpo_approved' isn't listed here - it branches on the survey's
+// own requiresTechnicalReview flag, handled separately in canActOnStage().
 const STAGE_OWNER: Partial<Record<ReviewStatus, string>> = {
   pending: 'gram_sachiv',
   gram_sachiv_approved: 'bdpo',
   bdpo_forwarded: 'ddpo',
+  xen_forwarded: 'ceo_zp',
 };
 
-function canActOnStage(currentUser: User, status: ReviewStatus): boolean {
+function canActOnStage(currentUser: User, survey: AssetSurvey): boolean {
   if (currentUser.is_super_admin || currentUser.role === 'admin') return true;
-  return STAGE_OWNER[status] === currentUser.role;
+  if (survey.reviewStatus === 'ddpo_approved') {
+    return survey.requiresTechnicalReview ? currentUser.role === 'xen_pr' : currentUser.role === 'ceo_zp';
+  }
+  return STAGE_OWNER[survey.reviewStatus] === currentUser.role;
 }
 
 function ReviewBadge({ value }: { value: ReviewStatus }) {
@@ -74,7 +86,8 @@ const EMPTY_PAGINATION: AssetSurveyPagination = {
 const EMPTY_STATS: AssetSurveyStats = {
   totalSurveys: 0, activeSurveyors: 0, poorDamaged: 0,
   statusCounts: {
-    pending: 0, returned: 0, gram_sachiv_approved: 0, bdpo_forwarded: 0, approved: 0, rejected: 0,
+    pending: 0, returned: 0, gram_sachiv_approved: 0, bdpo_forwarded: 0,
+    ddpo_approved: 0, xen_forwarded: 0, approved: 0, rejected: 0,
   },
 };
 
@@ -168,7 +181,11 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
 
   const handleVerify = (survey: AssetSurvey) => runStageAction(survey, () => api.verifyAssetSurvey(survey.id));
   const handleForward = (survey: AssetSurvey) => runStageAction(survey, () => api.forwardAssetSurvey(survey.id));
+  // DDPO's approval - sends the survey on to XEN-PR (technical asset types)
+  // or straight to CEO-ZP. Not the end of the chain, despite the name.
   const handleFinalApprove = (survey: AssetSurvey) => runStageAction(survey, () => api.approveAssetSurvey(survey.id));
+  const handleTechnicalReview = (survey: AssetSurvey) => runStageAction(survey, () => api.technicalReviewAssetSurvey(survey.id));
+  const handleCeoApprove = (survey: AssetSurvey) => runStageAction(survey, () => api.finalApproveAssetSurvey(survey.id));
 
   const handleDelete = async (survey: AssetSurvey) => {
     if (!confirm(`Delete survey for "${survey.assetName}"? This cannot be undone.`)) return;
@@ -272,7 +289,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2.5 flex-wrap">
                     <button onClick={() => setSelected(survey)} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline cursor-pointer"><Eye className="w-3.5 h-3.5" /> View</button>
-                    {canActOnStage(currentUser, survey.reviewStatus) && (
+                    {canActOnStage(currentUser, survey) && (
                       <>
                         {survey.reviewStatus === 'pending' && (
                           <>
@@ -296,6 +313,18 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
                           <button disabled={actioningId === survey.id} onClick={() => handleFinalApprove(survey)}
                             className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 cursor-pointer">
                             <Check className="w-3.5 h-3.5" /> Approve
+                          </button>
+                        )}
+                        {survey.reviewStatus === 'ddpo_approved' && survey.requiresTechnicalReview && (
+                          <button disabled={actioningId === survey.id} onClick={() => handleTechnicalReview(survey)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline disabled:opacity-50 cursor-pointer">
+                            <Check className="w-3.5 h-3.5" /> Technical review
+                          </button>
+                        )}
+                        {((survey.reviewStatus === 'ddpo_approved' && !survey.requiresTechnicalReview) || survey.reviewStatus === 'xen_forwarded') && (
+                          <button disabled={actioningId === survey.id} onClick={() => handleCeoApprove(survey)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 cursor-pointer">
+                            <Check className="w-3.5 h-3.5" /> Final approve
                           </button>
                         )}
                         <button disabled={actioningId === survey.id} onClick={() => { setReasonAction({ survey, action: 'reject' }); setReasonText(''); }}
@@ -371,6 +400,8 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
           onReturn={(reason) => submitReasonActionFor(selected, 'return', reason)}
           onForward={() => handleForward(selected)}
           onFinalApprove={() => handleFinalApprove(selected)}
+          onTechnicalReview={() => handleTechnicalReview(selected)}
+          onCeoApprove={() => handleCeoApprove(selected)}
           onReject={(reason) => submitReasonActionFor(selected, 'reject', reason)}
           onDelete={() => handleDelete(selected)}
           isActioning={actioningId === selected.id}
@@ -388,10 +419,14 @@ function Stat({ label, value, icon }: { label: string; value: number; icon: Reac
 }
 
 const ACTION_PAST_TENSE: Record<string, string> = {
-  verified: 'Verified', returned: 'Returned for correction', forwarded: 'Forwarded', approved: 'Approved', rejected: 'Rejected',
+  verified: 'Verified', returned: 'Returned for correction', forwarded: 'Forwarded', approved: 'Approved',
+  'technically reviewed': 'Technically reviewed', 'given final approval': 'Given final approval', rejected: 'Rejected',
 };
 
-function SurveyDetails({ survey, currentUser, onClose, onVerify, onReturn, onForward, onFinalApprove, onReject, onDelete, isActioning }: {
+function SurveyDetails({
+  survey, currentUser, onClose, onVerify, onReturn, onForward, onFinalApprove,
+  onTechnicalReview, onCeoApprove, onReject, onDelete, isActioning,
+}: {
   survey: AssetSurvey;
   currentUser: User;
   onClose: () => void;
@@ -399,13 +434,15 @@ function SurveyDetails({ survey, currentUser, onClose, onVerify, onReturn, onFor
   onReturn: (reason: string) => void;
   onForward: () => void;
   onFinalApprove: () => void;
+  onTechnicalReview: () => void;
+  onCeoApprove: () => void;
   onReject: (reason: string) => void;
   onDelete: () => void;
   isActioning: boolean;
 }) {
   const [reasonMode, setReasonMode] = useState<'reject' | 'return' | null>(null);
   const [reason, setReason] = useState('');
-  const canAct = canActOnStage(currentUser, survey.reviewStatus);
+  const canAct = canActOnStage(currentUser, survey);
 
   return <div className="fixed inset-0 bg-black/45 z-[70] flex items-center justify-center p-5" onClick={onClose}>
     <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
@@ -480,6 +517,18 @@ function SurveyDetails({ survey, currentUser, onClose, onVerify, onReturn, onFor
                 )}
                 {survey.reviewStatus === 'bdpo_forwarded' && (
                   <button disabled={isActioning} onClick={onFinalApprove}
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                    <Check className="w-3.5 h-3.5" /> {isActioning ? 'Approving…' : 'Approve (send to XEN-PR / CEO-ZP)'}
+                  </button>
+                )}
+                {survey.reviewStatus === 'ddpo_approved' && survey.requiresTechnicalReview && (
+                  <button disabled={isActioning} onClick={onTechnicalReview}
+                    className="flex items-center gap-1.5 bg-violet-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
+                    <Check className="w-3.5 h-3.5" /> {isActioning ? 'Submitting…' : 'Complete technical review'}
+                  </button>
+                )}
+                {((survey.reviewStatus === 'ddpo_approved' && !survey.requiresTechnicalReview) || survey.reviewStatus === 'xen_forwarded') && (
+                  <button disabled={isActioning} onClick={onCeoApprove}
                     className="flex items-center gap-1.5 bg-emerald-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer">
                     <Check className="w-3.5 h-3.5" /> {isActioning ? 'Approving…' : 'Give final approval'}
                   </button>

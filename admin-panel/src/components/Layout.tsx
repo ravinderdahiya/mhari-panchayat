@@ -71,12 +71,14 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
   { id: 'cplo-management', label: 'Surveyor (CPLO) / Gram Sachiv', icon: UserCheck, adminOnly: true, section: 'operations' },
   { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, section: 'operations',
-    roles: ['super_admin', 'admin', 'gram_sachiv', 'bdpo', 'ddpo'], children: [
+    roles: ['super_admin', 'admin', 'gram_sachiv', 'bdpo', 'ddpo', 'xen_pr', 'ceo_zp'], children: [
     { id: 'pending-review', label: 'Pending' },
     { id: 'returned', label: 'Returned' },
     { id: 'gram-sachiv-approved', label: 'Verified (Gram Sachiv)' },
     { id: 'bdpo-forwarded', label: 'Forwarded (BDPO)' },
-    { id: 'approved', label: 'Approved (DDPO)' },
+    { id: 'ddpo-approved', label: 'Approved (DDPO)' },
+    { id: 'xen-forwarded', label: 'Reviewed (XEN-PR)' },
+    { id: 'approved', label: 'Final Approved (CEO-ZP)' },
     { id: 'rejected', label: 'Rejected' },
   ] },
   { id: 'asset-types', label: 'Asset Types', icon: Layers3, adminOnly: true, section: 'operations' },

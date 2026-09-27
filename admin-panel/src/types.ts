@@ -300,16 +300,21 @@ export interface VillageAsset {
   created_at: string;
 }
 
-// Gram Sachiv -> BDPO -> DDPO approval chain. 'returned' is a surveyor/CPLO
-// correction loop back to 'pending', not a terminal state.
+// Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset types only) -> CEO-ZP
+// approval chain. 'returned' is a surveyor/CPLO correction loop back to
+// 'pending', not a terminal state. 'ddpo_approved' branches: CEO-ZP acts on
+// it directly when requiresTechnicalReview is false, otherwise XEN-PR reviews
+// it first (-> 'xen_forwarded') before CEO-ZP's final approval.
 export type AssetSurveyReviewStatus =
-  | 'pending' | 'returned' | 'gram_sachiv_approved' | 'bdpo_forwarded' | 'approved' | 'rejected';
+  | 'pending' | 'returned' | 'gram_sachiv_approved' | 'bdpo_forwarded'
+  | 'ddpo_approved' | 'xen_forwarded' | 'approved' | 'rejected';
 
 export interface AssetSurveyReview {
   actorId: number;
   actorName: string | null;
   actorRole: string;
-  action: 'verified' | 'returned' | 'forwarded' | 'approved' | 'rejected';
+  action: 'verified' | 'returned' | 'forwarded' | 'approved'
+    | 'technically reviewed' | 'given final approval' | 'rejected';
   remarks: string | null;
   createdAt: string;
 }
@@ -343,6 +348,9 @@ export interface AssetSurvey {
   department: { id: number; name: string; code: string | null } | null;
   assetType: { id: number; name: string; iconKey: string | null } | null;
   reviewStatus: AssetSurveyReviewStatus;
+  // Branches 'ddpo_approved': XEN-PR reviews it when true, otherwise CEO-ZP
+  // approves it directly. See AssetSurveyController::stageOwnerRole().
+  requiresTechnicalReview: boolean;
   reviewedByName: string | null;
   reviewedAt: string | null;
   rejectionReason: string | null;
