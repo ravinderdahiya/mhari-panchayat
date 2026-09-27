@@ -274,6 +274,20 @@ class ComplaintController extends Controller
         return $query->first();
     }
 
+    // A panchayat-scoped user's full jurisdiction: their primary panchayat_id
+    // plus any "additional charge" panchayats in the user_panchayats pivot
+    // (see ImportHaryanaOfficials - a Gram Sachiv commonly covers several).
+    /** @return list<int> */
+    private function allowedPanchayatIds(User $user): array
+    {
+        $ids = $user->panchayats()->pluck('panchayats.id')->all();
+        if ($user->panchayat_id) {
+            $ids[] = (int) $user->panchayat_id;
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
     // Restricts $query to complaints within $user's jurisdiction (per
     // JURISDICTION_SCOPE_BY_ROLE), plus anything already assigned to them
     // directly. Roles with no entry (admin, department staff, ...) aren't
@@ -288,8 +302,11 @@ class ComplaintController extends Controller
         $query->where(function ($q) use ($scope, $user) {
             $q->where('assigned_to_id', $user->id);
 
-            if ($scope === 'panchayat' && $user->panchayat_id) {
-                $q->orWhere('panchayat_id', $user->panchayat_id);
+            if ($scope === 'panchayat') {
+                $panchayatIds = $this->allowedPanchayatIds($user);
+                if ($panchayatIds !== []) {
+                    $q->orWhereIn('panchayat_id', $panchayatIds);
+                }
                 if ($user->district_id) {
                     $q->orWhere(fn ($dq) => $dq->whereNull('panchayat_id')->where('district_id', $user->district_id));
                 }
@@ -321,7 +338,7 @@ class ComplaintController extends Controller
 
         return match ($scope) {
             'panchayat' => $complaint->panchayat_id !== null
-                ? $complaint->panchayat_id === $user->panchayat_id
+                ? in_array($complaint->panchayat_id, $this->allowedPanchayatIds($user), true)
                 : ($user->district_id !== null && $complaint->district_id === $user->district_id),
             'block' => $this->bdpoBlockMatches($user, $complaint),
             'district' => $user->district_id !== null && $complaint->district_id === $user->district_id,

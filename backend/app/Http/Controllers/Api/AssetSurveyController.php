@@ -308,7 +308,7 @@ class AssetSurveyController extends Controller
         // jurisdiction - no jurisdiction assigned means nothing to review
         // yet, not everything. Admin/super_admin stay unrestricted.
         if ($user->role === 'gram_sachiv') {
-            $query->where('panchayat_id', $user->panchayat_id ?: 0);
+            $query->whereIn('panchayat_id', $this->allowedPanchayatIds($user) ?: [0]);
         } elseif ($user->role === 'bdpo') {
             $blockIds = $user->blocks()->pluck('blocks.id')->all();
             if ($user->block_id) {
@@ -418,7 +418,7 @@ class AssetSurveyController extends Controller
             abort(403, 'You can only view your own surveys.');
         }
 
-        if ($user->role === 'gram_sachiv' && $survey->panchayat_id !== $user->panchayat_id) {
+        if ($user->role === 'gram_sachiv' && ! in_array($survey->panchayat_id, $this->allowedPanchayatIds($user), true)) {
             abort(403, 'You can only view surveys from your own panchayat.');
         }
 
@@ -442,7 +442,7 @@ class AssetSurveyController extends Controller
         $photoPaths = $this->storePhotos($request);
 
         $survey = DB::transaction(function () use ($request, $data, $photoPaths) {
-            $panchayat = Panchayat::with('block')->find($request->user()->panchayat_id);
+            $panchayat = Panchayat::with('block.district')->find($request->user()->panchayat_id);
 
             $survey = AssetSurvey::create([
                 'surveyor_id' => $request->user()->id,
@@ -452,7 +452,13 @@ class AssetSurveyController extends Controller
                 'department_id' => $data['departmentId'],
                 'asset_type_id' => $data['assetTypeId'],
                 'asset_name' => $data['assetName'],
-                'district' => $data['district'],
+                // The mobile app's district field defaults from the phone's
+                // reverse-geocoder (see asset_survey_form_screen.dart), which
+                // for Haryana often reports the Division name (e.g. "Hisar
+                // Division") rather than the actual district - the assigned
+                // panchayat's own district (already resolved above for
+                // district_id) is authoritative whenever one exists.
+                'district' => $panchayat?->block?->district?->name ?? $data['district'],
                 'panchayat' => $data['panchayat'],
                 'village' => $data['village'],
                 'latitude' => $data['latitude'],
@@ -681,7 +687,7 @@ class AssetSurveyController extends Controller
         $requiredRole = self::TRANSITIONS[$action]['role'] ?? $this->stageOwnerRole($survey);
 
         $allowed = $requiredRole !== null && $user->role === $requiredRole && match ($requiredRole) {
-            'gram_sachiv' => (bool) $user->panchayat_id && $survey->panchayat_id === $user->panchayat_id,
+            'gram_sachiv' => in_array($survey->panchayat_id, $this->allowedPanchayatIds($user), true),
             'bdpo' => (bool) $survey->block_id && (
                 $survey->block_id === $user->block_id || $user->blocks()->whereKey($survey->block_id)->exists()
             ),
