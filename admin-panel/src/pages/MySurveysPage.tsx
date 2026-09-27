@@ -1,28 +1,38 @@
 import { useEffect, useState } from 'react';
 import {
-  Camera, ChevronLeft, ChevronRight, ClipboardCheck, Eye, MapPin, Search, X,
+  Camera, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Forward, MapPin, Search, X,
 } from 'lucide-react';
 import * as api from '../services/api';
 import type { AssetSurvey, AssetSurveyPagination, AssetSurveyReviewStatus, AssetSurveyStats } from '../types';
 
 const REVIEW_BADGE: Record<AssetSurveyReviewStatus, string> = {
+  submitted: 'bg-slate-50 text-slate-700 border-slate-200',
   pending: 'bg-amber-50 text-amber-800 border-amber-200',
   returned: 'bg-orange-50 text-orange-700 border-orange-200',
+  gram_sachiv_reviewed: 'bg-sky-50 text-sky-700 border-sky-200',
   gram_sachiv_approved: 'bg-sky-50 text-sky-700 border-sky-200',
+  bdpo_reviewed: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   bdpo_forwarded: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  ddpo_reviewed: 'bg-violet-50 text-violet-700 border-violet-200',
   ddpo_approved: 'bg-violet-50 text-violet-700 border-violet-200',
+  xen_reviewed: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   xen_forwarded: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 
 const REVIEW_LABEL: Record<AssetSurveyReviewStatus, string> = {
+  submitted: 'Not yet forwarded',
   pending: 'Pending review',
   returned: 'Returned for correction',
-  gram_sachiv_approved: 'Verified by Gram Sachiv',
+  gram_sachiv_reviewed: 'Reviewed by Gram Sachiv',
+  gram_sachiv_approved: 'Forwarded by Gram Sachiv',
+  bdpo_reviewed: 'Reviewed by BDPO',
   bdpo_forwarded: 'Forwarded by BDPO',
+  ddpo_reviewed: 'Reviewed by DDPO',
   ddpo_approved: 'Approved by DDPO',
-  xen_forwarded: 'Reviewed by XEN-PR',
+  xen_reviewed: 'Reviewed by XEN-PR',
+  xen_forwarded: 'Forwarded by XEN-PR',
   approved: 'Final approved',
   rejected: 'Rejected',
 };
@@ -35,9 +45,9 @@ const CONDITION_STYLE: Record<AssetSurvey['condition'], string> = {
 };
 
 const ACTION_PAST_TENSE: Record<string, string> = {
-  verified: 'Verified',
-  returned: 'Returned for correction',
+  reviewed: 'Reviewed',
   forwarded: 'Forwarded',
+  returned: 'Returned for correction',
   approved: 'Approved',
   'technically reviewed': 'Technically reviewed',
   'given final approval': 'Given final approval',
@@ -51,19 +61,28 @@ const EMPTY_PAGINATION: AssetSurveyPagination = {
 const EMPTY_STATS: AssetSurveyStats = {
   totalSurveys: 0, activeSurveyors: 0, poorDamaged: 0,
   statusCounts: {
-    pending: 0, returned: 0, gram_sachiv_approved: 0, bdpo_forwarded: 0,
-    ddpo_approved: 0, xen_forwarded: 0, approved: 0, rejected: 0,
+    submitted: 0, pending: 0, returned: 0,
+    gram_sachiv_reviewed: 0, gram_sachiv_approved: 0,
+    bdpo_reviewed: 0, bdpo_forwarded: 0,
+    ddpo_reviewed: 0, ddpo_approved: 0,
+    xen_reviewed: 0, xen_forwarded: 0,
+    approved: 0, rejected: 0,
   },
 };
 
 const STATUS_FILTERS: Array<{ id: 'all' | AssetSurveyReviewStatus; label: string }> = [
   { id: 'all', label: 'All' },
+  { id: 'submitted', label: 'Not forwarded' },
   { id: 'pending', label: 'Pending' },
   { id: 'returned', label: 'Returned' },
-  { id: 'gram_sachiv_approved', label: 'Verified' },
-  { id: 'bdpo_forwarded', label: 'Forwarded' },
+  { id: 'gram_sachiv_reviewed', label: 'Gram Sachiv reviewed' },
+  { id: 'gram_sachiv_approved', label: 'Gram Sachiv forwarded' },
+  { id: 'bdpo_reviewed', label: 'BDPO reviewed' },
+  { id: 'bdpo_forwarded', label: 'BDPO forwarded' },
+  { id: 'ddpo_reviewed', label: 'DDPO reviewed' },
   { id: 'ddpo_approved', label: 'DDPO approved' },
-  { id: 'xen_forwarded', label: 'XEN-PR reviewed' },
+  { id: 'xen_reviewed', label: 'XEN-PR reviewed' },
+  { id: 'xen_forwarded', label: 'XEN-PR forwarded' },
   { id: 'approved', label: 'Final approved' },
   { id: 'rejected', label: 'Rejected' },
 ];
@@ -90,8 +109,14 @@ export default function MySurveysPage() {
   const [stats, setStats] = useState<AssetSurveyStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   useEffect(() => { setPage(1); }, [statusFilter, query]);
+
+  // Bumped after forwarding a submission, to re-sync stats/pagination and
+  // move the row out of "Not forwarded" without a full page reload.
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,16 +147,35 @@ export default function MySurveysPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [page, query, statusFilter]);
+  }, [page, query, statusFilter, refreshTick]);
 
   const statusCount = (id: 'all' | AssetSurveyReviewStatus) => (
     id === 'all' ? stats.totalSurveys : stats.statusCounts[id]
   );
 
+  // The one action a surveyor takes after submitting: review their own entry,
+  // then explicitly send it on to Gram Sachiv.
+  const handleForwardSubmission = async (survey: AssetSurvey) => {
+    setActioningId(survey.id);
+    setActionError('');
+    try {
+      await api.forwardSubmissionAssetSurvey(survey.id);
+      setSelected(null);
+      setRefreshTick((t) => t + 1);
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {error && (
         <p className="text-xs text-status-new bg-status-new/10 border border-status-new/20 rounded-lg p-2">{error}</p>
+      )}
+      {actionError && (
+        <p className="text-xs text-status-new bg-status-new/10 border border-status-new/20 rounded-lg p-2">{actionError}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -220,13 +264,25 @@ export default function MySurveysPage() {
                       </span>
                     </td>
                     <td className="p-2.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelected(survey)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> View
-                      </button>
+                      <div className="flex items-center justify-end gap-2.5 flex-wrap">
+                        {survey.reviewStatus === 'submitted' && (
+                          <button
+                            type="button"
+                            disabled={actioningId === survey.id}
+                            onClick={() => handleForwardSubmission(survey)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline disabled:opacity-50 cursor-pointer"
+                          >
+                            <Forward className="w-3.5 h-3.5" /> Forward to Gram Sachiv
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelected(survey)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -275,13 +331,23 @@ export default function MySurveysPage() {
       </div>
 
       {selected && (
-        <SurveyDetails survey={selected} onClose={() => setSelected(null)} />
+        <SurveyDetails
+          survey={selected}
+          onClose={() => setSelected(null)}
+          onForwardSubmission={() => handleForwardSubmission(selected)}
+          isActioning={actioningId === selected.id}
+        />
       )}
     </div>
   );
 }
 
-function SurveyDetails({ survey, onClose }: { survey: AssetSurvey; onClose: () => void }) {
+function SurveyDetails({ survey, onClose, onForwardSubmission, isActioning }: {
+  survey: AssetSurvey;
+  onClose: () => void;
+  onForwardSubmission: () => void;
+  isActioning: boolean;
+}) {
   return (
     <div className="fixed inset-0 bg-black/45 z-[70] flex items-center justify-center p-5" onClick={onClose}>
       <div
@@ -371,6 +437,19 @@ function SurveyDetails({ survey, onClose }: { survey: AssetSurvey; onClose: () =
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {survey.reviewStatus === 'submitted' && (
+            <div className="border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                disabled={isActioning}
+                onClick={onForwardSubmission}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer"
+              >
+                <Forward className="w-3.5 h-3.5" /> {isActioning ? 'Forwarding…' : 'Forward to Gram Sachiv'}
+              </button>
             </div>
           )}
         </div>

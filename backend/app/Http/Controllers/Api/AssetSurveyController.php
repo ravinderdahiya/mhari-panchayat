@@ -22,36 +22,70 @@ class AssetSurveyController extends Controller
         'reviewedBy:id,name,username',
     ];
 
+    // Every in-flight stage (CPLO/surveyor's own submission included) is a
+    // review-then-forward pair: the actor marks their own work reviewed
+    // (not yet visible to the next role) before a separate, explicit action
+    // actually hands it on. CEO-ZP has no "forward" (nothing sits above
+    // them), so `finalApprove` stays the one exception with no _reviewed
+    // stage of its own.
     private const REVIEW_STATUSES = [
-        'pending', 'returned', 'gram_sachiv_approved', 'bdpo_forwarded',
-        'ddpo_approved', 'xen_forwarded', 'approved', 'rejected',
+        'submitted', 'pending', 'returned',
+        'gram_sachiv_reviewed', 'gram_sachiv_approved',
+        'bdpo_reviewed', 'bdpo_forwarded',
+        'ddpo_reviewed', 'ddpo_approved',
+        'xen_reviewed', 'xen_forwarded',
+        'approved', 'rejected',
     ];
 
-    // Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset types only) ->
-    // CEO-ZP final approval chain. `reject`'s role is resolved dynamically
-    // (whichever role currently owns the survey's stage may reject it), so
-    // it has no fixed 'role' entry here. `finalApprove` accepts either
-    // 'ddpo_approved' (non-technical asset types skip XEN-PR) or
-    // 'xen_forwarded' (technical ones) - see stageOwnerRole()/
-    // ensureStageActor() for the branch enforcement itself.
+    // CPLO/surveyor submits (created at 'submitted') -> forwardSubmission ->
+    // Gram Sachiv reviews (verify) -> forwards (gramSachivForward) ->
+    // BDPO reviews (bdpoReview) -> forwards (forward) ->
+    // DDPO reviews (ddpoReview) -> forwards (approve) ->
+    // [technical asset types only] XEN-PR reviews (technicalReview) ->
+    // forwards (xenForward) -> CEO-ZP gives final approval (finalApprove,
+    // from either 'ddpo_approved' direct or 'xen_forwarded').
+    // `reject`'s role is resolved dynamically (whichever role currently owns
+    // the survey's stage may reject it), so it has no fixed 'role' entry.
     private const TRANSITIONS = [
-        'verify' => ['from' => 'pending', 'to' => 'gram_sachiv_approved', 'role' => 'gram_sachiv'],
-        'return' => ['from' => 'pending', 'to' => 'returned', 'role' => 'gram_sachiv'],
-        'forward' => ['from' => 'gram_sachiv_approved', 'to' => 'bdpo_forwarded', 'role' => 'bdpo'],
-        'approve' => ['from' => 'bdpo_forwarded', 'to' => 'ddpo_approved', 'role' => 'ddpo'],
-        'technicalReview' => ['from' => 'ddpo_approved', 'to' => 'xen_forwarded', 'role' => 'xen_pr'],
+        'forwardSubmission' => ['from' => 'submitted', 'to' => 'pending', 'role' => null],
+
+        'verify' => ['from' => 'pending', 'to' => 'gram_sachiv_reviewed', 'role' => 'gram_sachiv'],
+        'return' => ['from' => ['pending', 'gram_sachiv_reviewed'], 'to' => 'returned', 'role' => 'gram_sachiv'],
+        'gramSachivForward' => ['from' => 'gram_sachiv_reviewed', 'to' => 'gram_sachiv_approved', 'role' => 'gram_sachiv'],
+
+        'bdpoReview' => ['from' => 'gram_sachiv_approved', 'to' => 'bdpo_reviewed', 'role' => 'bdpo'],
+        'forward' => ['from' => 'bdpo_reviewed', 'to' => 'bdpo_forwarded', 'role' => 'bdpo'],
+
+        'ddpoReview' => ['from' => 'bdpo_forwarded', 'to' => 'ddpo_reviewed', 'role' => 'ddpo'],
+        'approve' => ['from' => 'ddpo_reviewed', 'to' => 'ddpo_approved', 'role' => 'ddpo'],
+
+        'technicalReview' => ['from' => 'ddpo_approved', 'to' => 'xen_reviewed', 'role' => 'xen_pr'],
+        'xenForward' => ['from' => 'xen_reviewed', 'to' => 'xen_forwarded', 'role' => 'xen_pr'],
+
         'finalApprove' => ['from' => ['ddpo_approved', 'xen_forwarded'], 'to' => 'approved', 'role' => 'ceo_zp'],
-        'reject' => ['from' => ['pending', 'gram_sachiv_approved', 'bdpo_forwarded', 'ddpo_approved', 'xen_forwarded'], 'to' => 'rejected', 'role' => null],
+
+        'reject' => ['from' => [
+            'pending', 'gram_sachiv_reviewed', 'gram_sachiv_approved',
+            'bdpo_reviewed', 'bdpo_forwarded', 'ddpo_reviewed', 'ddpo_approved',
+            'xen_reviewed', 'xen_forwarded',
+        ], 'to' => 'rejected', 'role' => null],
     ];
 
     // The role that owns each in-flight status, used to resolve `reject`'s
-    // actor requirement dynamically from the survey's current stage.
-    // 'ddpo_approved' is intentionally absent - its owner depends on the
-    // asset type (see stageOwnerRole()), not a fixed role.
+    // actor requirement dynamically from the survey's current stage. Both
+    // halves of a role's review-then-forward pair map to that same role.
+    // 'submitted' and 'ddpo_approved' are intentionally absent: 'submitted'
+    // is the surveyor's own draft (ensureStageActor() checks ownership
+    // directly, not a fixed role), and 'ddpo_approved' branches by asset
+    // type (see stageOwnerRole()).
     private const STAGE_OWNER = [
         'pending' => 'gram_sachiv',
+        'gram_sachiv_reviewed' => 'gram_sachiv',
         'gram_sachiv_approved' => 'bdpo',
+        'bdpo_reviewed' => 'bdpo',
         'bdpo_forwarded' => 'ddpo',
+        'ddpo_reviewed' => 'ddpo',
+        'xen_reviewed' => 'xen_pr',
         'xen_forwarded' => 'ceo_zp',
     ];
 
@@ -467,6 +501,9 @@ class AssetSurveyController extends Controller
                 'description' => $data['description'] ?? null,
                 'survey_date' => $data['surveyDate'],
                 'photo_paths' => $photoPaths,
+                // Not yet visible to Gram Sachiv - the surveyor reviews their
+                // own entry and explicitly forwards it (forwardSubmission).
+                'review_status' => 'submitted',
             ]);
             $survey->update([
                 'asset_code' => 'AST-'.now()->format('Y').'-'.str_pad((string) $survey->id, 6, '0', STR_PAD_LEFT),
@@ -537,7 +574,24 @@ class AssetSurveyController extends Controller
         ]);
     }
 
-    // Gram Sachiv verifies a pending survey, sending it on to BDPO.
+    // The surveyor (CPLO/surveyor/...) reviews their own submitted survey and
+    // explicitly sends it on to Gram Sachiv - the only action they take
+    // after submission itself.
+    public function forwardSubmission(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'forwardSubmission');
+        $this->applyTransition($request, $survey, 'forwardSubmission');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey forwarded to Gram Sachiv.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // Gram Sachiv reviews a pending survey - not yet forwarded to BDPO
+    // (see gramSachivForward()).
     public function verify(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
@@ -546,12 +600,13 @@ class AssetSurveyController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Survey verified.',
+            'message' => 'Survey reviewed.',
             'survey' => $this->mapSurvey($request, $survey->fresh()),
         ]);
     }
 
-    // Gram Sachiv sends a pending survey back to the surveyor for correction.
+    // Gram Sachiv sends a pending or already-reviewed survey back to the
+    // surveyor for correction.
     public function returnForCorrection(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
@@ -566,7 +621,36 @@ class AssetSurveyController extends Controller
         ]);
     }
 
-    // BDPO forwards a gram-sachiv-verified survey on to DDPO.
+    // Gram Sachiv forwards a reviewed survey on to BDPO.
+    public function gramSachivForward(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'gramSachivForward');
+        $this->applyTransition($request, $survey, 'gramSachivForward');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey forwarded to BDPO.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // BDPO reviews a gram-sachiv-forwarded survey - not yet forwarded to
+    // DDPO (see forward()).
+    public function bdpoReview(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'bdpoReview');
+        $this->applyTransition($request, $survey, 'bdpoReview');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey reviewed.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // BDPO forwards a reviewed survey on to DDPO.
     public function forward(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
@@ -575,13 +659,29 @@ class AssetSurveyController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Survey forwarded.',
+            'message' => 'Survey forwarded to DDPO.',
             'survey' => $this->mapSurvey($request, $survey->fresh()),
         ]);
     }
 
-    // DDPO approves, sending technical-review asset types on to XEN-PR and
-    // everything else straight to CEO-ZP for final approval.
+    // DDPO reviews a bdpo-forwarded survey - not yet approved (see
+    // approve()).
+    public function ddpoReview(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'ddpoReview');
+        $this->applyTransition($request, $survey, 'ddpoReview');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey reviewed.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // DDPO approves a reviewed survey, sending technical-review asset types
+    // on to XEN-PR and everything else straight to CEO-ZP for final
+    // approval.
     public function approve(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::findOrFail($id);
@@ -595,9 +695,9 @@ class AssetSurveyController extends Controller
         ]);
     }
 
-    // XEN-PR (Executive Engineer, Panchayati Raj) signs off on the technical
-    // aspects of a DDPO-approved survey, for asset types that require it,
-    // before CEO-ZP's final approval.
+    // XEN-PR (Executive Engineer, Panchayati Raj) reviews the technical
+    // aspects of a DDPO-approved survey, for asset types that require it -
+    // not yet forwarded to CEO-ZP (see xenForward()).
     public function technicalReview(Request $request, int $id): JsonResponse
     {
         $survey = AssetSurvey::with('assetType')->findOrFail($id);
@@ -607,6 +707,20 @@ class AssetSurveyController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Technical review completed.',
+            'survey' => $this->mapSurvey($request, $survey->fresh()),
+        ]);
+    }
+
+    // XEN-PR forwards a technically-reviewed survey on to CEO-ZP.
+    public function xenForward(Request $request, int $id): JsonResponse
+    {
+        $survey = AssetSurvey::findOrFail($id);
+        $this->ensureStageActor($request, $survey, 'xenForward');
+        $this->applyTransition($request, $survey, 'xenForward');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Survey forwarded to CEO-ZP.',
             'survey' => $this->mapSurvey($request, $survey->fresh()),
         ]);
     }
@@ -666,14 +780,25 @@ class AssetSurveyController extends Controller
     }
 
     // admin/super_admin can act at any stage, on any survey, regardless of
-    // jurisdiction. Otherwise the actor's role must match the stage that
-    // owns $action (verify/return -> gram_sachiv, forward -> bdpo,
-    // approve -> ddpo, reject -> whichever role owns the survey's current
-    // status), and the actor's own jurisdiction must cover the survey's.
+    // jurisdiction. `forwardSubmission` is the one action with no fixed
+    // role - only the survey's own surveyor may take it. Otherwise the
+    // actor's role must match the stage that owns $action (verify/return/
+    // gramSachivForward -> gram_sachiv, bdpoReview/forward -> bdpo,
+    // ddpoReview/approve -> ddpo, technicalReview/xenForward -> xen_pr,
+    // reject -> whichever role owns the survey's current status), and the
+    // actor's own jurisdiction must cover the survey's.
     private function ensureStageActor(Request $request, AssetSurvey $survey, string $action): void
     {
         $user = $request->user();
         if ($user->isSuperAdmin() || $user->role === 'admin') {
+            return;
+        }
+
+        if ($action === 'forwardSubmission') {
+            if (! $this->isSurveyorRole($user->role) || $survey->surveyor_id !== $user->id) {
+                abort(403, 'You can only forward your own submitted surveys.');
+            }
+
             return;
         }
 
@@ -707,10 +832,14 @@ class AssetSurveyController extends Controller
     {
         $config = self::TRANSITIONS[$action];
         $from = (array) $config['from'];
+        // 'reviewed'/'forwarded' are reused across stages - actor_role
+        // (stored alongside, see below) disambiguates which stage a given
+        // row belongs to, same as 'forward' (BDPO) already did before this
+        // review/forward split existed.
         $pastTense = match ($action) {
-            'verify' => 'verified',
+            'forwardSubmission', 'gramSachivForward', 'forward', 'xenForward' => 'forwarded',
+            'verify', 'bdpoReview', 'ddpoReview' => 'reviewed',
             'return' => 'returned',
-            'forward' => 'forwarded',
             'approve' => 'approved',
             'technicalReview' => 'technically reviewed',
             'finalApprove' => 'given final approval',

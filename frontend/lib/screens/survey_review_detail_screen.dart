@@ -53,9 +53,11 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
     return '$day ${months[date.month - 1]} ${date.year}';
   }
 
-  /// Applies whichever positive action this role owns at the survey's
-  /// current stage - verify (Gram Sachiv), forward (BDPO), approve (DDPO),
-  /// technical review (XEN-PR), or final approve (CEO-ZP).
+  /// Applies whichever action this role owns at the survey's current stage
+  /// - each non-terminal stage is a review-then-forward pair (verify/
+  /// gramSachivForward for Gram Sachiv, bdpoReview/forward for BDPO,
+  /// ddpoReview/approve for DDPO, technicalReview/xenForward for XEN-PR);
+  /// finalApprove (CEO-ZP) stays a single action.
   Future<void> _performAction(SurveyReviewActionKind kind) async {
     if (_submitting) return;
     setState(() {
@@ -65,10 +67,18 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
     try {
       final updated = await switch (kind) {
         SurveyReviewActionKind.verify => SurveyReviewApi.verify(_survey.id),
+        SurveyReviewActionKind.gramSachivForward =>
+          SurveyReviewApi.gramSachivForward(_survey.id),
+        SurveyReviewActionKind.bdpoReview =>
+          SurveyReviewApi.bdpoReview(_survey.id),
         SurveyReviewActionKind.forward => SurveyReviewApi.forward(_survey.id),
+        SurveyReviewActionKind.ddpoReview =>
+          SurveyReviewApi.ddpoReview(_survey.id),
         SurveyReviewActionKind.approve => SurveyReviewApi.approve(_survey.id),
         SurveyReviewActionKind.technicalReview =>
           SurveyReviewApi.technicalReview(_survey.id),
+        SurveyReviewActionKind.xenForward =>
+          SurveyReviewApi.xenForward(_survey.id),
         SurveyReviewActionKind.finalApprove =>
           SurveyReviewApi.finalApprove(_survey.id),
       };
@@ -158,7 +168,8 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
       reviewStatus: status,
       requiresTechnicalReview: survey.requiresTechnicalReview,
     );
-    final canReturn = isGramSachiv && status == 'pending';
+    final canReturn = isGramSachiv &&
+        (status == 'pending' || status == 'gram_sachiv_reviewed');
     final showActionRow = action != null || canReject;
 
     return AppScaffold(

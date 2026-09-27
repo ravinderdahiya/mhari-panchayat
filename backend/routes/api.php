@@ -72,11 +72,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/surveys', [AssetSurveyController::class, 'store']);
     Route::get('/surveys/{id}', [AssetSurveyController::class, 'show']);
     Route::put('/surveys/{id}', [AssetSurveyController::class, 'update']);
+    Route::post('/surveys/{id}/forward-submission', [AssetSurveyController::class, 'forwardSubmission']);
     Route::post('/surveys/{id}/verify', [AssetSurveyController::class, 'verify']);
     Route::post('/surveys/{id}/return', [AssetSurveyController::class, 'returnForCorrection']);
+    Route::post('/surveys/{id}/gram-sachiv-forward', [AssetSurveyController::class, 'gramSachivForward']);
+    Route::post('/surveys/{id}/bdpo-review', [AssetSurveyController::class, 'bdpoReview']);
     Route::post('/surveys/{id}/forward', [AssetSurveyController::class, 'forward']);
+    Route::post('/surveys/{id}/ddpo-review', [AssetSurveyController::class, 'ddpoReview']);
     Route::post('/surveys/{id}/approve', [AssetSurveyController::class, 'approve']);
     Route::post('/surveys/{id}/technical-review', [AssetSurveyController::class, 'technicalReview']);
+    Route::post('/surveys/{id}/xen-forward', [AssetSurveyController::class, 'xenForward']);
     Route::post('/surveys/{id}/final-approve', [AssetSurveyController::class, 'finalApprove']);
     Route::post('/surveys/{id}/reject', [AssetSurveyController::class, 'reject']);
     Route::delete('/surveys/{id}', [AssetSurveyController::class, 'destroy']);

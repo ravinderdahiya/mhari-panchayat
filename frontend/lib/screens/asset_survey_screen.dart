@@ -8,6 +8,7 @@ import '../models/user_role.dart';
 import '../navigation/app_navigation.dart';
 import '../services/auth_api.dart';
 import '../services/survey_api.dart';
+import '../services/survey_review_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
 import '../widgets/common_widgets.dart';
@@ -39,6 +40,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
   String _existingQuery = '';
   String? _infoMessage;
   String? _serverRole;
+  String? _forwardingId;
 
   @override
   void initState() {
@@ -134,6 +136,25 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadingExisting = false);
+    }
+  }
+
+  // The one action a surveyor takes after submitting: review their own
+  // entry, then explicitly send it on to Gram Sachiv.
+  Future<void> _forwardSubmission(Survey survey) async {
+    if (_forwardingId != null) return;
+    setState(() => _forwardingId = survey.id);
+    try {
+      await SurveyReviewApi.forwardSubmission(survey.id);
+      if (!mounted) return;
+      await _loadExistingAssets();
+    } on SurveyReviewApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _forwardingId = null);
     }
   }
 
@@ -532,6 +553,8 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                     child: _ExistingAssetCard(
                                       survey: survey,
                                       onTap: () => _onSelectExisting(survey),
+                                      isForwarding: _forwardingId == survey.id,
+                                      onForward: () => _forwardSubmission(survey),
                                     ),
                                   );
                                 }, childCount: _filteredExisting.length),
@@ -774,12 +797,17 @@ class _ReviewStatusMeta {
 
 _ReviewStatusMeta _reviewStatusMeta(String? status) {
   return switch (status) {
+    'submitted' => _ReviewStatusMeta('Not yet forwarded', AppColors.mutedText),
     'pending' => _ReviewStatusMeta('Pending review', AppColors.pendingText),
     'returned' => _ReviewStatusMeta('Returned for correction', AppColors.rejectedText),
-    'gram_sachiv_approved' => _ReviewStatusMeta('Verified by Gram Sachiv', AppColors.inProgressText),
+    'gram_sachiv_reviewed' => _ReviewStatusMeta('Reviewed by Gram Sachiv', AppColors.inProgressText),
+    'gram_sachiv_approved' => _ReviewStatusMeta('Forwarded by Gram Sachiv', AppColors.inProgressText),
+    'bdpo_reviewed' => _ReviewStatusMeta('Reviewed by BDPO', AppColors.inProgressText),
     'bdpo_forwarded' => _ReviewStatusMeta('Forwarded by BDPO', AppColors.inProgressText),
+    'ddpo_reviewed' => _ReviewStatusMeta('Reviewed by DDPO', AppColors.primary),
     'ddpo_approved' => _ReviewStatusMeta('Approved by DDPO', AppColors.primary),
-    'xen_forwarded' => _ReviewStatusMeta('Reviewed by XEN-PR', AppColors.primary),
+    'xen_reviewed' => _ReviewStatusMeta('Reviewed by XEN-PR', AppColors.primary),
+    'xen_forwarded' => _ReviewStatusMeta('Forwarded by XEN-PR', AppColors.primary),
     'approved' => _ReviewStatusMeta('Final approved', AppColors.resolvedText),
     'rejected' => _ReviewStatusMeta('Rejected', AppColors.rejectedText),
     _ => _ReviewStatusMeta('—', AppColors.mutedText),
@@ -787,10 +815,17 @@ _ReviewStatusMeta _reviewStatusMeta(String? status) {
 }
 
 class _ExistingAssetCard extends StatelessWidget {
-  const _ExistingAssetCard({required this.survey, required this.onTap});
+  const _ExistingAssetCard({
+    required this.survey,
+    required this.onTap,
+    required this.isForwarding,
+    required this.onForward,
+  });
 
   final Survey survey;
   final VoidCallback onTap;
+  final bool isForwarding;
+  final VoidCallback onForward;
 
   @override
   Widget build(BuildContext context) {
@@ -854,6 +889,26 @@ class _ExistingAssetCard extends StatelessWidget {
                   fontSize: 11,
                   color: AppColors.rejectedText,
                   height: 1.3,
+                ),
+              ),
+            ],
+            if (survey.reviewStatus == 'submitted') ...[
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 30,
+                child: OutlinedButton.icon(
+                  onPressed: isForwarding ? null : onForward,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.forward_rounded, size: 15),
+                  label: Text(
+                    isForwarding ? 'भेजा जा रहा है…' : 'Forward to Gram Sachiv',
+                    style: GoogleFonts.poppins(fontSize: 11),
+                  ),
                 ),
               ),
             ],

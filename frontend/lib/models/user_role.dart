@@ -88,7 +88,9 @@ class VerifierCopy {
   };
 
   /// The review_status this role acts on next - the default/primary tab
-  /// their verification queue opens to.
+  /// their verification queue opens to. Unaffected by the review/forward
+  /// split below - each role's inbox status is still the one their
+  /// predecessor's forward action produces.
   static String inboxStatus(String? serverRole) => switch (_key(serverRole)) {
     'gram_sachiv' => 'pending',
     'bdpo' => 'gram_sachiv_approved',
@@ -98,31 +100,36 @@ class VerifierCopy {
     _ => 'pending',
   };
 
-  /// Status tabs shown in this role's queue: their inbox first, then
-  /// what they've already sent on, then terminal states. Covers all five
-  /// stages of the escalation chain, Gram Sachiv included, so the queue
-  /// screen can look this up the same way regardless of which is signed in.
+  /// Status tabs shown in this role's queue: their inbox first, then their
+  /// own reviewed-but-not-yet-forwarded stage, then what they've already
+  /// sent on, then terminal states. Covers all five stages of the
+  /// escalation chain, Gram Sachiv included, so the queue screen can look
+  /// this up the same way regardless of which is signed in.
   static List<(String, String)> statusTabs(String? serverRole) {
     return switch (_key(serverRole)) {
       'gram_sachiv' => const [
         ('pending', 'Pending'),
+        ('gram_sachiv_reviewed', 'Reviewed'),
+        ('gram_sachiv_approved', 'Forwarded'),
         ('returned', 'Returned'),
-        ('gram_sachiv_approved', 'Verified'),
         ('rejected', 'Rejected'),
       ],
       'bdpo' => const [
         ('gram_sachiv_approved', 'Inbox'),
+        ('bdpo_reviewed', 'Reviewed'),
         ('bdpo_forwarded', 'Forwarded'),
         ('rejected', 'Rejected'),
       ],
       'ddpo' => const [
         ('bdpo_forwarded', 'Inbox'),
+        ('ddpo_reviewed', 'Reviewed'),
         ('ddpo_approved', 'Approved'),
         ('rejected', 'Rejected'),
       ],
       'xen_pr' => const [
         ('ddpo_approved', 'Inbox'),
-        ('xen_forwarded', 'Reviewed'),
+        ('xen_reviewed', 'Reviewed'),
+        ('xen_forwarded', 'Forwarded'),
         ('rejected', 'Rejected'),
       ],
       'ceo_zp' => const [
@@ -138,8 +145,19 @@ class VerifierCopy {
 
 /// One action a verifier can take on a survey at its current stage -
 /// resolved per (serverRole, reviewStatus, requiresTechnicalReview) by
-/// [SurveyReviewAction.forStage].
-enum SurveyReviewActionKind { verify, forward, approve, technicalReview, finalApprove }
+/// [SurveyReviewAction.forStage]. Every non-terminal stage is a
+/// review-then-forward pair: `verify`/`bdpoReview`/`ddpoReview`/
+/// `technicalReview` mark the actor's own review (not yet visible to the
+/// next role), `gramSachivForward`/`forward`/`approve`/`xenForward` are the
+/// separate, explicit action that actually hands it on. `finalApprove`
+/// stays a single action - CEO-ZP has nothing further to forward to.
+enum SurveyReviewActionKind {
+  verify, gramSachivForward,
+  bdpoReview, forward,
+  ddpoReview, approve,
+  technicalReview, xenForward,
+  finalApprove,
+}
 
 class SurveyReviewAction {
   const SurveyReviewAction({required this.kind, required this.label});
@@ -147,10 +165,10 @@ class SurveyReviewAction {
   final SurveyReviewActionKind kind;
   final String label;
 
-  /// The single positive action available to [serverRole] on a survey
-  /// currently at [reviewStatus], or null if this role has no action to
-  /// take right now (wrong stage, or - for XEN-PR/CEO-ZP - the wrong side
-  /// of the technical-review branch for this asset type).
+  /// The single action available to [serverRole] on a survey currently at
+  /// [reviewStatus], or null if this role has no action to take right now
+  /// (wrong stage, or - for XEN-PR/CEO-ZP - the wrong side of the
+  /// technical-review branch for this asset type).
   static SurveyReviewAction? forStage({
     required String? serverRole,
     required String reviewStatus,
@@ -160,21 +178,37 @@ class SurveyReviewAction {
     return switch ((role, reviewStatus)) {
       ('gram_sachiv', 'pending') => const SurveyReviewAction(
         kind: SurveyReviewActionKind.verify,
-        label: 'Verify',
+        label: 'Mark Reviewed',
+      ),
+      ('gram_sachiv', 'gram_sachiv_reviewed') => const SurveyReviewAction(
+        kind: SurveyReviewActionKind.gramSachivForward,
+        label: 'Forward to BDPO',
       ),
       ('bdpo', 'gram_sachiv_approved') => const SurveyReviewAction(
+        kind: SurveyReviewActionKind.bdpoReview,
+        label: 'Mark Reviewed',
+      ),
+      ('bdpo', 'bdpo_reviewed') => const SurveyReviewAction(
         kind: SurveyReviewActionKind.forward,
         label: 'Forward to DDPO',
       ),
       ('ddpo', 'bdpo_forwarded') => const SurveyReviewAction(
+        kind: SurveyReviewActionKind.ddpoReview,
+        label: 'Mark Reviewed',
+      ),
+      ('ddpo', 'ddpo_reviewed') => const SurveyReviewAction(
         kind: SurveyReviewActionKind.approve,
         label: 'Approve',
       ),
       ('xen_pr', 'ddpo_approved') when requiresTechnicalReview =>
         const SurveyReviewAction(
           kind: SurveyReviewActionKind.technicalReview,
-          label: 'Complete Technical Review',
+          label: 'Mark Technically Reviewed',
         ),
+      ('xen_pr', 'xen_reviewed') => const SurveyReviewAction(
+        kind: SurveyReviewActionKind.xenForward,
+        label: 'Forward to CEO-ZP',
+      ),
       ('ceo_zp', 'ddpo_approved') when !requiresTechnicalReview =>
         const SurveyReviewAction(
           kind: SurveyReviewActionKind.finalApprove,
@@ -189,15 +223,19 @@ class SurveyReviewAction {
   }
 
   /// Whether [serverRole] may reject a survey currently at [reviewStatus] -
-  /// true exactly when they also own that stage's positive action (or, for
-  /// Gram Sachiv, the 'return' action).
+  /// true exactly when they also own that stage's action (or, for Gram
+  /// Sachiv, the 'return' action - available both before and after they've
+  /// marked it reviewed, right up until they actually forward it).
   static bool canReject({
     required String? serverRole,
     required String reviewStatus,
     required bool requiresTechnicalReview,
   }) {
     final role = (serverRole ?? '').trim().toLowerCase();
-    if (role == 'gram_sachiv' && reviewStatus == 'pending') return true;
+    if (role == 'gram_sachiv' &&
+        (reviewStatus == 'pending' || reviewStatus == 'gram_sachiv_reviewed')) {
+      return true;
+    }
     return forStage(
           serverRole: serverRole,
           reviewStatus: reviewStatus,

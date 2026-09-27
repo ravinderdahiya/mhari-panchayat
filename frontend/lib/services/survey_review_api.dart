@@ -78,15 +78,51 @@ class SurveyReviewApi {
         .toList();
   }
 
-  /// Gram Sachiv's positive action on a pending survey - sends it on to
-  /// BDPO. Named `verify` (not `approve`) because `/approve` is reserved
-  /// for DDPO's final sign-off further down the chain.
+  /// The surveyor's (CPLO/surveyor/...) own action after submitting: sends
+  /// their reviewed survey on to Gram Sachiv.
+  static Future<Survey> forwardSubmission(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/forward-submission'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// Gram Sachiv reviews a pending survey - not yet forwarded (see
+  /// [gramSachivForward]). Named `verify` (not `review`) to match the
+  /// existing `/verify` endpoint.
   static Future<Survey> verify(String surveyId) async {
     final headers = await _authHeaders();
     late final http.Response response;
     try {
       response = await http
           .post(_uri('/$surveyId/verify'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// Gram Sachiv's positive action on a reviewed survey - sends it on to
+  /// BDPO.
+  static Future<Survey> gramSachivForward(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/gram-sachiv-forward'), headers: headers)
           .timeout(const Duration(seconds: 20));
     } catch (_) {
       throw SurveyReviewApiException(
@@ -113,13 +149,49 @@ class SurveyReviewApi {
     return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
   }
 
-  /// BDPO's positive action - sends a gram-sachiv-verified survey on to DDPO.
+  /// BDPO reviews a gram-sachiv-forwarded survey - not yet forwarded (see
+  /// [forward]).
+  static Future<Survey> bdpoReview(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/bdpo-review'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// BDPO's positive action - sends a reviewed survey on to DDPO.
   static Future<Survey> forward(String surveyId) async {
     final headers = await _authHeaders();
     late final http.Response response;
     try {
       response = await http
           .post(_uri('/$surveyId/forward'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// DDPO reviews a bdpo-forwarded survey - not yet approved (see
+  /// [approve]).
+  static Future<Survey> ddpoReview(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/ddpo-review'), headers: headers)
           .timeout(const Duration(seconds: 20));
     } catch (_) {
       throw SurveyReviewApiException(
@@ -148,14 +220,32 @@ class SurveyReviewApi {
     return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
   }
 
-  /// XEN-PR's technical sign-off, only reachable for asset types that
-  /// require it - sends the survey on to CEO-ZP.
+  /// XEN-PR's technical review, only reachable for asset types that
+  /// require it - not yet forwarded (see [xenForward]).
   static Future<Survey> technicalReview(String surveyId) async {
     final headers = await _authHeaders();
     late final http.Response response;
     try {
       response = await http
           .post(_uri('/$surveyId/technical-review'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
+  /// XEN-PR's positive action - sends a technically-reviewed survey on to
+  /// CEO-ZP.
+  static Future<Survey> xenForward(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .post(_uri('/$surveyId/xen-forward'), headers: headers)
           .timeout(const Duration(seconds: 20));
     } catch (_) {
       throw SurveyReviewApiException(

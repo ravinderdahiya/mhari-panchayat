@@ -300,20 +300,30 @@ export interface VillageAsset {
   created_at: string;
 }
 
-// Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset types only) -> CEO-ZP
-// approval chain. 'returned' is a surveyor/CPLO correction loop back to
-// 'pending', not a terminal state. 'ddpo_approved' branches: CEO-ZP acts on
-// it directly when requiresTechnicalReview is false, otherwise XEN-PR reviews
-// it first (-> 'xen_forwarded') before CEO-ZP's final approval.
+// CPLO/surveyor -> Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset
+// types only) -> CEO-ZP approval chain. Every non-terminal stage is a
+// review-then-forward pair: the actor marks their own work reviewed (the
+// `*_reviewed` statuses - not yet visible to the next role) before a
+// separate, explicit forward action hands it on. 'returned' is a
+// surveyor/CPLO correction loop back to 'pending', not a terminal state.
+// 'ddpo_approved' branches: CEO-ZP acts on it directly when
+// requiresTechnicalReview is false, otherwise XEN-PR reviews it first
+// (-> 'xen_reviewed' -> 'xen_forwarded') before CEO-ZP's final approval.
 export type AssetSurveyReviewStatus =
-  | 'pending' | 'returned' | 'gram_sachiv_approved' | 'bdpo_forwarded'
-  | 'ddpo_approved' | 'xen_forwarded' | 'approved' | 'rejected';
+  | 'submitted' | 'pending' | 'returned'
+  | 'gram_sachiv_reviewed' | 'gram_sachiv_approved'
+  | 'bdpo_reviewed' | 'bdpo_forwarded'
+  | 'ddpo_reviewed' | 'ddpo_approved'
+  | 'xen_reviewed' | 'xen_forwarded'
+  | 'approved' | 'rejected';
 
 export interface AssetSurveyReview {
   actorId: number;
   actorName: string | null;
   actorRole: string;
-  action: 'verified' | 'returned' | 'forwarded' | 'approved'
+  // 'reviewed'/'forwarded' are reused across stages - actorRole disambiguates
+  // which stage a given row belongs to (e.g. "Reviewed by X (bdpo)").
+  action: 'reviewed' | 'forwarded' | 'returned' | 'approved'
     | 'technically reviewed' | 'given final approval' | 'rejected';
   remarks: string | null;
   createdAt: string;
