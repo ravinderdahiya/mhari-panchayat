@@ -67,7 +67,7 @@ const NAV_ITEMS: NavItem[] = [
   ] },
   { id: 'reports', label: 'Reports', icon: FileBarChart },
   { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, section: 'operations' },
-  { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['surveyor'], section: 'operations' },
+  { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['surveyor', 'cplo'], section: 'operations' },
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
   { id: 'cplo-management', label: 'Surveyor (CPLO) / Gram Sachiv', icon: UserCheck, adminOnly: true, section: 'operations' },
   { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, section: 'operations',
