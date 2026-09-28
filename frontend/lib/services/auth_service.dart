@@ -13,6 +13,7 @@ class AuthSession {
     this.officerProfileId,
     this.assignedPanchayatId,
     this.assignedPanchayatName,
+    this.assignedDistrictName,
   });
 
   final String token;
@@ -39,6 +40,11 @@ class AuthSession {
   final int? assignedPanchayatId;
   final String? assignedPanchayatName;
 
+  /// The assigned panchayat's own district - authoritative for the survey
+  /// form's District field, since the phone's on-device reverse-geocoder
+  /// often reports the Division name instead (see AssetSurveyFormScreen).
+  final String? assignedDistrictName;
+
   bool get isValid => token.isNotEmpty;
 }
 
@@ -55,6 +61,7 @@ class AuthService {
   static const _officerProfileIdKey = 'officer_profile_id';
   static const _assignedPanchayatIdKey = 'assigned_panchayat_id';
   static const _assignedPanchayatNameKey = 'assigned_panchayat_name';
+  static const _assignedDistrictNameKey = 'assigned_district_name';
 
   static Future<AuthSession?> getSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -76,6 +83,7 @@ class AuthService {
       officerProfileId: prefs.getString(_officerProfileIdKey),
       assignedPanchayatId: prefs.getInt(_assignedPanchayatIdKey),
       assignedPanchayatName: prefs.getString(_assignedPanchayatNameKey),
+      assignedDistrictName: prefs.getString(_assignedDistrictNameKey),
     );
   }
 
@@ -94,6 +102,7 @@ class AuthService {
     String? officerProfileId,
     int? assignedPanchayatId,
     String? assignedPanchayatName,
+    String? assignedDistrictName,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -137,11 +146,18 @@ class AuthService {
     } else {
       await prefs.remove(_assignedPanchayatNameKey);
     }
+
+    if (assignedDistrictName != null) {
+      await prefs.setString(_assignedDistrictNameKey, assignedDistrictName);
+    } else {
+      await prefs.remove(_assignedDistrictNameKey);
+    }
   }
 
   static Future<void> persistAssignedPanchayat({
     int? id,
     String? name,
+    String? districtName,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (id != null) {
@@ -150,6 +166,10 @@ class AuthService {
     final value = name?.trim();
     if (value != null && value.isNotEmpty) {
       await prefs.setString(_assignedPanchayatNameKey, value);
+    }
+    final district = districtName?.trim();
+    if (district != null && district.isNotEmpty) {
+      await prefs.setString(_assignedDistrictNameKey, district);
     }
   }
 
@@ -175,5 +195,6 @@ class AuthService {
     await prefs.remove(_officerProfileIdKey);
     await prefs.remove(_assignedPanchayatIdKey);
     await prefs.remove(_assignedPanchayatNameKey);
+    await prefs.remove(_assignedDistrictNameKey);
   }
 }

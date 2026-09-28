@@ -32,6 +32,36 @@ extension SurveyConditionLabel on SurveyCondition {
   }
 }
 
+/// One row of the survey's review-chain audit trail (see
+/// AssetSurveyController::applyTransition()) - who acted, what they did,
+/// and when. 'reviewed'/'forwarded' are reused across stages; [actorRole]
+/// disambiguates which stage a given row belongs to.
+class SurveyReview {
+  const SurveyReview({
+    required this.actorRole,
+    required this.action,
+    this.actorName,
+    this.remarks,
+    this.createdAt,
+  });
+
+  final String? actorName;
+  final String actorRole;
+  final String action;
+  final String? remarks;
+  final DateTime? createdAt;
+
+  factory SurveyReview.fromJson(Map<String, dynamic> json) {
+    return SurveyReview(
+      actorName: json['actorName'] as String?,
+      actorRole: (json['actorRole'] as String? ?? '').toLowerCase(),
+      action: json['action'] as String? ?? '',
+      remarks: json['remarks'] as String?,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+    );
+  }
+}
+
 class Survey {
   const Survey({
     required this.id,
@@ -58,6 +88,7 @@ class Survey {
     this.panchayatId,
     this.rejectionReason,
     this.requiresTechnicalReview = true,
+    this.reviews = const [],
   });
 
   final String id;
@@ -88,8 +119,11 @@ class Survey {
   /// when false, a ddpo_approved survey goes straight to CEO-ZP.
   final bool requiresTechnicalReview;
 
+  final List<SurveyReview> reviews;
+
   factory Survey.fromJson(Map<String, dynamic> json) {
     final photos = json['photoUrls'] as List<dynamic>? ?? const [];
+    final reviews = json['reviews'] as List<dynamic>? ?? const [];
     return Survey(
       id: json['id'] as String? ?? '',
       assetId: json['assetId'] as String? ?? '',
@@ -122,6 +156,9 @@ class Survey {
       rejectionReason: json['rejectionReason'] as String?,
       requiresTechnicalReview:
           json['requiresTechnicalReview'] as bool? ?? true,
+      reviews: reviews
+          .map((e) => SurveyReview.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

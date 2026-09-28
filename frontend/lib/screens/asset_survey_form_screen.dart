@@ -111,12 +111,14 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
     final session = await AuthService.getSession();
     var assignedId = session?.assignedPanchayatId;
     var assignedName = session?.assignedPanchayatName;
+    var assignedDistrict = session?.assignedDistrictName;
     var serverRole = session?.serverRole;
     var isCplo = FieldStaffCopy.isCplo(serverRole) ||
         session?.role == UserRole.cplo;
 
     if (assignedId == null ||
         (assignedName == null || assignedName.isEmpty) ||
+        (assignedDistrict == null || assignedDistrict.isEmpty) ||
         serverRole == null) {
       try {
         final profile = await AuthApi.getProfile();
@@ -124,12 +126,16 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
         assignedName = (assignedName == null || assignedName.isEmpty)
             ? profile.panchayatName
             : assignedName;
+        assignedDistrict = (assignedDistrict == null || assignedDistrict.isEmpty)
+            ? profile.districtName
+            : assignedDistrict;
         serverRole ??= profile.role;
         isCplo = FieldStaffCopy.isCplo(serverRole) || isCplo;
         await AuthService.persistServerRole(profile.role);
         await AuthService.persistAssignedPanchayat(
           id: assignedId,
           name: assignedName,
+          districtName: assignedDistrict,
         );
       } catch (_) {}
     }
@@ -146,6 +152,14 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
           (widget.existingSurvey == null ||
               _gpController.text.trim().isEmpty)) {
         _gpController.text = assignedName;
+      }
+      // Same reasoning as the panchayat override above - authoritative,
+      // and not dependent on the phone's own (often wrong) reverse-geocoder.
+      if (assignedDistrict != null &&
+          assignedDistrict.isNotEmpty &&
+          (widget.existingSurvey == null ||
+              _districtController.text.trim().isEmpty)) {
+        _districtController.text = assignedDistrict;
       }
     });
     if (_assignmentMissing) {
@@ -304,9 +318,9 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
         return;
       }
 
-      String? detectedVillage;
-      String? detectedPanchayat;
-      String? detectedDistrict;
+      String? nativeVillage;
+      String? nativePanchayat;
+      String? nativeDistrict;
       try {
         final placemarks = await Geocoding().placemarkFromCoordinates(
           position.latitude,
@@ -314,13 +328,13 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
         );
         if (placemarks.isNotEmpty) {
           final place = placemarks.first;
-          detectedVillage = (place.subLocality?.trim().isNotEmpty ?? false)
+          nativeVillage = (place.subLocality?.trim().isNotEmpty ?? false)
               ? place.subLocality!.trim()
               : place.locality?.trim();
-          detectedPanchayat = (place.locality?.trim().isNotEmpty ?? false)
+          nativePanchayat = (place.locality?.trim().isNotEmpty ?? false)
               ? place.locality!.trim()
-              : detectedVillage;
-          detectedDistrict =
+              : nativeVillage;
+          nativeDistrict =
               (place.subAdministrativeArea?.trim().isNotEmpty ?? false)
               ? place.subAdministrativeArea!.trim()
               : place.administrativeArea?.trim();
@@ -329,20 +343,30 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
         // Native reverse geocoding is unavailable on Flutter web.
       }
 
-      if (detectedVillage == null ||
-          detectedPanchayat == null ||
-          detectedDistrict == null) {
-        try {
-          final location = await LocationApi.reverse(
-            latitude: position.latitude,
-            longitude: position.longitude,
-          );
-          detectedVillage ??= location?.village;
-          detectedPanchayat ??= location?.panchayat;
-          detectedDistrict ??= location?.district;
-        } catch (_) {
-          // Coordinates remain usable when the online lookup is unavailable.
-        }
+      // The phone's own reverse-geocoder is frequently wrong here - not just
+      // the district-vs-division mixup (e.g. "Hisar Division" for a village
+      // in Jind), but also village/panchayat, where it often names whatever
+      // large landmark or institution the GPS point happens to fall inside
+      // (e.g. "Haryana Agricultural University's ...") instead of the actual
+      // revenue village. The backend's own LGD-boundary lookup is
+      // authoritative for all three whenever it resolves; native geocoding
+      // is only the fallback when the backend lookup is unavailable.
+      String? detectedVillage;
+      String? detectedPanchayat;
+      String? detectedDistrict;
+      try {
+        final location = await LocationApi.reverse(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        detectedVillage = location?.village ?? nativeVillage;
+        detectedPanchayat = location?.panchayat ?? nativePanchayat;
+        detectedDistrict = location?.district ?? nativeDistrict;
+      } catch (_) {
+        // Coordinates remain usable when the online lookup is unavailable.
+        detectedVillage = nativeVillage;
+        detectedPanchayat = nativePanchayat;
+        detectedDistrict = nativeDistrict;
       }
 
       if (!mounted) return;

@@ -62,6 +62,7 @@ class StaffLoginResult {
     this.officerProfileId,
     this.assignedPanchayatId,
     this.assignedPanchayatName,
+    this.assignedDistrictName,
   });
 
   final String token;
@@ -78,6 +79,10 @@ class StaffLoginResult {
   /// CPLO (see CploManagementPage on the admin side).
   final int? assignedPanchayatId;
   final String? assignedPanchayatName;
+
+  /// The assigned panchayat's own district - authoritative for the survey
+  /// form's District field (see AssetSurveyFormScreen).
+  final String? assignedDistrictName;
 }
 
 class UserProfile {
@@ -221,6 +226,7 @@ class AuthApi {
     final role = (user['role'] as String? ?? 'department_officer')
         .toLowerCase();
     final panchayat = user['panchayat'] as Map<String, dynamic>?;
+    final district = user['district'] as Map<String, dynamic>?;
     return StaffLoginResult(
       token: body['token'] as String? ?? '',
       id: user['id']?.toString() ?? '',
@@ -233,6 +239,7 @@ class AuthApi {
       officerProfileId: user['id']?.toString(),
       assignedPanchayatId: int.tryParse(panchayat?['id']?.toString() ?? ''),
       assignedPanchayatName: panchayat?['name'] as String?,
+      assignedDistrictName: district?['name'] as String?,
     );
   }
 

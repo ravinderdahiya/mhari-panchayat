@@ -184,6 +184,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
           MaterialPageRoute<void>(
             builder: (_) => AssetDetailsScreen(
               assetId: survey.id,
+              survey: survey,
               onUpdateSurvey: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => AssetSurveyFormScreen(

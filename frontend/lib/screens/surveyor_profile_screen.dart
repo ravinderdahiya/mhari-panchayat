@@ -136,18 +136,8 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
           label: 'Panchayat',
           value: profile!.panchayatName!,
         ),
-      if ((profile?.memberId ?? '').isNotEmpty)
-        _InfoRowData(
-          icon: Icons.credit_card_rounded,
-          label: 'Member ID',
-          value: profile!.memberId!,
-        ),
-      if ((profile?.familyId ?? '').isNotEmpty)
-        _InfoRowData(
-          icon: Icons.groups_rounded,
-          label: 'Family ID',
-          value: profile!.familyId!,
-        ),
+      // Member ID / Family ID intentionally not shown - personal
+      // identifiers, no reason to surface them on this screen.
       _InfoRowData(
         icon: Icons.fact_check_rounded,
         label: 'Total Surveys Submitted',
