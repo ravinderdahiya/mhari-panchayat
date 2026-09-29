@@ -184,7 +184,11 @@ const ACTION_API: Record<ActionKind, (id: string) => Promise<unknown>> = {
 };
 
 export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysPageProps) {
-  const reviewStatus = CHILD_TO_REVIEW_STATUS[childId ?? ''] ?? 'pending';
+  // 'all' has no single review_status - the fetch below omits the filter
+  // entirely so every survey shows regardless of stage, same as MySurveysPage's
+  // own "All" filter for a surveyor's own list.
+  const isAll = childId === 'all';
+  const reviewStatus = isAll ? undefined : (CHILD_TO_REVIEW_STATUS[childId ?? ''] ?? 'pending');
 
   const [surveys, setSurveys] = useState<AssetSurvey[]>([]);
   const [selected, setSelected] = useState<AssetSurvey | null>(null);
@@ -305,8 +309,10 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
-          {REVIEW_LABEL[reviewStatus]}
-          <span className="text-[11px] font-normal text-muted">({stats.statusCounts[reviewStatus]})</span>
+          {isAll ? 'All surveys' : REVIEW_LABEL[reviewStatus!]}
+          <span className="text-[11px] font-normal text-muted">
+            ({isAll ? stats.totalSurveys : stats.statusCounts[reviewStatus!]})
+          </span>
         </h2>
       </div>
 
@@ -329,7 +335,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
 
       <div className="bg-white border border-line rounded-xl overflow-hidden">
         {loading ? <p className="p-8 text-sm text-muted text-center">Loading asset surveys…</p>
-          : surveys.length === 0 ? <p className="p-8 text-sm text-muted text-center">No {REVIEW_LABEL[reviewStatus].toLowerCase()} surveys found.</p>
+          : surveys.length === 0 ? <p className="p-8 text-sm text-muted text-center">No {isAll ? '' : `${REVIEW_LABEL[reviewStatus!].toLowerCase()} `}surveys found.</p>
           : <div className="overflow-x-auto"><table className="w-full text-left">
             <thead className="bg-cream border-b border-line text-[10px] uppercase tracking-wide text-muted"><tr>
               <th className="px-4 py-3 w-16">S.No.</th><th className="px-4 py-3">Asset</th><th className="px-4 py-3">Surveyor</th>

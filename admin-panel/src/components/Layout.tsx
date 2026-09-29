@@ -72,6 +72,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'cplo-management', label: 'Surveyor (CPLO) / Gram Sachiv', icon: UserCheck, adminOnly: true, section: 'operations' },
   { id: 'asset-surveys', label: 'Asset Surveys', icon: ListChecks, section: 'operations',
     roles: ['super_admin', 'admin', 'gram_sachiv', 'bdpo', 'ddpo', 'xen_pr', 'ceo_zp'], children: [
+    { id: 'all', label: 'All' },
     { id: 'submitted', label: 'Submitted' },
     { id: 'pending-review', label: 'Pending' },
     { id: 'returned', label: 'Returned' },
