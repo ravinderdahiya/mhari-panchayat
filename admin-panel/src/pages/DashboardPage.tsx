@@ -14,12 +14,12 @@ import { dotSymbol, diamondSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import SurveyPopupCard from '../components/SurveyPopupCard';
 import PanchayatPopupCard from '../components/PanchayatPopupCard';
-import type { AssetSurvey, Complaint, ComplaintReports, ComplaintStatus } from '../types';
+import type { AssetSurvey, Block, Complaint, ComplaintReports, ComplaintStatus, District, Tehsil, Village } from '../types';
 
 ChartJS.register(ArcElement, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
 
@@ -65,6 +65,16 @@ const SURVEY_MAP_LEGEND = [
   { label: 'Rejected', color: '#3C5E7D', statuses: ['rejected'] },
 ] as const;
 
+interface LocationSelection {
+  level: 'district' | 'tehsil' | 'block' | 'village';
+  id: number;
+  name: string;
+}
+
+const LOCATION_LEVEL_LABEL: Record<LocationSelection['level'], string> = {
+  district: 'District', tehsil: 'Tehsil', block: 'Block', village: 'Village',
+};
+
 interface DashboardPageProps {
   onNavigateToComplaints: (status: ComplaintStatus | 'All') => void;
   onNavigateToComplaint: (id: number) => void;
@@ -80,6 +90,57 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const [excludedSurveyGroups, setExcludedSurveyGroups] = useState<Set<string>>(new Set());
   const [showComplaintsLayer, setShowComplaintsLayer] = useState(true);
   const [showSurveysLayer, setShowSurveysLayer] = useState(true);
+
+  // District/Tehsil/Block/Village search - narrows both layers to one
+  // location and re-fits the map there (see the combined extent-fit effect
+  // below, which already reacts to filteredMapPoints/filteredSurveyMapPoints
+  // changing for any reason, search included).
+  const [selectedLocation, setSelectedLocation] = useState<LocationSelection | null>(null);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationSuggestOpen, setLocationSuggestOpen] = useState(false);
+  const [locationMasterLoaded, setLocationMasterLoaded] = useState(false);
+  const [districtsMaster, setDistrictsMaster] = useState<District[]>([]);
+  const [tehsilsMaster, setTehsilsMaster] = useState<Tehsil[]>([]);
+  const [blocksMaster, setBlocksMaster] = useState<Block[]>([]);
+  const [villageSuggestions, setVillageSuggestions] = useState<Village[]>([]);
+
+  // Districts/tehsils/blocks are small lists (well under a hundred rows) -
+  // fine to load once, in full, the first time the search box is used.
+  // Villages number in the thousands (see SurveyorsPage's own note on this),
+  // so those are searched server-side instead, below.
+  const loadLocationMaster = () => {
+    if (locationMasterLoaded) return;
+    setLocationMasterLoaded(true);
+    Promise.all([
+      api.masterApi('districts').list(),
+      api.masterApi('tehsils').list(),
+      api.masterApi('blocks').list(),
+    ])
+      .then(([d, t, b]) => {
+        setDistrictsMaster(d.items || []);
+        setTehsilsMaster(t.items || []);
+        setBlocksMaster(b.items || []);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    const q = locationQuery.trim();
+    if (q.length < 2) {
+      setVillageSuggestions([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      api.masterApi('villages').list({ search: q })
+        .then((res) => { if (!cancelled) setVillageSuggestions((res.items || []).slice(0, 8)); })
+        .catch(() => {});
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [locationQuery]);
 
   useEffect(() => {
     api.getComplaintReports()
@@ -111,15 +172,39 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     [mapPoints],
   );
   const groupOf = (status: string) => MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
+  // Tehsil has no equivalent on AssetSurvey (see LocationSelection's block
+  // below) - a tehsil search correctly narrows surveys to zero rather than
+  // guessing, since the data genuinely doesn't carry that link.
+  const complaintMatchesLocation = (c: Complaint): boolean => {
+    if (!selectedLocation) return true;
+    switch (selectedLocation.level) {
+      case 'district': return c.district_id === selectedLocation.id;
+      case 'tehsil': return c.tehsil_id === selectedLocation.id;
+      case 'block': return c.panchayatMaster?.block_id === selectedLocation.id;
+      case 'village': return c.village_id === selectedLocation.id;
+    }
+  };
+  const surveyMatchesLocation = (s: AssetSurvey): boolean => {
+    if (!selectedLocation) return true;
+    switch (selectedLocation.level) {
+      case 'district': return s.districtId === selectedLocation.id;
+      case 'tehsil': return false;
+      case 'block': return s.blockId === selectedLocation.id;
+      // AssetSurvey has no village_id, only the free-text name captured at
+      // submission time - name match is the best available link.
+      case 'village': return s.village.trim().toLowerCase() === selectedLocation.name.trim().toLowerCase();
+    }
+  };
+
   const filteredMapPoints = showComplaintsLayer ? mapPoints.filter(
-    (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category?.name ?? 'Uncategorised'),
+    (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category?.name ?? 'Uncategorised') && complaintMatchesLocation(c),
   ) : [];
 
   const surveyMapPoints = surveys.filter((s) => s.latitude !== null && s.longitude !== null);
   const surveyGroupOf = (status: string) =>
     SURVEY_MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
   const filteredSurveyMapPoints = showSurveysLayer
-    ? surveyMapPoints.filter((s) => !excludedSurveyGroups.has(surveyGroupOf(s.reviewStatus)))
+    ? surveyMapPoints.filter((s) => !excludedSurveyGroups.has(surveyGroupOf(s.reviewStatus)) && surveyMatchesLocation(s))
     : [];
 
   const toggleSetMember = (set: Set<string>, setSet: (s: Set<string>) => void, value: string) => {
@@ -403,6 +488,85 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
           <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[36rem]">
             <div className="absolute inset-0">
               <ArcGISMap center={mapCenter} zoom={8} onViewReady={setView} />
+            </div>
+
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-[300px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
+                <input
+                  value={locationQuery}
+                  onFocus={() => { loadLocationMaster(); setLocationSuggestOpen(true); }}
+                  onChange={(event) => {
+                    setLocationQuery(event.target.value);
+                    setLocationSuggestOpen(true);
+                    if (selectedLocation) setSelectedLocation(null);
+                  }}
+                  placeholder="Search district, tehsil, block or village…"
+                  className="w-full pl-8 pr-8 py-2.5 text-xs bg-paper/95 backdrop-blur-sm rounded-xl shadow-xl border border-line/70 outline-none focus:ring-2 focus:ring-accent/40"
+                />
+                {(locationQuery || selectedLocation) && (
+                  <button
+                    onClick={() => { setSelectedLocation(null); setLocationQuery(''); setLocationSuggestOpen(false); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer"
+                    aria-label="Clear location search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {locationSuggestOpen && locationQuery.trim().length >= 1 && !selectedLocation && (() => {
+                const q = locationQuery.trim().toLowerCase();
+                const districtMatches = districtsMaster.filter((d) => d.name.toLowerCase().includes(q)).slice(0, 5);
+                const tehsilMatches = tehsilsMaster.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
+                const blockMatches = blocksMaster.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
+                const villageMatches = villageSuggestions;
+                const groups: Array<[LocationSelection['level'], { id: number; name: string }[]]> = [
+                  ['district', districtMatches], ['tehsil', tehsilMatches],
+                  ['block', blockMatches], ['village', villageMatches],
+                ];
+                const hasAny = groups.some(([, items]) => items.length > 0);
+
+                return (
+                  <div className="mt-1.5 bg-paper rounded-xl shadow-xl border border-line/70 overflow-y-auto max-h-72">
+                    {!hasAny ? (
+                      <p className="text-xs text-muted p-3">No matches.</p>
+                    ) : groups.map(([level, items]) => items.length === 0 ? null : (
+                      <div key={level} className="py-1">
+                        <div className="text-[10px] font-bold tracking-wide text-muted px-3 pt-1.5 pb-1">
+                          {LOCATION_LEVEL_LABEL[level].toUpperCase()}
+                        </div>
+                        {items.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setSelectedLocation({ level, id: item.id, name: item.name });
+                              setLocationQuery(item.name);
+                              setLocationSuggestOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-cream cursor-pointer"
+                          >
+                            {item.name}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {selectedLocation && (
+                <div className="mt-1.5 inline-flex items-center gap-1.5 bg-accent-soft text-accent-dark text-[11px] font-semibold px-2.5 py-1.5 rounded-full shadow">
+                  {LOCATION_LEVEL_LABEL[selectedLocation.level]}: {selectedLocation.name}
+                  <button
+                    onClick={() => { setSelectedLocation(null); setLocationQuery(''); }}
+                    className="cursor-pointer hover:opacity-70"
+                    aria-label="Clear location filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2.5">

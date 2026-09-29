@@ -45,6 +45,56 @@ class GisController extends Controller
         return $this->proxy($request, self::PANCHAYAT_VECTORTILE_URL, 'harsac_gis', $path);
     }
 
+    /**
+     * Precise point-in-polygon lookup against the real panchayat boundary
+     * layer (sublayer 1, panchayat_bnd - same layer the admin dashboard's
+     * map overlays) - used by LocationController::lookup() as the geofence
+     * check's authoritative source, in place of guessing from a third-party
+     * geocoder's fuzzy village-name match. Returns null (caller falls back
+     * to name-based matching) on any GIS failure or when the point simply
+     * doesn't fall inside any published panchayat polygon.
+     *
+     * @return array{code: string, name: ?string}|null
+     */
+    public function pointInPanchayat(float $latitude, float $longitude): ?array
+    {
+        $token = $this->resolveToken('harsac_gis');
+        if (! $token) {
+            return null;
+        }
+
+        try {
+            $http = Http::timeout(15);
+            if (! app()->environment('production')) {
+                $http = $http->withOptions(['verify' => false]);
+            }
+            $response = $http->get(self::PANCHAYAT_MAPSERVER_URL.'/1/query', [
+                'f' => 'json',
+                'geometry' => "{$longitude},{$latitude}",
+                'geometryType' => 'esriGeometryPoint',
+                'inSR' => 4326,
+                'spatialRel' => 'esriSpatialRelIntersects',
+                'outFields' => 'local_body_code,localbodyname',
+                'returnGeometry' => 'false',
+                'token' => $token,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('GIS point-in-panchayat query failed', ['reason' => $exception->getMessage()]);
+
+            return null;
+        }
+
+        $attributes = $response->json('features.0.attributes');
+        if (! $attributes || empty($attributes['local_body_code'])) {
+            return null;
+        }
+
+        return [
+            'code' => (string) $attributes['local_body_code'],
+            'name' => $attributes['localbodyname'] ?? null,
+        ];
+    }
+
     private function proxy(Request $request, string $baseUrl, string $serviceKey, string $path): Response
     {
         $token = $this->resolveToken($serviceKey);

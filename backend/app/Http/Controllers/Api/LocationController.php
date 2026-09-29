@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\District;
+use App\Models\Panchayat;
 use App\Models\Tehsil;
 use App\Models\Village;
 use Illuminate\Support\Collection;
@@ -192,65 +193,113 @@ class LocationController extends Controller
         return response()->json(['location' => $this->lookup($latitude, $longitude)]);
     }
 
+    /**
+     * Third-party (Nominatim) reverse geocode, fuzzy-matched against our own
+     * hierarchy by name - kept as the source for village/tehsil detail
+     * (which the GIS boundary layer below doesn't carry), and as the sole
+     * fallback if that layer is ever unreachable. On its own, this is not
+     * precise enough to gate the field-survey geofence - see lookup().
+     *
+     * @return array<string, mixed>|null
+     */
+    private function lookupViaNominatim(float $latitude, float $longitude): ?array
+    {
+        try {
+            $response = Http::acceptJson()
+                ->withHeaders([
+                    'Accept-Language' => 'en',
+                    'User-Agent' => 'MhariPanchayat/1.0 (local-government survey app)',
+                ])
+                ->timeout(10)
+                ->get('https://nominatim.openstreetmap.org/reverse', [
+                    'format' => 'jsonv2',
+                    'lat' => $latitude,
+                    'lon' => $longitude,
+                    'addressdetails' => 1,
+                    'zoom' => 18,
+                ]);
+            $response->throw();
+        } catch (\Throwable) {
+            return null;
+        }
+        $address = $response->json('address', []);
+
+        $villageName = $address['village']
+            ?? $address['hamlet']
+            ?? $address['suburb']
+            ?? $address['town']
+            ?? $address['city']
+            ?? null;
+
+        $districtName = $address['state_district']
+            ?? $address['county']
+            ?? $address['district']
+            ?? null;
+
+        return $this->resolveHierarchy(
+            [$districtName, $address['county'] ?? null, $address['district'] ?? null],
+            [
+                $address['subdistrict'] ?? null,
+                $address['city_district'] ?? null,
+                $address['municipality'] ?? null,
+                $address['town'] ?? null,
+                $address['city'] ?? null,
+                $address['county'] ?? null,
+            ],
+            [
+                $villageName,
+                $address['hamlet'] ?? null,
+                $address['suburb'] ?? null,
+                $address['town'] ?? null,
+                $address['city'] ?? null,
+                $address['municipality'] ?? null,
+            ],
+            $address['municipality'] ?? $address['city_district'] ?? $villageName,
+        );
+    }
+
     /** @return array<string, mixed>|null */
     public function lookup(float $latitude, float $longitude): ?array
     {
         $latitude = round($latitude, 6);
         $longitude = round($longitude, 6);
-        $cacheKey = "reverse-location:v2:{$latitude}:{$longitude}";
+        // v3: now backed by the real panchayat boundary polygons, not just
+        // Nominatim name-guessing - old cached entries predate that and
+        // could still carry a wrong panchayat, so they're not reused.
+        $cacheKey = "reverse-location:v3:{$latitude}:{$longitude}";
 
         return Cache::remember($cacheKey, now()->addDays(30), function () use ($latitude, $longitude) {
-            try {
-                $response = Http::acceptJson()
-                    ->withHeaders([
-                        'Accept-Language' => 'en',
-                        'User-Agent' => 'MhariPanchayat/1.0 (local-government survey app)',
-                    ])
-                    ->timeout(10)
-                    ->get('https://nominatim.openstreetmap.org/reverse', [
-                        'format' => 'jsonv2',
-                        'lat' => $latitude,
-                        'lon' => $longitude,
-                        'addressdetails' => 1,
-                        'zoom' => 18,
-                    ]);
-                $response->throw();
-            } catch (\Throwable) {
+            $nominatim = $this->lookupViaNominatim($latitude, $longitude);
+            $gis = app(GisController::class)->pointInPanchayat($latitude, $longitude);
+
+            if (! $gis && ! $nominatim) {
                 return null;
             }
-            $address = $response->json('address', []);
 
-            $villageName = $address['village']
-                ?? $address['hamlet']
-                ?? $address['suburb']
-                ?? $address['town']
-                ?? $address['city']
-                ?? null;
+            $result = $nominatim ?? [
+                'districtId' => null, 'district' => null,
+                'tehsilId' => null, 'tehsil' => null,
+                'villageId' => null, 'village' => null,
+                'panchayatId' => null, 'panchayat' => null,
+            ];
 
-            $districtName = $address['state_district']
-                ?? $address['county']
-                ?? $address['district']
-                ?? null;
-            return $this->resolveHierarchy(
-                [$districtName, $address['county'] ?? null, $address['district'] ?? null],
-                [
-                    $address['subdistrict'] ?? null,
-                    $address['city_district'] ?? null,
-                    $address['municipality'] ?? null,
-                    $address['town'] ?? null,
-                    $address['city'] ?? null,
-                    $address['county'] ?? null,
-                ],
-                [
-                    $villageName,
-                    $address['hamlet'] ?? null,
-                    $address['suburb'] ?? null,
-                    $address['town'] ?? null,
-                    $address['city'] ?? null,
-                    $address['municipality'] ?? null,
-                ],
-                $address['municipality'] ?? $address['city_district'] ?? $villageName,
-            );
+            // The actual boundary polygon is authoritative over Nominatim's
+            // fuzzy village-name guess for panchayat/district - overrides
+            // just those fields; village/tehsil (which this layer doesn't
+            // carry) stay whatever the name-based lookup above found.
+            if ($gis) {
+                $panchayat = Panchayat::where('code', $gis['code'])->with('block.district')->first();
+                if ($panchayat) {
+                    $result['panchayatId'] = $panchayat->id;
+                    $result['panchayat'] = $panchayat->name;
+                    if ($panchayat->block?->district_id) {
+                        $result['districtId'] = $panchayat->block->district_id;
+                        $result['district'] = $panchayat->block->district?->name;
+                    }
+                }
+            }
+
+            return $result;
         });
     }
 }
