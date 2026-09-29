@@ -492,7 +492,7 @@ export default function SurveyorsPage({ onNavigateToComplaint }: SurveyorsPagePr
   if (isLoading) return <p className="text-sm text-muted">Loading…</p>;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col">
       {error && <p className="text-xs text-status-new bg-status-new/10 border border-status-new/20 rounded-lg p-2 mb-3">{error}</p>}
 
       <div className="flex items-center gap-2 mb-3">
