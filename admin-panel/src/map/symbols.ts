@@ -10,6 +10,18 @@ export function dotSymbol(color: string) {
   };
 }
 
+// Diamond, not a circle - so asset-survey markers stay visually distinct
+// from complaint markers (dotSymbol) when both layers share one map.
+export function diamondSymbol(color: string) {
+  return {
+    type: 'simple-marker' as const,
+    style: 'diamond' as const,
+    color,
+    size: 14,
+    outline: { color: 'white', width: 2 },
+  };
+}
+
 export function lineSymbolFor(color: string, opts?: { dashed?: boolean }) {
   return {
     type: 'simple-line' as const,

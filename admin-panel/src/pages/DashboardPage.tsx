@@ -10,15 +10,16 @@ import UniqueValueRenderer from '@arcgis/core/renderers/UniqueValueRenderer.js';
 import Extent from '@arcgis/core/geometry/Extent.js';
 import * as reactiveUtils from '@arcgis/core/core/reactiveUtils.js';
 import ArcGISMap from '../map/ArcGISMap';
-import { dotSymbol } from '../map/symbols';
+import { dotSymbol, diamondSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
+import SurveyPopupCard from '../components/SurveyPopupCard';
 import PanchayatPopupCard from '../components/PanchayatPopupCard';
-import type { Complaint, ComplaintReports, ComplaintStatus } from '../types';
+import type { AssetSurvey, Complaint, ComplaintReports, ComplaintStatus } from '../types';
 
 ChartJS.register(ArcElement, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
 
@@ -47,6 +48,23 @@ const MAP_LEGEND = [
   { label: 'Rejected', color: '#3C5E7D', statuses: ['Rejected'] },
 ] as const;
 
+// Asset-survey marker legend: the 13 review_status values grouped into the
+// 4 stages worth telling apart at a glance on the map (see
+// AssetSurveysPage.tsx's REVIEW_LABEL for the full per-status breakdown,
+// shown in the marker popup instead of here).
+const SURVEY_MAP_LEGEND = [
+  {
+    label: 'In Review', color: '#2a78d6', statuses: [
+      'submitted', 'pending', 'gram_sachiv_reviewed', 'gram_sachiv_approved',
+      'bdpo_reviewed', 'bdpo_forwarded', 'ddpo_reviewed', 'ddpo_approved',
+      'xen_reviewed', 'xen_forwarded',
+    ],
+  },
+  { label: 'Approved', color: '#3F6B4F', statuses: ['approved'] },
+  { label: 'Returned', color: '#C68A16', statuses: ['returned'] },
+  { label: 'Rejected', color: '#3C5E7D', statuses: ['rejected'] },
+] as const;
+
 interface DashboardPageProps {
   onNavigateToComplaints: (status: ComplaintStatus | 'All') => void;
   onNavigateToComplaint: (id: number) => void;
@@ -55,9 +73,13 @@ interface DashboardPageProps {
 export default function DashboardPage({ onNavigateToComplaints, onNavigateToComplaint }: DashboardPageProps) {
   const [reports, setReports] = useState<ComplaintReports | null>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [surveys, setSurveys] = useState<AssetSurvey[]>([]);
   const [error, setError] = useState('');
   const [excludedGroups, setExcludedGroups] = useState<Set<string>>(new Set());
   const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set());
+  const [excludedSurveyGroups, setExcludedSurveyGroups] = useState<Set<string>>(new Set());
+  const [showComplaintsLayer, setShowComplaintsLayer] = useState(true);
+  const [showSurveysLayer, setShowSurveysLayer] = useState(true);
 
   useEffect(() => {
     api.getComplaintReports()
@@ -65,6 +87,9 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       .catch((err) => setError((err as Error).message));
     api.getComplaints()
       .then(({ complaints }) => setComplaints(complaints))
+      .catch(() => {});
+    api.getAssetSurveysForMap()
+      .then(({ surveys }) => setSurveys(surveys))
       .catch(() => {});
   }, []);
 
@@ -86,9 +111,17 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     [mapPoints],
   );
   const groupOf = (status: string) => MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
-  const filteredMapPoints = mapPoints.filter(
+  const filteredMapPoints = showComplaintsLayer ? mapPoints.filter(
     (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category?.name ?? 'Uncategorised'),
-  );
+  ) : [];
+
+  const surveyMapPoints = surveys.filter((s) => s.latitude !== null && s.longitude !== null);
+  const surveyGroupOf = (status: string) =>
+    SURVEY_MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
+  const filteredSurveyMapPoints = showSurveysLayer
+    ? surveyMapPoints.filter((s) => !excludedSurveyGroups.has(surveyGroupOf(s.reviewStatus)))
+    : [];
+
   const toggleSetMember = (set: Set<string>, setSet: (s: Set<string>) => void, value: string) => {
     const next = new Set(set);
     if (next.has(value)) next.delete(value); else next.add(value);
@@ -96,14 +129,18 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   };
   const mapCenter: [number, number] = mapPoints.length
     ? [mapPoints[0].lat!, mapPoints[0].long!]
-    : [29.0588, 76.0856]; // Haryana, default when nothing has coordinates yet
+    : surveyMapPoints.length
+      ? [surveyMapPoints[0].latitude!, surveyMapPoints[0].longitude!]
+      : [29.0588, 76.0856]; // Haryana, default when nothing has coordinates yet
 
   const [view, setView] = useState<MapView | null>(null);
   const [mapLayer, setMapLayer] = useState<'imagery' | 'streets'>('imagery');
   const [filterTab, setFilterTab] = useState<'status' | 'category'>('status');
   const pointLayerRef = useRef<FeatureLayer | null>(null);
+  const surveyLayerRef = useRef<FeatureLayer | null>(null);
   const onNavigateToComplaintRef = useLatestRef(onNavigateToComplaint);
   const complaintsRef = useLatestRef(complaints);
+  const surveysRef = useLatestRef(surveys);
   const popupRootRef = useRef<{ root: Root; container: HTMLDivElement } | null>(null);
   // Unmounts the React root backing the popup's custom content, if any. The
   // popup widget only ever detaches the content node from the DOM - it never
@@ -272,22 +309,85 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     if (pointLayerRef.current) view.map.remove(pointLayerRef.current);
     view.map.add(layer);
     pointLayerRef.current = layer;
-
-    if (filteredMapPoints.length > 0) {
-      const xy = filteredMapPoints.map((c) => toArcgisXY(c.lat!, c.long!));
-      const xs = xy.map(([x]) => x);
-      const ys = xy.map(([, y]) => y);
-      const extent = new Extent({
-        xmin: Math.min(...xs), xmax: Math.max(...xs),
-        ymin: Math.min(...ys), ymax: Math.max(...ys),
-        spatialReference: { wkid: 4326 },
-      }).expand(1.2);
-      void view.goTo({ target: extent }, { duration: 300 })
-        .then(() => { if (view.zoom > 13) return view.goTo({ zoom: 13 }); })
-        .catch(() => {});
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, filteredMapPoints]);
+
+  // Rebuild the asset-survey points FeatureLayer whenever the filtered set
+  // changes - a second, independent layer sharing this same map, distinct
+  // from complaints by marker shape (diamond vs circle) as well as color.
+  useEffect(() => {
+    if (!view) return;
+
+    const graphics = filteredSurveyMapPoints.map((s) => new Graphic({
+      geometry: toArcgisPoint(s.latitude!, s.longitude!),
+      attributes: {
+        id: s.id,
+        code: s.assetId,
+        legendGroup: surveyGroupOf(s.reviewStatus),
+        assetName: s.assetName,
+      },
+    }));
+
+    const layer = new FeatureLayer({
+      source: graphics,
+      objectIdField: 'id',
+      geometryType: 'point',
+      fields: [
+        { name: 'id', type: 'oid' },
+        { name: 'code', type: 'string' },
+        { name: 'legendGroup', type: 'string' },
+        { name: 'assetName', type: 'string' },
+      ],
+      featureReduction: { type: 'cluster', clusterRadius: '80px' },
+      renderer: new UniqueValueRenderer({
+        field: 'legendGroup',
+        defaultSymbol: diamondSymbol('#64748b'),
+        uniqueValueInfos: SURVEY_MAP_LEGEND.map(({ label, color }) => ({ value: label, symbol: diamondSymbol(color) })),
+      }),
+      popupTemplate: {
+        title: 'Survey {code}',
+        content: (event) => {
+          const survey = surveysRef.current.find((s) => s.id === event.graphic.attributes.id);
+          unmountPopupRoot();
+          const container = document.createElement('div');
+          const root = createRoot(container);
+          popupRootRef.current = { root, container };
+          root.render(survey ? <SurveyPopupCard survey={survey} /> : <span className="text-xs text-muted">Survey details unavailable.</span>);
+          return container;
+        },
+      },
+    });
+
+    if (!view.map) return;
+    if (surveyLayerRef.current) view.map.remove(surveyLayerRef.current);
+    view.map.add(layer);
+    surveyLayerRef.current = layer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, filteredSurveyMapPoints]);
+
+  // Fits the view to whatever's actually visible across both layers
+  // combined - runs after both layer-rebuild effects above rather than
+  // inside either of them, so toggling one layer off doesn't fight the
+  // other's own fit-to-extent animation.
+  useEffect(() => {
+    if (!view) return;
+    const complaintXY = filteredMapPoints.map((c) => toArcgisXY(c.lat!, c.long!));
+    const surveyXY = filteredSurveyMapPoints.map((s) => toArcgisXY(s.latitude!, s.longitude!));
+    const xy = [...complaintXY, ...surveyXY];
+    if (xy.length === 0) return;
+
+    const xs = xy.map(([x]) => x);
+    const ys = xy.map(([, y]) => y);
+    const extent = new Extent({
+      xmin: Math.min(...xs), xmax: Math.max(...xs),
+      ymin: Math.min(...ys), ymax: Math.max(...ys),
+      spatialReference: { wkid: 4326 },
+    }).expand(1.2);
+    void view.goTo({ target: extent }, { duration: 300 })
+      .then(() => { if (view.zoom > 13) return view.goTo({ zoom: 13 }); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, filteredMapPoints, filteredSurveyMapPoints]);
 
   const topClosedCount = reports?.closedByPerson[0]?.count ?? 0;
   const closedTotal = reports?.closedByPerson.reduce((sum, p) => sum + p.count, 0) ?? 0;
@@ -319,6 +419,13 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
                   </div>
                 </button>
               ))}
+              <div className="bg-paper rounded-md shadow-lg px-4 py-2.5 flex items-center gap-2.5 min-w-[190px]">
+                <ClipboardList className="w-4 h-4 text-accent shrink-0" />
+                <div>
+                  <span className="font-serif font-semibold text-[15px] text-ink mr-1 tabular-nums">{surveys.length}</span>
+                  <span className="text-[12.5px] text-muted">Asset Surveys</span>
+                </div>
+              </div>
             </div>
 
             <div className="absolute top-4 right-4 z-20 w-[230px] bg-paper/95 backdrop-blur-sm rounded-2xl shadow-xl border border-line/70 overflow-hidden">
@@ -345,59 +452,114 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
 
               <div className="border-t border-line" />
 
-              <div className="p-3.5 pt-3">
-                <div className="flex gap-1 bg-cream rounded-full p-1 mb-3">
-                  <button
-                    onClick={() => setFilterTab('status')}
-                    className={`flex-1 h-7 rounded-full text-[10.5px] font-bold tracking-wide cursor-pointer transition-colors ${filterTab === 'status' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                  >
-                    STATUS
-                  </button>
-                  <button
-                    onClick={() => setFilterTab('category')}
-                    className={`flex-1 h-7 rounded-full text-[10.5px] font-bold tracking-wide cursor-pointer transition-colors ${filterTab === 'category' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                  >
-                    CATEGORY
-                  </button>
-                </div>
-
-                {filterTab === 'status' ? (
-                  <div className="space-y-0.5">
-                    {MAP_LEGEND.map(({ label, color }) => (
-                      <label key={label} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={!excludedGroups.has(label)}
-                          onChange={() => toggleSetMember(excludedGroups, setExcludedGroups, label)}
-                          className="accent-accent w-3.5 h-3.5"
-                        />
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white shadow-sm" style={{ backgroundColor: color }} />
-                        <span className="text-ink/85">{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-0.5 max-h-48 overflow-y-auto">
-                    {mapCategories.length === 0 && <p className="text-xs text-muted">No categories yet.</p>}
-                    {mapCategories.map((name) => (
-                      <label key={name} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={!excludedCategories.has(name)}
-                          onChange={() => toggleSetMember(excludedCategories, setExcludedCategories, name)}
-                          className="accent-accent w-3.5 h-3.5"
-                        />
-                        <span className="text-ink/85">{name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+              <div className="p-3.5 pb-2.5 space-y-1">
+                <label className="flex items-center gap-2 text-[12px] font-semibold cursor-pointer rounded-lg px-1.5 py-1 -mx-1.5 hover:bg-cream/70 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={showComplaintsLayer}
+                    onChange={() => setShowComplaintsLayer((v) => !v)}
+                    className="accent-accent w-3.5 h-3.5"
+                  />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-slate-400" />
+                  <span className="text-ink/85">Complaints</span>
+                </label>
+                <label className="flex items-center gap-2 text-[12px] font-semibold cursor-pointer rounded-lg px-1.5 py-1 -mx-1.5 hover:bg-cream/70 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={showSurveysLayer}
+                    onChange={() => setShowSurveysLayer((v) => !v)}
+                    className="accent-accent w-3.5 h-3.5"
+                  />
+                  <span className="w-2.5 h-2.5 rotate-45 shrink-0 bg-slate-400" />
+                  <span className="text-ink/85">Asset Surveys</span>
+                </label>
               </div>
+
+              {showComplaintsLayer && (
+                <>
+                  <div className="border-t border-line" />
+                  <div className="p-3.5 pt-3">
+                    <div className="flex gap-1 bg-cream rounded-full p-1 mb-3">
+                      <button
+                        onClick={() => setFilterTab('status')}
+                        className={`flex-1 h-7 rounded-full text-[10.5px] font-bold tracking-wide cursor-pointer transition-colors ${filterTab === 'status' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                      >
+                        STATUS
+                      </button>
+                      <button
+                        onClick={() => setFilterTab('category')}
+                        className={`flex-1 h-7 rounded-full text-[10.5px] font-bold tracking-wide cursor-pointer transition-colors ${filterTab === 'category' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                      >
+                        CATEGORY
+                      </button>
+                    </div>
+
+                    {filterTab === 'status' ? (
+                      <div className="space-y-0.5">
+                        {MAP_LEGEND.map(({ label, color }) => (
+                          <label key={label} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!excludedGroups.has(label)}
+                              onChange={() => toggleSetMember(excludedGroups, setExcludedGroups, label)}
+                              className="accent-accent w-3.5 h-3.5"
+                            />
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white shadow-sm" style={{ backgroundColor: color }} />
+                            <span className="text-ink/85">{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                        {mapCategories.length === 0 && <p className="text-xs text-muted">No categories yet.</p>}
+                        {mapCategories.map((name) => (
+                          <label key={name} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!excludedCategories.has(name)}
+                              onChange={() => toggleSetMember(excludedCategories, setExcludedCategories, name)}
+                              className="accent-accent w-3.5 h-3.5"
+                            />
+                            <span className="text-ink/85">{name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {showSurveysLayer && (
+                <>
+                  <div className="border-t border-line" />
+                  <div className="p-3.5 pt-3">
+                    <div className="text-[10.5px] font-bold tracking-wide text-muted mb-2">SURVEY STATUS</div>
+                    <div className="space-y-0.5">
+                      {SURVEY_MAP_LEGEND.map(({ label, color }) => (
+                        <label key={label} className="flex items-center gap-2 text-[12.5px] cursor-pointer rounded-lg px-1.5 py-1.5 -mx-1.5 hover:bg-cream/70 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={!excludedSurveyGroups.has(label)}
+                            onChange={() => toggleSetMember(excludedSurveyGroups, setExcludedSurveyGroups, label)}
+                            className="accent-accent w-3.5 h-3.5"
+                          />
+                          <span className="w-2.5 h-2.5 rotate-45 shrink-0 ring-2 ring-white shadow-sm" style={{ backgroundColor: color }} />
+                          <span className="text-ink/85">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
-            {(mapPoints.length === 0 || filteredMapPoints.length === 0) && (
+            {filteredMapPoints.length === 0 && filteredSurveyMapPoints.length === 0 && (
               <div className="absolute bottom-4 left-4 z-20 bg-paper rounded-md shadow-lg px-3 py-2 text-xs text-muted">
-                {mapPoints.length === 0 ? 'No complaints have location data yet.' : 'No complaints match the current filters.'}
+                {!showComplaintsLayer && !showSurveysLayer
+                  ? 'Both layers are hidden.'
+                  : mapPoints.length === 0 && surveyMapPoints.length === 0
+                    ? 'Nothing has location data yet.'
+                    : 'Nothing matches the current filters.'}
               </div>
             )}
           </div>

@@ -376,6 +376,12 @@ export const deleteAdminAssetType = (id: number) =>
   jsonRequest<{ success: boolean }>(`/api/admin/asset-types/${id}`, 'DELETE');
 
 // --- MOBILE ASSET SURVEYS ---
+// Every survey with coordinates, unpaginated, for map plotting (e.g. the
+// Dashboard's combined complaints+surveys map) - jurisdiction-scoped same as
+// the paginated list, so super_admin/admin see all of them.
+export const getAssetSurveysForMap = () =>
+  request<{ success: boolean; surveys: AssetSurvey[] }>('/api/surveys');
+
 export const getAssetSurveys = (options: {
   page?: number;
   perPage?: number;
