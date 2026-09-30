@@ -80,7 +80,7 @@ class SurveyApi {
               if (description != null && description.isNotEmpty)
                 'description': description,
               'condition': condition.wireValue,
-              'surveyDate': surveyDate.toIso8601String(),
+              'surveyDate': surveyDate.toUtc().toIso8601String(),
             });
 
       for (var i = 0; i < photos.length; i++) {
