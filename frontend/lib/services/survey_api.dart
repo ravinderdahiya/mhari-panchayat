@@ -80,7 +80,9 @@ class SurveyApi {
               if (description != null && description.isNotEmpty)
                 'description': description,
               'condition': condition.wireValue,
-              'surveyDate': surveyDate.toUtc().toIso8601String(),
+              // Backend APP_TIMEZONE is Asia/Kolkata: naive (no offset) timestamps
+              // are interpreted as IST, matching this device's local wall-clock time.
+              'surveyDate': surveyDate.toIso8601String(),
             });
 
       for (var i = 0; i < photos.length; i++) {
