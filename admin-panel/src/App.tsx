@@ -19,6 +19,7 @@ import AssetTypesPage from './pages/AssetTypesPage';
 import AssetSurveysPage from './pages/AssetSurveysPage';
 import ProjectMeetingPage from './pages/ProjectMeetingPage';
 import ProfilePage from './pages/ProfilePage';
+import FeedbackPage from './pages/FeedbackPage';
 import ComingSoon from './components/ComingSoon';
 import Layout from './components/Layout';
 import type { View } from './components/Layout';
@@ -119,6 +120,7 @@ export default function App() {
       {activeView === 'users' && <UsersPage currentUser={currentUser} />}
       {activeView === 'elected-representatives' && <ElectedRepresentativesPage />}
       {activeView === 'citizens' && <CitizensPage />}
+      {activeView === 'feedback' && <FeedbackPage />}
       {activeView === 'project-meeting' && <ProjectMeetingPage />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}

@@ -42,6 +42,7 @@ class PermissionSeeder extends Seeder
             ['key' => 'audit.view', 'label' => 'View audit logs', 'group' => 'Administration', 'roles' => $superAdmins],
             ['key' => 'workflow.manage', 'label' => 'Configure workflows', 'group' => 'Administration', 'roles' => $superAdmins],
             ['key' => 'reports.view', 'label' => 'View system reports', 'group' => 'Reports', 'roles' => $superAdmins],
+            ['key' => 'feedback.view', 'label' => 'View app feedback', 'group' => 'Feedback', 'roles' => ['admin', 'state_admin']],
         ];
     }
 

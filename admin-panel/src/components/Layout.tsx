@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
   Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, Vote,
-  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation,
+  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation, MessageCircleHeart,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'profile';
+  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'profile' | 'feedback';
 
 interface LayoutProps {
   currentUser: User;
@@ -36,6 +36,7 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
   roles?: string[];
+  permission?: string;
   section?: 'operations' | 'system';
   children?: NavChild[];
   groups?: NavGroup[];
@@ -91,6 +92,10 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'users', label: 'Users', icon: Users, adminOnly: true, section: 'operations' },
   { id: 'elected-representatives', label: 'Elected Representatives', icon: Vote, adminOnly: true, section: 'operations' },
   { id: 'citizens', label: 'Citizens', icon: UserRound, adminOnly: true, section: 'operations' },
+  // Permission-gated (not role-gated like the rest of this list) - respects
+  // whatever the Roles page grants feedback.view to, admin/state_admin by
+  // default (see PermissionSeeder), instead of a fixed role list.
+  { id: 'feedback', label: 'App Feedback', icon: MessageCircleHeart, permission: 'feedback.view', section: 'operations' },
   { id: 'roles', label: 'Roles', icon: ShieldCheck, adminOnly: true, section: 'operations' },
   { id: 'project-meeting', label: 'Project Meeting', icon: Presentation, adminOnly: true, section: 'system' },
   { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true, section: 'system' },
@@ -111,6 +116,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   users: 'Manage admin users and access',
   'elected-representatives': 'Zila Parishad, Panchayat Samiti and Panch directory',
   citizens: 'Mobile app citizen registrations',
+  feedback: 'Feedback shared by staff from the mobile app',
   roles: 'Configure role-based permissions',
   'project-meeting': 'Slide-style project overview, workflows and next actions',
   settings: 'System configuration',
@@ -129,7 +135,8 @@ export default function Layout({ currentUser, activeView, activeChildId, onNavig
   const [activeChildren, setActiveChildren] = useState<Partial<Record<View, string>>>({});
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     (!item.adminOnly || !!currentUser.is_super_admin) &&
-    (!item.roles || item.roles.includes(currentUser.role)));
+    (!item.roles || item.roles.includes(currentUser.role)) &&
+    (!item.permission || !!currentUser.is_super_admin || (currentUser.permissions ?? []).includes(item.permission)));
   const activeLabel = activeView === 'profile' ? 'My Profile' : NAV_ITEMS.find((item) => item.id === activeView)?.label ?? '';
   const displayName = currentUser.name || currentUser.username;
 

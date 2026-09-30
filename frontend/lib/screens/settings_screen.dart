@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/common_widgets.dart';
 import 'change_password_screen.dart';
+import 'feedback_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -195,6 +196,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           icon: Icons.policy_rounded,
                           title: _t('गोपनीयता नीति', 'Privacy policy'),
                           onTap: () {},
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _SectionLabel(_t('सहायता', 'SUPPORT')),
+                    _SettingsGroup(
+                      children: [
+                        _NavRow(
+                          icon: Icons.feedback_outlined,
+                          title: _t('App Feedback भेजें', 'Send App Feedback'),
+                          onTap: () => push(context, const FeedbackScreen()),
                         ),
                       ],
                     ),

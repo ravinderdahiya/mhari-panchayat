@@ -18,14 +18,12 @@ const EMPTY_PAGINATION: MasterPagination = {
   to: null,
 };
 
-// This tab covers both the imported `cplo` role (one per Gram Panchayat,
-// already panchayat-scoped from ImportHaryanaOfficials) and any `surveyor`
-// who has been given a single panchayat to act as CPLO - restricting them
-// (via the existing department-assignment scoping) to Panchayati Raj asset
-// surveys for that panchayat. Most plain surveyors won't have a panchayat
-// set at all.
+// Strictly role-exclusive: this tab is the `cplo` role only (one per Gram
+// Panchayat, already panchayat-scoped from ImportHaryanaOfficials) - plain
+// `surveyor` accounts never appear here, even if one has been given a
+// panchayat. Manage surveyors from the separate Surveyors page instead.
 const TABS = [
-  { roles: ['cplo', 'surveyor'], label: 'Surveyor (CPLO)', hint: 'CPLOs and Surveyors acting as CPLO - scoped to Panchayati Raj surveys for their assigned panchayat only.' },
+  { roles: ['cplo'], label: 'Surveyor (CPLO)', hint: 'CPLOs - scoped to Panchayati Raj surveys for their assigned panchayat only.' },
   { roles: ['gram_sachiv'], label: 'Gram Sachiv', hint: 'Verifies (approves/rejects) surveys submitted for their assigned panchayat.' },
 ] as const;
 
@@ -372,7 +370,7 @@ export default function CploManagementPage() {
         ) : users.length === 0 ? (
           <p className="text-sm text-muted p-6 text-center">
             {activeLabel === TABS[0].label
-              ? 'No CPLOs or surveyors match your filters. Assign the cplo/surveyor role from the Users page, then set a panchayat here to have them act as CPLO.'
+              ? 'No CPLOs match your filters. Assign the cplo role from the Users page, then set a panchayat here.'
               : 'No Gram Sachiv accounts match your filters. Assign the role from the Users page, then set their panchayat here.'}
           </p>
         ) : (

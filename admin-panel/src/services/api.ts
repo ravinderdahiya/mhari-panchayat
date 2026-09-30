@@ -1,4 +1,4 @@
-import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, ElectedRepresentative, RolePermissionMatrix, User, VillageAsset } from '../types';
+import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, ElectedRepresentative, Feedback, RolePermissionMatrix, User, VillageAsset } from '../types';
 
 // 127.0.0.1, not localhost - on this machine "localhost" resolves to ::1
 // first, and the dev server only listens on IPv4, so every request pays a
@@ -392,6 +392,12 @@ export const getLocationExtent = (level: 'district' | 'tehsil' | 'block' | 'panc
 // the paginated list, so super_admin/admin see all of them.
 export const getAssetSurveysForMap = () =>
   request<{ success: boolean; surveys: AssetSurvey[] }>('/api/surveys');
+
+// App feedback shared by staff from the mobile app - gated by
+// permission:feedback.view server-side (admin/state_admin/super_admin by
+// default, see PermissionSeeder).
+export const getFeedback = () =>
+  request<{ success: boolean; feedback: Feedback[] }>('/api/feedback');
 
 export const getAssetSurveys = (options: {
   page?: number;

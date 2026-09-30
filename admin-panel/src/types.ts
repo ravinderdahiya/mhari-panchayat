@@ -300,6 +300,20 @@ export interface VillageAsset {
   created_at: string;
 }
 
+export type FeedbackCategory = 'bug' | 'suggestion' | 'complaint' | 'general';
+
+export interface Feedback {
+  id: number;
+  category: FeedbackCategory;
+  rating: number | null;
+  message: string;
+  photoUrl: string | null;
+  userId: number;
+  userName: string | null;
+  userRole: string;
+  createdAt: string;
+}
+
 // CPLO/surveyor -> Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset
 // types only) -> CEO-ZP approval chain. Every non-terminal stage is a
 // review-then-forward pair: the actor marks their own work reviewed (the
