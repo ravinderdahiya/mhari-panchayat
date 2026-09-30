@@ -56,6 +56,7 @@ Route::get('/gis/panchayat-vector/{path?}', [GisController::class, 'proxyPanchay
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/reverse', [LocationController::class, 'reverse']);
     Route::get('/location/resolve', [LocationController::class, 'resolve']);
+    Route::get('/location/extent', [LocationController::class, 'extent']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);

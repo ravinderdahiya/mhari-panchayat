@@ -95,6 +95,61 @@ class GisController extends Controller
         ];
     }
 
+    /**
+     * Combined bounding box of one or more panchayats, by their LGD code -
+     * used by LocationController::extent() to zoom the dashboard map to a
+     * searched District/Tehsil/Block/Village even when it has zero
+     * complaints/surveys to derive an extent from otherwise.
+     *
+     * @param  list<string>  $codes
+     * @return array{xmin: float, ymin: float, xmax: float, ymax: float}|null
+     */
+    public function extentForPanchayatCodes(array $codes): ?array
+    {
+        $codes = array_values(array_unique(array_filter($codes)));
+        if ($codes === []) {
+            return null;
+        }
+
+        $token = $this->resolveToken('harsac_gis');
+        if (! $token) {
+            return null;
+        }
+
+        $where = 'local_body_code IN ('.implode(',', array_map(
+            fn ($code) => "'".addslashes($code)."'",
+            $codes
+        )).')';
+
+        try {
+            $http = Http::timeout(20);
+            if (! app()->environment('production')) {
+                $http = $http->withOptions(['verify' => false]);
+            }
+            $response = $http->get(self::PANCHAYAT_MAPSERVER_URL.'/1/query', [
+                'f' => 'json',
+                'where' => $where,
+                'outSR' => 4326,
+                'returnExtentOnly' => 'true',
+                'token' => $token,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('GIS extent query failed', ['reason' => $exception->getMessage()]);
+
+            return null;
+        }
+
+        $extent = $response->json('extent');
+        if (! $extent || ! isset($extent['xmin'], $extent['ymin'], $extent['xmax'], $extent['ymax'])) {
+            return null;
+        }
+
+        return [
+            'xmin' => (float) $extent['xmin'], 'ymin' => (float) $extent['ymin'],
+            'xmax' => (float) $extent['xmax'], 'ymax' => (float) $extent['ymax'],
+        ];
+    }
+
     private function proxy(Request $request, string $baseUrl, string $serviceKey, string $path): Response
     {
         $token = $this->resolveToken($serviceKey);

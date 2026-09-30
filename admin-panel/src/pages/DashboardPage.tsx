@@ -6,11 +6,13 @@ import type MapView from '@arcgis/core/views/MapView.js';
 import Graphic from '@arcgis/core/Graphic.js';
 import FeatureLayer from '@arcgis/core/layers/FeatureLayer.js';
 import MapImageLayer from '@arcgis/core/layers/MapImageLayer.js';
+import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer.js';
+import Polygon from '@arcgis/core/geometry/Polygon.js';
 import UniqueValueRenderer from '@arcgis/core/renderers/UniqueValueRenderer.js';
 import Extent from '@arcgis/core/geometry/Extent.js';
 import * as reactiveUtils from '@arcgis/core/core/reactiveUtils.js';
 import ArcGISMap from '../map/ArcGISMap';
-import { dotSymbol, diamondSymbol } from '../map/symbols';
+import { dotSymbol, diamondSymbol, highlightFillSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
@@ -19,7 +21,7 @@ import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import SurveyPopupCard from '../components/SurveyPopupCard';
 import PanchayatPopupCard from '../components/PanchayatPopupCard';
-import type { AssetSurvey, Block, Complaint, ComplaintReports, ComplaintStatus, District, Tehsil, Village } from '../types';
+import type { AssetSurvey, Block, Complaint, ComplaintReports, ComplaintStatus, District, Panchayat, Tehsil, Village } from '../types';
 
 ChartJS.register(ArcElement, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
 
@@ -66,13 +68,13 @@ const SURVEY_MAP_LEGEND = [
 ] as const;
 
 interface LocationSelection {
-  level: 'district' | 'tehsil' | 'block' | 'village';
+  level: 'district' | 'tehsil' | 'block' | 'panchayat' | 'village';
   id: number;
   name: string;
 }
 
 const LOCATION_LEVEL_LABEL: Record<LocationSelection['level'], string> = {
-  district: 'District', tehsil: 'Tehsil', block: 'Block', village: 'Village',
+  district: 'District', tehsil: 'Tehsil', block: 'Block', panchayat: 'Panchayat', village: 'Village',
 };
 
 interface DashboardPageProps {
@@ -103,11 +105,12 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const [tehsilsMaster, setTehsilsMaster] = useState<Tehsil[]>([]);
   const [blocksMaster, setBlocksMaster] = useState<Block[]>([]);
   const [villageSuggestions, setVillageSuggestions] = useState<Village[]>([]);
+  const [panchayatSuggestions, setPanchayatSuggestions] = useState<Panchayat[]>([]);
 
   // Districts/tehsils/blocks are small lists (well under a hundred rows) -
   // fine to load once, in full, the first time the search box is used.
-  // Villages number in the thousands (see SurveyorsPage's own note on this),
-  // so those are searched server-side instead, below.
+  // Panchayats (~6.2k) and villages (~7k) are searched server-side instead,
+  // below (see SurveyorsPage's own note on this).
   const loadLocationMaster = () => {
     if (locationMasterLoaded) return;
     setLocationMasterLoaded(true);
@@ -128,12 +131,20 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     const q = locationQuery.trim();
     if (q.length < 2) {
       setVillageSuggestions([]);
+      setPanchayatSuggestions([]);
       return undefined;
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      api.masterApi('villages').list({ search: q })
+      // `search` is only applied server-side for paginated requests (see
+      // MasterDataController::index) - without `paginated: true` this was
+      // silently ignoring the query and returning the first 8 rows
+      // alphabetically, regardless of what was typed.
+      api.masterApi('villages').list({ search: q, paginated: true, perPage: 8, status: 'active' })
         .then((res) => { if (!cancelled) setVillageSuggestions((res.items || []).slice(0, 8)); })
+        .catch(() => {});
+      api.masterApi('panchayats').list({ search: q, paginated: true, perPage: 8, status: 'active' })
+        .then((res) => { if (!cancelled) setPanchayatSuggestions((res.items || []).slice(0, 8)); })
         .catch(() => {});
     }, 300);
     return () => {
@@ -166,46 +177,68 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const statusEntries = reports ? ALL_STATUSES.map((s) => [s, reports.byStatus[s] ?? 0] as const) : [];
   const statusTotal = statusEntries.reduce((sum, [, count]) => sum + count, 0);
 
-  const mapPoints = complaints.filter((c) => c.lat !== null && c.long !== null);
+  const mapPoints = useMemo(() => complaints.filter((c) => c.lat !== null && c.long !== null), [complaints]);
   const mapCategories = useMemo(
     () => Array.from(new Set(mapPoints.map((c) => c.category?.name ?? 'Uncategorised'))).sort(),
     [mapPoints],
   );
   const groupOf = (status: string) => MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
-  // Tehsil has no equivalent on AssetSurvey (see LocationSelection's block
-  // below) - a tehsil search correctly narrows surveys to zero rather than
-  // guessing, since the data genuinely doesn't carry that link.
+  const normName = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
+  // Complaints/surveys can be submitted without every location field
+  // resolved to a master-data ID (free-text-only entries, or a surveyor
+  // with no fixed panchayat/block) - matching by ID alone silently dropped
+  // those from search results. Falling back to a name match against
+  // whichever free-text field the entity actually has picks them back up.
+  // Block has no free-text fallback on either entity (only the resolved
+  // ID), and tehsil has no equivalent on AssetSurvey at all - both stay
+  // ID-only / unmatched rather than guessing.
   const complaintMatchesLocation = (c: Complaint): boolean => {
     if (!selectedLocation) return true;
+    const name = normName(selectedLocation.name);
     switch (selectedLocation.level) {
-      case 'district': return c.district_id === selectedLocation.id;
-      case 'tehsil': return c.tehsil_id === selectedLocation.id;
+      case 'district': return c.district_id === selectedLocation.id || normName(c.district?.name) === name;
+      case 'tehsil': return c.tehsil_id === selectedLocation.id || normName(c.tehsil?.name) === name;
       case 'block': return c.panchayatMaster?.block_id === selectedLocation.id;
-      case 'village': return c.village_id === selectedLocation.id;
+      case 'panchayat': return c.panchayat_id === selectedLocation.id || normName(c.panchayat) === name;
+      case 'village': return c.village_id === selectedLocation.id || normName(c.village) === name;
     }
   };
   const surveyMatchesLocation = (s: AssetSurvey): boolean => {
     if (!selectedLocation) return true;
+    const name = normName(selectedLocation.name);
     switch (selectedLocation.level) {
-      case 'district': return s.districtId === selectedLocation.id;
+      case 'district': return s.districtId === selectedLocation.id || normName(s.district) === name;
       case 'tehsil': return false;
       case 'block': return s.blockId === selectedLocation.id;
-      // AssetSurvey has no village_id, only the free-text name captured at
-      // submission time - name match is the best available link.
-      case 'village': return s.village.trim().toLowerCase() === selectedLocation.name.trim().toLowerCase();
+      case 'panchayat': return s.panchayatId === selectedLocation.id || normName(s.panchayat) === name;
+      case 'village': return normName(s.village) === name;
     }
   };
 
-  const filteredMapPoints = showComplaintsLayer ? mapPoints.filter(
-    (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category?.name ?? 'Uncategorised') && complaintMatchesLocation(c),
-  ) : [];
+  // Memoized so this only produces a new array (and re-triggers the map
+  // effects below, including the extent-fit one) when something that
+  // actually changes the result changes - not on every unrelated re-render
+  // (e.g. typing in the location search box before selecting anything),
+  // which was re-firing the extent-fit effect and re-issuing view.goTo()
+  // mid-animation, unpredictably interrupting its own zoom.
+  const filteredMapPoints = useMemo(
+    () => showComplaintsLayer ? mapPoints.filter(
+      (c) => !excludedGroups.has(groupOf(c.status)) && !excludedCategories.has(c.category?.name ?? 'Uncategorised') && complaintMatchesLocation(c),
+    ) : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mapPoints, showComplaintsLayer, excludedGroups, excludedCategories, selectedLocation],
+  );
 
-  const surveyMapPoints = surveys.filter((s) => s.latitude !== null && s.longitude !== null);
+  const surveyMapPoints = useMemo(() => surveys.filter((s) => s.latitude !== null && s.longitude !== null), [surveys]);
   const surveyGroupOf = (status: string) =>
     SURVEY_MAP_LEGEND.find((g) => (g.statuses as readonly string[]).includes(status))?.label ?? 'Other';
-  const filteredSurveyMapPoints = showSurveysLayer
-    ? surveyMapPoints.filter((s) => !excludedSurveyGroups.has(surveyGroupOf(s.reviewStatus)) && surveyMatchesLocation(s))
-    : [];
+  const filteredSurveyMapPoints = useMemo(
+    () => showSurveysLayer
+      ? surveyMapPoints.filter((s) => !excludedSurveyGroups.has(surveyGroupOf(s.reviewStatus)) && surveyMatchesLocation(s))
+      : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [surveyMapPoints, showSurveysLayer, excludedSurveyGroups, selectedLocation],
+  );
 
   const toggleSetMember = (set: Set<string>, setSet: (s: Set<string>) => void, value: string) => {
     const next = new Set(set);
@@ -223,6 +256,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const [filterTab, setFilterTab] = useState<'status' | 'category'>('status');
   const pointLayerRef = useRef<FeatureLayer | null>(null);
   const surveyLayerRef = useRef<FeatureLayer | null>(null);
+  const highlightLayerRef = useRef<GraphicsLayer | null>(null);
   const onNavigateToComplaintRef = useLatestRef(onNavigateToComplaint);
   const complaintsRef = useLatestRef(complaints);
   const surveysRef = useLatestRef(surveys);
@@ -322,6 +356,48 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
+
+  // The boundary layer above renders every panchayat in the same thin
+  // orange line, so a search result doesn't visually stand out among its
+  // neighbours - this draws just the searched District/Tehsil/Block/Village's
+  // real boundary polygon(s) on top, in a distinct highlight colour.
+  useEffect(() => {
+    if (!view?.map) return undefined;
+    const layer = new GraphicsLayer();
+    view.map.add(layer);
+    highlightLayerRef.current = layer;
+    return () => {
+      if (view.map) view.map.remove(layer);
+      highlightLayerRef.current = null;
+    };
+  }, [view]);
+
+  useEffect(() => {
+    const layer = highlightLayerRef.current;
+    if (!layer) return undefined;
+    layer.removeAll();
+    if (!selectedLocation) return undefined;
+
+    let cancelled = false;
+    api.getLocationExtent(selectedLocation.level, selectedLocation.id)
+      .then(async (res) => {
+        if (cancelled || !res.codes?.length) return;
+        const where = `local_body_code IN (${res.codes.map((code) => `'${code.replace(/'/g, "''")}'`).join(',')})`;
+        const url = `${api.gisPanchayatMapServerUrl}/1/query?f=json&outSR=4326&returnGeometry=true&outFields=local_body_code&where=${encodeURIComponent(where)}`;
+        const response = await fetch(url);
+        const body: { features?: { geometry?: { rings?: number[][][] } }[] } = await response.json();
+        if (cancelled) return;
+        const graphics = (body.features ?? [])
+          .filter((feature): feature is { geometry: { rings: number[][][] } } => Boolean(feature.geometry?.rings))
+          .map((feature) => new Graphic({
+            geometry: new Polygon({ rings: feature.geometry.rings, spatialReference: { wkid: 4326 } }),
+            symbol: highlightFillSymbol(),
+          }));
+        layer.addMany(graphics);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [view, selectedLocation]);
 
   // Register the popup's "View Details" action handler once per view, and
   // unmount the React root backing the popup's custom content whenever it
@@ -456,23 +532,48 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   // other's own fit-to-extent animation.
   useEffect(() => {
     if (!view) return;
+
+    const goToBox = (xmin: number, xmax: number, ymin: number, ymax: number) => {
+      // A single matching point (or a location with a degenerately small
+      // boundary) makes a zero-width/zero-height extent - expand(1.2)
+      // leaves that at zero too (1.2x nothing is still nothing), so goTo
+      // has no visible effect. Pad it manually first so there's always
+      // something to expand and zoom to. WGS84 degrees (see toArcgisXY),
+      // not meters - 0.01deg is roughly a 1km pad at Haryana's latitude.
+      if (xmax - xmin < 0.001) { xmin -= 0.01; xmax += 0.01; }
+      if (ymax - ymin < 0.001) { ymin -= 0.01; ymax += 0.01; }
+      const extent = new Extent({ xmin, xmax, ymin, ymax, spatialReference: { wkid: 4326 } }).expand(1.2);
+      void view.goTo({ target: extent }, { duration: 300 })
+        .then(() => { if (view.zoom > 13) return view.goTo({ zoom: 13 }); })
+        .catch(() => {});
+    };
+
     const complaintXY = filteredMapPoints.map((c) => toArcgisXY(c.lat!, c.long!));
     const surveyXY = filteredSurveyMapPoints.map((s) => toArcgisXY(s.latitude!, s.longitude!));
     const xy = [...complaintXY, ...surveyXY];
-    if (xy.length === 0) return;
 
-    const xs = xy.map(([x]) => x);
-    const ys = xy.map(([, y]) => y);
-    const extent = new Extent({
-      xmin: Math.min(...xs), xmax: Math.max(...xs),
-      ymin: Math.min(...ys), ymax: Math.max(...ys),
-      spatialReference: { wkid: 4326 },
-    }).expand(1.2);
-    void view.goTo({ target: extent }, { duration: 300 })
-      .then(() => { if (view.zoom > 13) return view.goTo({ zoom: 13 }); })
+    if (xy.length > 0) {
+      const xs = xy.map(([x]) => x);
+      const ys = xy.map(([, y]) => y);
+      goToBox(Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys));
+      return;
+    }
+
+    // No complaints/surveys matched (a real possibility for a location that
+    // just hasn't had anything reported yet) - fall back to the searched
+    // location's own real boundary extent, so the search still navigates
+    // there instead of silently doing nothing.
+    if (!selectedLocation) return;
+    let cancelled = false;
+    api.getLocationExtent(selectedLocation.level, selectedLocation.id)
+      .then((res) => {
+        if (cancelled || !res.extent) return;
+        goToBox(res.extent.xmin, res.extent.xmax, res.extent.ymin, res.extent.ymax);
+      })
       .catch(() => {});
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, filteredMapPoints, filteredSurveyMapPoints]);
+  }, [view, filteredMapPoints, filteredSurveyMapPoints, selectedLocation]);
 
   const topClosedCount = reports?.closedByPerson[0]?.count ?? 0;
   const closedTotal = reports?.closedByPerson.reduce((sum, p) => sum + p.count, 0) ?? 0;
@@ -501,7 +602,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
                     setLocationSuggestOpen(true);
                     if (selectedLocation) setSelectedLocation(null);
                   }}
-                  placeholder="Search district, tehsil, block or village…"
+                  placeholder="Search district, tehsil, block, panchayat or village…"
                   className="w-full pl-8 pr-8 py-2.5 text-xs bg-paper/95 backdrop-blur-sm rounded-xl shadow-xl border border-line/70 outline-none focus:ring-2 focus:ring-accent/40"
                 />
                 {(locationQuery || selectedLocation) && (
@@ -521,9 +622,10 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
                 const tehsilMatches = tehsilsMaster.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
                 const blockMatches = blocksMaster.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
                 const villageMatches = villageSuggestions;
+                const panchayatMatches = panchayatSuggestions;
                 const groups: Array<[LocationSelection['level'], { id: number; name: string }[]]> = [
                   ['district', districtMatches], ['tehsil', tehsilMatches],
-                  ['block', blockMatches], ['village', villageMatches],
+                  ['block', blockMatches], ['panchayat', panchayatMatches], ['village', villageMatches],
                 ];
                 const hasAny = groups.some(([, items]) => items.length > 0);
 

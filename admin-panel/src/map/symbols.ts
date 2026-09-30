@@ -43,6 +43,17 @@ export function fillSymbolFor(color: string, opts?: { dashed?: boolean }) {
   };
 }
 
+// Searched District/Tehsil/Block/Village boundary, drawn over the always-on
+// (thin, uniformly orange) panchayat boundary raster layer so the one the
+// user searched for actually stands out among all its neighbours.
+export function highlightFillSymbol() {
+  return {
+    type: 'simple-fill' as const,
+    color: [34, 211, 238, 0.18],
+    outline: { color: '#22d3ee', width: 3 },
+  };
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace('#', '');
   const r = parseInt(clean.substring(0, 2), 16);

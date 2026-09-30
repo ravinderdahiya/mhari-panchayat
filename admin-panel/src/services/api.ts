@@ -376,6 +376,17 @@ export const deleteAdminAssetType = (id: number) =>
   jsonRequest<{ success: boolean }>(`/api/admin/asset-types/${id}`, 'DELETE');
 
 // --- MOBILE ASSET SURVEYS ---
+// Real boundary-polygon extent for a District/Tehsil/Block/Village (see
+// DashboardPage's location search) - used to zoom the map there even when
+// it has zero complaints/surveys of its own to derive an extent from.
+export const getLocationExtent = (level: 'district' | 'tehsil' | 'block' | 'panchayat' | 'village', id: number) =>
+  request<{
+    success: boolean;
+    extent?: { xmin: number; ymin: number; xmax: number; ymax: number };
+    codes?: string[];
+    message?: string;
+  }>(`/api/location/extent?level=${level}&id=${id}`);
+
 // Every survey with coordinates, unpaginated, for map plotting (e.g. the
 // Dashboard's combined complaints+surveys map) - jurisdiction-scoped same as
 // the paginated list, so super_admin/admin see all of them.

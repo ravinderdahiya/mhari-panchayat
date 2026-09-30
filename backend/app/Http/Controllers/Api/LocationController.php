@@ -180,6 +180,34 @@ class LocationController extends Controller
         )]);
     }
 
+    // Zooms the dashboard map to a searched District/Tehsil/Block/Village
+    // that has zero complaints/surveys of its own to derive a map extent
+    // from - resolves it to whichever panchayats fall under it, and asks
+    // GisController for their combined real boundary extent.
+    public function extent(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'level' => ['required', 'in:district,tehsil,block,panchayat,village'],
+            'id' => ['required', 'integer'],
+        ]);
+
+        $codes = match ($data['level']) {
+            'district' => Panchayat::whereHas('block', fn ($query) => $query->where('district_id', $data['id']))->pluck('code'),
+            'block' => Panchayat::where('block_id', $data['id'])->pluck('code'),
+            'tehsil' => Panchayat::whereIn('id', Village::where('tehsil_id', $data['id'])->pluck('panchayat_id')->unique())->pluck('code'),
+            'panchayat' => Panchayat::whereKey($data['id'])->pluck('code'),
+            'village' => Panchayat::whereIn('id', Village::whereKey($data['id'])->pluck('panchayat_id'))->pluck('code'),
+        };
+        $codes = $codes->filter()->values()->all();
+
+        $extent = app(GisController::class)->extentForPanchayatCodes($codes);
+        if (! $extent) {
+            return response()->json(['success' => false, 'message' => 'Boundary not found for this location', 'codes' => $codes], 404);
+        }
+
+        return response()->json(['success' => true, 'extent' => $extent, 'codes' => $codes]);
+    }
+
     public function reverse(Request $request): JsonResponse
     {
         $coordinates = $request->validate([
