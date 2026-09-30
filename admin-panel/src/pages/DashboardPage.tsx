@@ -16,7 +16,7 @@ import { dotSymbol, diamondSymbol, highlightFillSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import SurveyPopupCard from '../components/SurveyPopupCard';
@@ -92,6 +92,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const [excludedSurveyGroups, setExcludedSurveyGroups] = useState<Set<string>>(new Set());
   const [showComplaintsLayer, setShowComplaintsLayer] = useState(true);
   const [showSurveysLayer, setShowSurveysLayer] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(true);
 
   // District/Tehsil/Block/Village search - narrows both layers to one
   // location and re-fits the map there (see the combined extent-fit effect
@@ -586,7 +587,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         <p className="text-sm text-slate-400">Loading…</p>
       ) : (
         <>
-          <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[36rem]">
+          <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[48rem]">
             <div className="absolute inset-0">
               <ArcGISMap center={mapCenter} zoom={8} onViewReady={setView} />
             </div>
@@ -694,8 +695,19 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
               </div>
             </div>
 
-            <div className="absolute top-4 right-4 z-20 w-[230px] bg-paper/95 backdrop-blur-sm rounded-2xl shadow-xl border border-line/70 overflow-hidden">
-              <div className="p-3">
+            <div className="absolute top-4 right-4 z-20 flex items-start">
+              <button
+                onClick={() => setLegendOpen((v) => !v)}
+                className="mt-1 shrink-0 bg-paper/95 backdrop-blur-sm rounded-l-xl shadow-xl border border-line/70 border-r-0 w-6 h-10 flex items-center justify-center cursor-pointer hover:bg-cream/70 transition-colors"
+                aria-label={legendOpen ? 'Hide map legend' : 'Show map legend'}
+                title={legendOpen ? 'Hide legend' : 'Show legend'}
+              >
+                {legendOpen ? <ChevronRight className="w-4 h-4 text-muted" /> : <ChevronLeft className="w-4 h-4 text-muted" />}
+              </button>
+
+              <div className={`shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out ${legendOpen ? 'w-[230px]' : 'w-0'}`}>
+                <div className="w-[230px] bg-paper/95 backdrop-blur-sm rounded-2xl rounded-tl-none shadow-xl border border-line/70 overflow-hidden">
+                  <div className="p-3">
                 <div className="flex gap-1 bg-cream rounded-full p-1">
                   <button
                     onClick={() => setMapLayer('streets')}
@@ -817,6 +829,8 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
                   </div>
                 </>
               )}
+            </div>
+              </div>
             </div>
 
             {filteredMapPoints.length === 0 && filteredSurveyMapPoints.length === 0 && (
