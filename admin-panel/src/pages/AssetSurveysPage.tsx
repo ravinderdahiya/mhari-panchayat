@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, Forward, MapPin, RotateCcw, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
 import * as api from '../services/api';
+import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 import type { AssetSurvey, AssetSurveyPagination, AssetSurveyReviewStatus, AssetSurveyStats, User } from '../types';
 
 type ReviewStatus = AssetSurveyReviewStatus;
@@ -486,6 +487,7 @@ function SurveyDetails({
 }) {
   const [reasonMode, setReasonMode] = useState<'reject' | 'return' | null>(null);
   const [reason, setReason] = useState('');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const canAct = canActOnStage(currentUser, survey);
   const action = primaryActionFor(survey);
 
@@ -519,7 +521,7 @@ function SurveyDetails({
         <a href={`https://www.google.com/maps?q=${survey.latitude},${survey.longitude}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"><MapPin className="w-3.5 h-3.5" /> Open GPS location</a>
         <div><p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted mb-2"><Camera className="w-3.5 h-3.5" /> Survey photos ({survey.photoUrls.length})</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{survey.photoUrls.map((url, index) =>
-            <a key={url} href={api.mediaUrl(url)} target="_blank" rel="noreferrer" className="block aspect-[4/3] rounded-lg overflow-hidden border border-line bg-cream"><img src={api.mediaUrl(url)} alt={`Survey ${index + 1}`} className="w-full h-full object-cover" /></a>)}</div>
+            <PhotoThumbnail key={url} url={api.mediaUrl(url)} label={`Photo ${index + 1}`} onView={setLightboxUrl} />)}</div>
         </div>
 
         {survey.reviews.length > 0 && (
@@ -578,6 +580,7 @@ function SurveyDetails({
         )}
       </div>
     </div>
+    <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
   </div>;
 }
 
