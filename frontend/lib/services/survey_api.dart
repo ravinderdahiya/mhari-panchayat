@@ -80,7 +80,12 @@ class SurveyApi {
               if (description != null && description.isNotEmpty)
                 'description': description,
               'condition': condition.wireValue,
-              'surveyDate': surveyDate.toIso8601String(),
+              // .toUtc() first - a bare local DateTime's toIso8601String() has
+              // no timezone marker, so the backend (app.timezone=UTC) was
+              // reading the IST wall-clock value as if it were already UTC,
+              // shifting every survey date +5:30 (e.g. 1:24pm IST capture
+              // showing as 6:53pm after the round trip).
+              'surveyDate': surveyDate.toUtc().toIso8601String(),
             });
 
       for (var i = 0; i < photos.length; i++) {
