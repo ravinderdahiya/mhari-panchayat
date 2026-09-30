@@ -304,7 +304,7 @@ function StatusBadge({ active }: { active: boolean }) {
 }
 
 function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose: () => void }) {
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; images: string[] } | null>(null);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-5" onClick={onClose}>
@@ -338,7 +338,7 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
                 <ComplaintSummaryCard
                   key={complaint.id}
                   complaint={complaint}
-                  onViewPhoto={setLightboxUrl}
+                  onViewPhoto={(url, images) => setLightbox({ url, images })}
                 />
               ))}
             </div>
@@ -349,12 +349,12 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
         </div>
       </div>
 
-      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      <PhotoLightbox url={lightbox?.url ?? null} images={lightbox?.images} onClose={() => setLightbox(null)} />
     </div>
   );
 }
 
-function ComplaintSummaryCard({ complaint, onViewPhoto }: { complaint: CitizenComplaintSummary; onViewPhoto: (url: string) => void }) {
+function ComplaintSummaryCard({ complaint, onViewPhoto }: { complaint: CitizenComplaintSummary; onViewPhoto: (url: string, images: string[]) => void }) {
   const issuePhotos = (complaint.issuePhotoUrls && complaint.issuePhotoUrls.length > 0
     ? complaint.issuePhotoUrls
     : complaint.beforePhotoUrl
@@ -388,7 +388,12 @@ function ComplaintSummaryCard({ complaint, onViewPhoto }: { complaint: CitizenCo
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {photos.map(([stage, url]) => (
-            <PhotoThumbnail key={`${stage}-${url}`} url={api.mediaUrl(url!)} label={stage} onView={onViewPhoto} />
+            <PhotoThumbnail
+              key={`${stage}-${url}`}
+              url={api.mediaUrl(url!)}
+              label={stage}
+              onView={(clickedUrl) => onViewPhoto(clickedUrl, photos.map(([, u]) => api.mediaUrl(u!)))}
+            />
           ))}
         </div>
       )}

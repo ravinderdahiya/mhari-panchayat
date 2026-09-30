@@ -580,7 +580,7 @@ function SurveyDetails({
         )}
       </div>
     </div>
-    <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+    <PhotoLightbox url={lightboxUrl} images={survey.photoUrls.map((url) => api.mediaUrl(url))} onClose={() => setLightboxUrl(null)} />
   </div>;
 }
 

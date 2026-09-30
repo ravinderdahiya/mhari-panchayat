@@ -106,6 +106,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxGallery, setLightboxGallery] = useState<string[]>([]);
 
   const [assignedToId, setAssignedToId] = useState('');
   const [surveyNotes, setSurveyNotes] = useState('');
@@ -559,8 +560,8 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                   Uploaded Photos
                 </h3>
                 <div className="grid grid-cols-3 gap-3">
-                  {(
-                    [
+                  {(() => {
+                    const pairs: [string, string][] = [
                       ...issuePhotos.map((url, index): [string, string] => [
                         issuePhotos.length > 1 ? `Issue ${index + 1}` : 'Issue',
                         url,
@@ -571,15 +572,17 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
                           ['After', selected.after_photo_url],
                         ] as [string, string | null][]
                       ).filter((pair): pair is [string, string] => !!pair[1]),
-                    ]
-                  ).map(([stage, url]) => (
-                    <PhotoThumbnail
-                      key={`${stage}-${url}`}
-                      url={api.mediaUrl(url)}
-                      label={stage}
-                      onView={setLightboxUrl}
-                    />
-                  ))}
+                    ];
+                    const galleryUrls = pairs.map(([, url]) => api.mediaUrl(url));
+                    return pairs.map(([stage, url]) => (
+                      <PhotoThumbnail
+                        key={`${stage}-${url}`}
+                        url={api.mediaUrl(url)}
+                        label={stage}
+                        onView={() => { setLightboxUrl(api.mediaUrl(url)); setLightboxGallery(galleryUrls); }}
+                      />
+                    ));
+                  })()}
                 </div>
               </div>
             )}
@@ -774,7 +777,7 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
         </div>
       )}
 
-      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      <PhotoLightbox url={lightboxUrl} images={lightboxGallery} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   Camera, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Forward, MapPin, Search, X,
 } from 'lucide-react';
 import * as api from '../services/api';
+import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 import type { AssetSurvey, AssetSurveyPagination, AssetSurveyReviewStatus, AssetSurveyStats } from '../types';
 
 const REVIEW_BADGE: Record<AssetSurveyReviewStatus, string> = {
@@ -348,6 +349,7 @@ function SurveyDetails({ survey, onClose, onForwardSubmission, isActioning }: {
   onForwardSubmission: () => void;
   isActioning: boolean;
 }) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   return (
     <div className="fixed inset-0 bg-black/45 z-[70] flex items-center justify-center p-5" onClick={onClose}>
       <div
@@ -411,15 +413,7 @@ function SurveyDetails({ survey, onClose, onForwardSubmission, isActioning }: {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {survey.photoUrls.map((url, index) => (
-                <a
-                  key={url}
-                  href={api.mediaUrl(url)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 bg-slate-50"
-                >
-                  <img src={api.mediaUrl(url)} alt={`Survey ${index + 1}`} className="w-full h-full object-cover" />
-                </a>
+                <PhotoThumbnail key={url} url={api.mediaUrl(url)} label={`Photo ${index + 1}`} onView={setLightboxUrl} />
               ))}
             </div>
           </div>
@@ -454,6 +448,7 @@ function SurveyDetails({ survey, onClose, onForwardSubmission, isActioning }: {
           )}
         </div>
       </div>
+      <PhotoLightbox url={lightboxUrl} images={survey.photoUrls.map((url) => api.mediaUrl(url))} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }
