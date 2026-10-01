@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, Users as UsersIcon, Inbox, ChevronLeft, ChevronRight, Lock, Trash2, Eye, EyeOff, Pencil,
-  Phone, Mail, MapPin, IdCard, Users2, ShieldCheck, X, RefreshCw,
+  Phone, Mail, MapPin, IdCard, Users2, ShieldCheck, X, RefreshCw, UserPlus, AtSign,
 } from 'lucide-react';
 import * as api from '../services/api';
 import { masterApi } from '../services/api';
@@ -68,6 +68,8 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
 
   const [editName, setEditName] = useState('');
   const [editMobile, setEditMobile] = useState('');
@@ -174,7 +176,72 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
     setError('');
   };
 
+  const openCreate = () => {
+    loadPanchayatsOnce();
+    setIsCreating(true);
+    setNewUsername('');
+    setEditName('');
+    setEditMobile('');
+    setEditEmail('');
+    setEditEmployeeId('');
+    setEditMemberId('');
+    setEditFamilyId('');
+    setEditRole(roles[0] ?? '');
+    setEditDepartment('');
+    setEditDistrict('');
+    setEditBlock('');
+    setEditPanchayat('');
+    setEditActive(true);
+    setEditPassword('');
+    setShowEditPassword(false);
+    setError('');
+  };
+
+  const closeModal = () => {
+    setSelected(null);
+    setIsCreating(false);
+  };
+
   const isSelf = selected?.id === currentUser.id;
+
+  const create = async () => {
+    if (!newUsername.trim() || !editPassword.trim() || !editRole) {
+      setError('Username, password and role are required.');
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const payload: Parameters<typeof api.createUser>[0] = {
+        username: newUsername.trim(),
+        password: editPassword.trim(),
+        name: editName.trim() || null,
+        mobile: editMobile.trim() || null,
+        email: editEmail.trim() || null,
+        employee_id: editEmployeeId.trim() || null,
+        member_id: editMemberId.trim() || null,
+        family_id: editFamilyId.trim() || null,
+        role: editRole,
+        department_id: editDepartment ? Number(editDepartment) : null,
+        is_active: editActive,
+      };
+      if (editPanchayat) {
+        payload.panchayat_id = Number(editPanchayat);
+      } else {
+        payload.district_id = editDistrict ? Number(editDistrict) : null;
+        payload.block_id = editBlock ? Number(editBlock) : null;
+      }
+
+      await api.createUser(payload);
+      closeModal();
+      setSuccessMessage('User created successfully');
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const save = async () => {
     if (!selected) return;
@@ -250,7 +317,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
           {successMessage}
         </div>
       )}
-      {error && !selected && (
+      {error && !selected && !isCreating && (
         <div role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
           {error}
         </div>
@@ -320,6 +387,14 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
+        </button>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-accent hover:bg-accent-dark px-3 py-2 rounded-lg cursor-pointer"
+        >
+          <UserPlus className="w-3.5 h-3.5" />
+          Add User
         </button>
         <span className="text-xs text-slate-400 ml-auto flex items-center gap-1.5">
           <UsersIcon className="w-3.5 h-3.5" />
@@ -557,12 +632,12 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
         </div>
       )}
 
-      {selected && (
+      {(selected || isCreating) && (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-5 overflow-y-auto"
-          onClick={() => setSelected(null)}
+          onClick={closeModal}
         >
           <div
             className="w-full max-w-3xl my-auto bg-white rounded-2xl shadow-2xl overflow-hidden"
@@ -571,18 +646,18 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
             <div className="relative bg-gradient-to-br from-accent to-accent-dark px-5 pt-5 pb-6 text-white">
               <button
                 type="button"
-                onClick={() => setSelected(null)}
+                onClick={closeModal}
                 className="absolute top-3 right-3 p-1.5 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${avatarColor(selected.id)}`}>
-                  {initials(selected.name, selected.username)}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${isCreating ? 'bg-white/15' : avatarColor(selected!.id)}`}>
+                  {isCreating ? <UserPlus className="w-5 h-5" /> : initials(selected!.name, selected!.username)}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-bold text-base leading-tight truncate">{selected.name || selected.username}</h2>
-                  <p className="text-xs text-white/75">@{selected.username} {selected.email && `· ${selected.email}`}</p>
+                  <h2 className="font-bold text-base leading-tight truncate">{isCreating ? 'Add User' : (selected!.name || selected!.username)}</h2>
+                  <p className="text-xs text-white/75">{isCreating ? 'Create a new admin/staff account' : `@${selected!.username} ${selected!.email ? `· ${selected!.email}` : ''}`}</p>
                 </div>
                 {isSelf && (
                   <span className="ml-auto shrink-0 flex items-center gap-1 text-[11px] font-semibold bg-white/15 border border-white/25 rounded-lg px-2.5 py-1">
@@ -597,17 +672,20 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
               {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>}
 
               <EditSection title="Identity" icon={<Users2 className="w-3.5 h-3.5" />}>
-                <TextField label="Full Name" value={editName} onChange={setEditName} span={2} />
+                {isCreating && (
+                  <TextField label="Username *" value={newUsername} onChange={setNewUsername} icon={<AtSign className="w-3.5 h-3.5" />} />
+                )}
+                <TextField label="Full Name" value={editName} onChange={setEditName} span={isCreating ? undefined : 2} />
                 <TextField label="Phone No." value={editMobile} onChange={setEditMobile} icon={<Phone className="w-3.5 h-3.5" />} />
                 <TextField label="Email" value={editEmail} onChange={setEditEmail} icon={<Mail className="w-3.5 h-3.5" />} />
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Password</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Password{isCreating ? ' *' : ''}</label>
                   <div className="relative">
                     <input
                       type={showEditPassword ? 'text' : 'password'}
                       value={editPassword}
                       onChange={(e) => setEditPassword(e.target.value)}
-                      placeholder={selected.login_password ? 'Leave blank to keep current' : 'Set a password to show it here'}
+                      placeholder={isCreating ? 'Set a login password' : selected!.login_password ? 'Leave blank to keep current' : 'Set a password to show it here'}
                       autoComplete="new-password"
                       className="w-full text-xs border border-slate-300 rounded-lg py-1.5 pl-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
@@ -620,8 +698,8 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
                       {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                  {selected.login_password && !editPassword && (
-                    <p className="mt-1 font-mono text-[11px] text-slate-500">Current: {selected.login_password}</p>
+                  {!isCreating && selected!.login_password && !editPassword && (
+                    <p className="mt-1 font-mono text-[11px] text-slate-500">Current: {selected!.login_password}</p>
                   )}
                 </div>
               </EditSection>
@@ -719,14 +797,14 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
             <div className="flex items-center gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50">
               <button
                 disabled={isSubmitting}
-                onClick={save}
+                onClick={isCreating ? create : save}
                 className="bg-accent hover:bg-accent-dark disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg"
               >
-                {isSubmitting ? 'Saving…' : 'Save Changes'}
+                {isCreating ? (isSubmitting ? 'Creating…' : 'Create User') : (isSubmitting ? 'Saving…' : 'Save Changes')}
               </button>
               <button
                 type="button"
-                onClick={() => setSelected(null)}
+                onClick={closeModal}
                 className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white"
               >
                 Close

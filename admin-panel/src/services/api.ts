@@ -266,6 +266,25 @@ export const updateUser = (
   },
 ) => jsonRequest<{ success: boolean; message: string; user: AdminUser }>(`/api/users/${id}`, 'PATCH', fields);
 
+export const createUser = (fields: {
+  username: string;
+  password: string;
+  name?: string | null;
+  mobile?: string | null;
+  email?: string | null;
+  employee_id?: string | null;
+  member_id?: string | null;
+  family_id?: string | null;
+  role: string;
+  department_id?: number | null;
+  department_ids?: number[];
+  district_id?: number | null;
+  block_id?: number | null;
+  panchayat_id?: number | null;
+  village_ids?: number[];
+  is_active?: boolean;
+}) => jsonRequest<{ success: boolean; message: string; user: AdminUser }>('/api/users', 'POST', fields);
+
 export const deleteUser = (id: number) =>
   jsonRequest<{ success: boolean; message: string }>(`/api/users/${id}`, 'DELETE');
 

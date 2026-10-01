@@ -165,6 +165,64 @@ class UserController extends Controller
         ]);
     }
 
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'username' => ['required', 'string', 'max:50', 'unique:users,username'],
+            'password' => ['required', 'string', 'min:8'],
+            'name' => ['nullable', 'string', 'max:150'],
+            'mobile' => ['nullable', 'string', 'max:20'],
+            'email' => ['nullable', 'email', 'max:150'],
+            'employee_id' => ['nullable', 'string', 'max:50'],
+            'member_id' => ['nullable', 'string', 'max:50'],
+            'family_id' => ['nullable', 'string', 'max:50'],
+            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+            'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
+            'department_ids' => ['sometimes', 'array'],
+            'department_ids.*' => ['integer', 'exists:departments,id'],
+            'district_id' => ['sometimes', 'nullable', 'exists:districts,id'],
+            'block_id' => ['sometimes', 'nullable', 'exists:blocks,id'],
+            'panchayat_id' => ['sometimes', 'nullable', 'exists:panchayats,id'],
+            'village_ids' => ['sometimes', 'array'],
+            'village_ids.*' => ['integer', 'exists:villages,id'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        // Same panchayat-wins-over-block/district rule as update().
+        if (! empty($data['panchayat_id'])) {
+            $panchayat = Panchayat::with('block')->find($data['panchayat_id']);
+            $data['block_id'] = $panchayat?->block_id;
+            $data['district_id'] = $panchayat?->block?->district_id;
+        }
+
+        $departmentIds = $data['department_ids'] ?? null;
+        unset($data['department_ids']);
+        if ($departmentIds !== null) {
+            $data['department_id'] = $departmentIds[0] ?? null;
+        }
+
+        $villageIds = $data['village_ids'] ?? null;
+        unset($data['village_ids']);
+
+        $data['is_active'] = $data['is_active'] ?? true;
+
+        $user = User::create($data);
+
+        if ($departmentIds !== null) {
+            $user->departments()->sync($departmentIds);
+        }
+        if ($villageIds !== null) {
+            $user->villages()->sync($villageIds);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User created successfully',
+            'user' => $user->fresh(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name', 'villages'])
+                ?->appendRevealedLoginPassword(),
+        ], 201);
+    }
+
     public function update(Request $request, int $id)
     {
         $user = User::findOrFail($id);

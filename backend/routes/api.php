@@ -113,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);
         Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'update']);
         Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
         Route::get('/elected-representatives', [ElectedRepresentativeController::class, 'index']);
         Route::get('/citizens', [CitizenController::class, 'index']);
         Route::delete('/citizens/{citizen}', [CitizenController::class, 'destroy']);
