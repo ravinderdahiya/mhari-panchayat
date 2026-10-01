@@ -309,7 +309,23 @@ class UserController extends Controller
             return response()->json(['success' => false, 'message' => 'You cannot delete your own account'], 400);
         }
 
-        $user->delete();
+        // Review-history rows (asset_survey_reviews.actor_id) deliberately
+        // have no cascade/null-on-delete - they're an audit trail, so losing
+        // or orphaning them silently on a delete would be worse than just
+        // refusing. Any staff account that has reviewed/forwarded a survey
+        // hits this. Deactivating (is_active=false) is the supported way to
+        // retire such an account.
+        try {
+            $user->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23503') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This user has linked records (survey reviews, complaints, etc.) and cannot be deleted. Set the account to Inactive instead.',
+                ], 409);
+            }
+            throw $e;
+        }
 
         return response()->json(['success' => true, 'message' => 'User deleted successfully']);
     }
