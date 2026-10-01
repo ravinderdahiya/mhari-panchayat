@@ -16,7 +16,7 @@ import { dotSymbol, diamondSymbol, highlightFillSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X, ChevronLeft, ChevronRight, MapPin, SlidersHorizontal } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import SurveyPopupCard from '../components/SurveyPopupCard';
@@ -630,121 +630,131 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
               <ArcGISMap center={mapCenter} zoom={8} onViewReady={setView} />
             </div>
 
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-[300px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
-                <input
-                  value={locationQuery}
-                  onFocus={() => { loadLocationMaster(); setLocationSuggestOpen(true); }}
-                  onChange={(event) => {
-                    setLocationQuery(event.target.value);
-                    setLocationSuggestOpen(true);
-                    if (selectedLocation) setSelectedLocation(null);
-                  }}
-                  placeholder="Search district, tehsil, block, panchayat, village or lat, long…"
-                  className="w-full pl-8 pr-8 py-2.5 text-xs bg-paper/95 backdrop-blur-sm rounded-xl shadow-xl border border-line/70 outline-none focus:ring-2 focus:ring-accent/40"
-                />
-                {(locationQuery || selectedLocation) && (
-                  <button
-                    onClick={() => {
-                      setSelectedLocation(null); setLocationQuery(''); setLocationSuggestOpen(false);
-                      coordPinLayerRef.current?.removeAll();
-                    }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer"
-                    aria-label="Clear location search"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {locationSuggestOpen && locationQuery.trim().length >= 1 && !selectedLocation && (() => {
-                const q = locationQuery.trim().toLowerCase();
-                const districtMatches = districtsMaster.filter((d) => d.name.toLowerCase().includes(q)).slice(0, 5);
-                const tehsilMatches = tehsilsMaster.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
-                const blockMatches = blocksMaster.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
-                const villageMatches = villageSuggestions;
-                const panchayatMatches = panchayatSuggestions;
-                const groups: Array<[LocationSelection['level'], { id: number; name: string }[]]> = [
-                  ['district', districtMatches], ['tehsil', tehsilMatches],
-                  ['block', blockMatches], ['panchayat', panchayatMatches], ['village', villageMatches],
-                ];
-                const hasAny = groups.some(([, items]) => items.length > 0);
-                const coords = parseLatLong(locationQuery);
-
-                return (
-                  <div className="mt-1.5 bg-paper rounded-xl shadow-xl border border-line/70 overflow-y-auto max-h-72">
-                    {coords && (
-                      <div className="py-1 border-b border-line/50">
-                        <div className="text-[10px] font-bold tracking-wide text-muted px-3 pt-1.5 pb-1">COORDINATES</div>
-                        <button
-                          onClick={() => goToCoordinates(coords.lat, coords.lng)}
-                          className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-cream cursor-pointer flex items-center gap-1.5"
-                        >
-                          <MapPin className="w-3 h-3 text-accent shrink-0" /> Go to {coords.lat}, {coords.lng}
-                        </button>
-                      </div>
-                    )}
-                    {!hasAny && !coords ? (
-                      <p className="text-xs text-muted p-3">No matches.</p>
-                    ) : groups.map(([level, items]) => items.length === 0 ? null : (
-                      <div key={level} className="py-1">
-                        <div className="text-[10px] font-bold tracking-wide text-muted px-3 pt-1.5 pb-1">
-                          {LOCATION_LEVEL_LABEL[level].toUpperCase()}
-                        </div>
-                        {items.map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              setSelectedLocation({ level, id: item.id, name: item.name });
-                              setLocationQuery(item.name);
-                              setLocationSuggestOpen(false);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-cream cursor-pointer"
-                          >
-                            {item.name}
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              {selectedLocation && (
-                <div className="mt-1.5 inline-flex items-center gap-1.5 bg-accent-soft text-accent-dark text-[11px] font-semibold px-2.5 py-1.5 rounded-full shadow">
-                  {LOCATION_LEVEL_LABEL[selectedLocation.level]}: {selectedLocation.name}
-                  <button
-                    onClick={() => { setSelectedLocation(null); setLocationQuery(''); }}
-                    className="cursor-pointer hover:opacity-70"
-                    aria-label="Clear location filter"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2.5">
+            <div
+              className="absolute top-4 left-4 z-30 flex items-center gap-2"
+              style={{ right: legendOpen ? 282 : 52 }}
+            >
               {heroStats.map(({ label, value, icon: Icon, filter }) => (
                 <button
                   key={label}
                   onClick={() => onNavigateToComplaints(filter)}
-                  className="text-left bg-paper rounded-md shadow-lg px-4 py-2.5 flex items-center gap-2.5 min-w-[190px] cursor-pointer"
+                  className="text-left bg-white/78 backdrop-blur-md border border-white/70 rounded-2xl shadow-md px-3 py-2 flex items-center gap-2 shrink-0 cursor-pointer hover:bg-white/90 transition-colors"
                 >
-                  <Icon className="w-4 h-4 text-accent shrink-0" />
-                  <div>
-                    <span className="font-serif font-semibold text-[15px] text-ink mr-1 tabular-nums">{value}</span>
-                    <span className="text-[12.5px] text-muted">{label}</span>
+                  <div className="w-9 h-9 rounded-full bg-white/70 flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 text-accent" />
+                  </div>
+                  <div className="w-px h-6 bg-ink/15 shrink-0" />
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-serif font-bold text-[22px] leading-none text-ink tabular-nums underline decoration-2 underline-offset-4 decoration-ink/60">{value}</span>
+                    <span className="text-[11.5px] text-ink/60 font-medium whitespace-nowrap">{label}</span>
                   </div>
                 </button>
               ))}
-              <div className="bg-paper rounded-md shadow-lg px-4 py-2.5 flex items-center gap-2.5 min-w-[190px]">
-                <ClipboardList className="w-4 h-4 text-accent shrink-0" />
-                <div>
-                  <span className="font-serif font-semibold text-[15px] text-ink mr-1 tabular-nums">{surveys.length}</span>
-                  <span className="text-[12.5px] text-muted">Asset Surveys</span>
+              <div className="bg-white/78 backdrop-blur-md border border-white/70 rounded-2xl shadow-md px-3 py-2 flex items-center gap-2 shrink-0">
+                <div className="w-9 h-9 rounded-full bg-white/70 flex items-center justify-center shrink-0">
+                  <ClipboardList className="w-4 h-4 text-accent" />
                 </div>
+                <div className="w-px h-6 bg-ink/15 shrink-0" />
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-serif font-bold text-[22px] leading-none text-ink tabular-nums underline decoration-2 underline-offset-4 decoration-ink/60">{surveys.length}</span>
+                  <span className="text-[11.5px] text-ink/60 font-medium whitespace-nowrap">Asset Surveys</span>
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0 max-w-[420px] relative">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                  <input
+                    value={locationQuery}
+                    onFocus={() => { loadLocationMaster(); setLocationSuggestOpen(true); }}
+                    onChange={(event) => {
+                      setLocationQuery(event.target.value);
+                      setLocationSuggestOpen(true);
+                      if (selectedLocation) setSelectedLocation(null);
+                    }}
+                    placeholder="Search district, tehsil, block, panchayat, village or lat, long…"
+                    className="w-full pl-11 pr-16 py-[18px] text-xs bg-white/78 backdrop-blur-md rounded-full shadow-md border border-white/70 outline-none focus:ring-2 focus:ring-accent/40"
+                  />
+                  {(locationQuery || selectedLocation) && (
+                    <button
+                      onClick={() => {
+                        setSelectedLocation(null); setLocationQuery(''); setLocationSuggestOpen(false);
+                        coordPinLayerRef.current?.removeAll();
+                      }}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer"
+                      aria-label="Clear location search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <SlidersHorizontal className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
+
+                {locationSuggestOpen && locationQuery.trim().length >= 1 && !selectedLocation && (() => {
+                  const q = locationQuery.trim().toLowerCase();
+                  const districtMatches = districtsMaster.filter((d) => d.name.toLowerCase().includes(q)).slice(0, 5);
+                  const tehsilMatches = tehsilsMaster.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
+                  const blockMatches = blocksMaster.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
+                  const villageMatches = villageSuggestions;
+                  const panchayatMatches = panchayatSuggestions;
+                  const groups: Array<[LocationSelection['level'], { id: number; name: string }[]]> = [
+                    ['district', districtMatches], ['tehsil', tehsilMatches],
+                    ['block', blockMatches], ['panchayat', panchayatMatches], ['village', villageMatches],
+                  ];
+                  const hasAny = groups.some(([, items]) => items.length > 0);
+                  const coords = parseLatLong(locationQuery);
+
+                  return (
+                    <div className="mt-1.5 bg-paper rounded-xl shadow-xl border border-line/70 overflow-y-auto max-h-72">
+                      {coords && (
+                        <div className="py-1 border-b border-line/50">
+                          <div className="text-[10px] font-bold tracking-wide text-muted px-3 pt-1.5 pb-1">COORDINATES</div>
+                          <button
+                            onClick={() => goToCoordinates(coords.lat, coords.lng)}
+                            className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-cream cursor-pointer flex items-center gap-1.5"
+                          >
+                            <MapPin className="w-3 h-3 text-accent shrink-0" /> Go to {coords.lat}, {coords.lng}
+                          </button>
+                        </div>
+                      )}
+                      {!hasAny && !coords ? (
+                        <p className="text-xs text-muted p-3">No matches.</p>
+                      ) : groups.map(([level, items]) => items.length === 0 ? null : (
+                        <div key={level} className="py-1">
+                          <div className="text-[10px] font-bold tracking-wide text-muted px-3 pt-1.5 pb-1">
+                            {LOCATION_LEVEL_LABEL[level].toUpperCase()}
+                          </div>
+                          {items.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                setSelectedLocation({ level, id: item.id, name: item.name });
+                                setLocationQuery(item.name);
+                                setLocationSuggestOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-cream cursor-pointer"
+                            >
+                              {item.name}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {selectedLocation && (
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 bg-accent-soft text-accent-dark text-[11px] font-semibold px-2.5 py-1.5 rounded-full shadow">
+                    {LOCATION_LEVEL_LABEL[selectedLocation.level]}: {selectedLocation.name}
+                    <button
+                      onClick={() => { setSelectedLocation(null); setLocationQuery(''); }}
+                      className="cursor-pointer hover:opacity-70"
+                      aria-label="Clear location filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
