@@ -446,7 +446,6 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         { name: 'category', type: 'string' },
         { name: 'statusLabel', type: 'string' },
       ],
-      featureReduction: { type: 'cluster', clusterRadius: '80px' },
       renderer: new UniqueValueRenderer({
         field: 'legendGroup',
         defaultSymbol: dotSymbol('#64748b'),
@@ -500,7 +499,6 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         { name: 'legendGroup', type: 'string' },
         { name: 'assetName', type: 'string' },
       ],
-      featureReduction: { type: 'cluster', clusterRadius: '80px' },
       renderer: new UniqueValueRenderer({
         field: 'legendGroup',
         defaultSymbol: diamondSymbol('#64748b'),

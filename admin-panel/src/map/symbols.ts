@@ -5,7 +5,7 @@ export function dotSymbol(color: string) {
     type: 'simple-marker' as const,
     style: 'circle' as const,
     color,
-    size: 14,
+    size: 9,
     outline: { color: 'white', width: 2 },
   };
 }
@@ -17,8 +17,8 @@ export function diamondSymbol(color: string) {
     type: 'simple-marker' as const,
     style: 'diamond' as const,
     color,
-    size: 14,
-    outline: { color: 'white', width: 2 },
+    size: 9,
+    outline: { color: 'white', width: 1 },
   };
 }
 
