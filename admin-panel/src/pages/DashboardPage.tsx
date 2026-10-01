@@ -277,22 +277,26 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const onNavigateToComplaintRef = useLatestRef(onNavigateToComplaint);
   const complaintsRef = useLatestRef(complaints);
   const surveysRef = useLatestRef(surveys);
-  const popupRootRef = useRef<{ root: Root; container: HTMLDivElement } | null>(null);
-  // Unmounts the React root backing the popup's custom content, if any. The
-  // popup widget only ever detaches the content node from the DOM - it never
-  // unmounts what was rendered into it - so this has to be done by hand
-  // whenever the popup closes or its content is replaced for a new feature.
+  // One entry per content() call, not just the latest - a single click can
+  // hit more than one layer at (almost) the same point (e.g. a complaint and
+  // a survey marker on top of each other), and the popup widget's combined
+  // multi-feature view ("1 of 2") can invoke more than one layer's content()
+  // callback for the same click. Eagerly unmounting "whichever was there
+  // before" (the previous design) raced across those calls and left
+  // whichever feature rendered first blank once the second one unmounted
+  // its shared root. Every root here lives until the whole popup closes.
+  const popupRootsRef = useRef<Set<{ root: Root; container: HTMLDivElement }>>(new Set());
   // Deferred a tick: unmounting synchronously here can collide with React's
   // own in-progress render of this component (e.g. a click that both
   // selects a new feature and triggers a parent re-render), which React
   // warns about ("Attempted to synchronously unmount a root while React was
   // already rendering"). A fresh task sidesteps whatever call stack
   // triggered this.
-  const unmountPopupRoot = () => {
-    if (!popupRootRef.current) return;
-    const { root } = popupRootRef.current;
-    popupRootRef.current = null;
-    setTimeout(() => root.unmount(), 0);
+  const unmountAllPopupRoots = () => {
+    if (popupRootsRef.current.size === 0) return;
+    const entries = Array.from(popupRootsRef.current);
+    popupRootsRef.current.clear();
+    setTimeout(() => entries.forEach(({ root }) => root.unmount()), 0);
   };
 
   const isInitialBasemapRef = useRef(true);
@@ -337,10 +341,10 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
           popupTemplate: {
             title: '{localbodyname}',
             content: (event) => {
-              unmountPopupRoot();
               const container = document.createElement('div');
               const root = createRoot(container);
-              popupRootRef.current = { root, container };
+              const entry = { root, container };
+              popupRootsRef.current.add(entry);
               const attributes = event.graphic.attributes;
               root.render(<PanchayatPopupCard attributes={attributes} />);
 
@@ -351,11 +355,11 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
               if (code) {
                 void api.getPanchayatOfficials(String(code))
                   .then((result) => {
-                    if (popupRootRef.current?.container !== container) return; // popup moved on
+                    if (!popupRootsRef.current.has(entry)) return; // popup moved on
                     root.render(<PanchayatPopupCard attributes={attributes} localOfficials={{ cplo: result.cplo, gram_sachiv: result.gram_sachiv }} />);
                   })
                   .catch(() => {
-                    if (popupRootRef.current?.container !== container) return;
+                    if (!popupRootsRef.current.has(entry)) return;
                     root.render(<PanchayatPopupCard attributes={attributes} localOfficials={null} />);
                   });
               }
@@ -450,11 +454,11 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       const id = popup.selectedFeature?.attributes?.id;
       if (id != null) onNavigateToComplaintRef.current(id);
     });
-    const visibleHandle = reactiveUtils.watch(() => popup.visible, (visible) => { if (!visible) unmountPopupRoot(); });
+    const visibleHandle = reactiveUtils.watch(() => popup.visible, (visible) => { if (!visible) unmountAllPopupRoots(); });
     return () => {
       actionHandle.remove();
       visibleHandle.remove();
-      unmountPopupRoot();
+      unmountAllPopupRoots();
     };
   }, [view, onNavigateToComplaintRef]);
 
@@ -493,10 +497,9 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         title: 'Complaint {code}',
         content: (event) => {
           const complaint = complaintsRef.current.find((c) => c.id === event.graphic.attributes.id);
-          unmountPopupRoot();
           const container = document.createElement('div');
           const root = createRoot(container);
-          popupRootRef.current = { root, container };
+          popupRootsRef.current.add({ root, container });
           root.render(complaint ? <ComplaintPopupCard complaint={complaint} /> : <span className="text-xs text-muted">Complaint details unavailable.</span>);
           return container;
         },
@@ -546,10 +549,9 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
         title: 'Survey {code}',
         content: (event) => {
           const survey = surveysRef.current.find((s) => s.id === event.graphic.attributes.id);
-          unmountPopupRoot();
           const container = document.createElement('div');
           const root = createRoot(container);
-          popupRootRef.current = { root, container };
+          popupRootsRef.current.add({ root, container });
           root.render(survey ? <SurveyPopupCard survey={survey} /> : <span className="text-xs text-muted">Survey details unavailable.</span>);
           return container;
         },
