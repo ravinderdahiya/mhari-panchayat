@@ -16,7 +16,7 @@ import { dotSymbol, diamondSymbol, highlightFillSymbol } from '../map/symbols';
 import { createStreetsBasemap, createWorldImageryBasemap } from '../map/basemap';
 import { toArcgisPoint, toArcgisXY } from '../map/coords';
 import { useLatestRef } from '../map/useLatestRef';
-import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ListChecks, Hourglass, Wrench, Map as MapIcon, Satellite, ClipboardList, Search, X, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import * as api from '../services/api';
 import ComplaintPopupCard from '../components/ComplaintPopupCard';
 import SurveyPopupCard from '../components/SurveyPopupCard';
@@ -76,6 +76,21 @@ interface LocationSelection {
 const LOCATION_LEVEL_LABEL: Record<LocationSelection['level'], string> = {
   district: 'District', tehsil: 'Tehsil', block: 'Block', panchayat: 'Panchayat', village: 'Village',
 };
+
+// Lets the same search box also jump straight to a GPS coordinate, typed as
+// "lat, long" (comma and/or whitespace separated) - e.g. pasted from a
+// survey's GPS field. Not treated as a LocationSelection (it isn't a
+// district/tehsil/block/panchayat/village entity, so it can't filter
+// complaints/surveys) - just pans the map there and drops a pin.
+function parseLatLong(query: string): { lat: number; lng: number } | null {
+  const parts = query.trim().split(/[\s,]+/).filter(Boolean);
+  if (parts.length !== 2) return null;
+  const lat = Number(parts[0]);
+  const lng = Number(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
+}
 
 interface DashboardPageProps {
   onNavigateToComplaints: (status: ComplaintStatus | 'All') => void;
@@ -258,6 +273,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   const pointLayerRef = useRef<FeatureLayer | null>(null);
   const surveyLayerRef = useRef<FeatureLayer | null>(null);
   const highlightLayerRef = useRef<GraphicsLayer | null>(null);
+  const coordPinLayerRef = useRef<GraphicsLayer | null>(null);
   const onNavigateToComplaintRef = useLatestRef(onNavigateToComplaint);
   const complaintsRef = useLatestRef(complaints);
   const surveysRef = useLatestRef(surveys);
@@ -372,6 +388,28 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       highlightLayerRef.current = null;
     };
   }, [view]);
+
+  // Holds the single pin dropped by a "lat, long" search - separate from
+  // highlightLayerRef so a coordinate search and a district/block/village
+  // search never clear each other out.
+  useEffect(() => {
+    if (!view?.map) return undefined;
+    const layer = new GraphicsLayer();
+    view.map.add(layer);
+    coordPinLayerRef.current = layer;
+    return () => {
+      if (view.map) view.map.remove(layer);
+      coordPinLayerRef.current = null;
+    };
+  }, [view]);
+
+  const goToCoordinates = (lat: number, lng: number) => {
+    coordPinLayerRef.current?.removeAll();
+    coordPinLayerRef.current?.add(new Graphic({ geometry: toArcgisPoint(lat, lng), symbol: dotSymbol('#ef4444') }));
+    void view?.goTo({ target: toArcgisPoint(lat, lng), zoom: 16 }, { duration: 300 }).catch(() => {});
+    setLocationQuery(`${lat}, ${lng}`);
+    setLocationSuggestOpen(false);
+  };
 
   useEffect(() => {
     const layer = highlightLayerRef.current;
@@ -601,12 +639,15 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
                     setLocationSuggestOpen(true);
                     if (selectedLocation) setSelectedLocation(null);
                   }}
-                  placeholder="Search district, tehsil, block, panchayat or village…"
+                  placeholder="Search district, tehsil, block, panchayat, village or lat, long…"
                   className="w-full pl-8 pr-8 py-2.5 text-xs bg-paper/95 backdrop-blur-sm rounded-xl shadow-xl border border-line/70 outline-none focus:ring-2 focus:ring-accent/40"
                 />
                 {(locationQuery || selectedLocation) && (
                   <button
-                    onClick={() => { setSelectedLocation(null); setLocationQuery(''); setLocationSuggestOpen(false); }}
+                    onClick={() => {
+                      setSelectedLocation(null); setLocationQuery(''); setLocationSuggestOpen(false);
+                      coordPinLayerRef.current?.removeAll();
+                    }}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer"
                     aria-label="Clear location search"
                   >
@@ -627,10 +668,22 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
                   ['block', blockMatches], ['panchayat', panchayatMatches], ['village', villageMatches],
                 ];
                 const hasAny = groups.some(([, items]) => items.length > 0);
+                const coords = parseLatLong(locationQuery);
 
                 return (
                   <div className="mt-1.5 bg-paper rounded-xl shadow-xl border border-line/70 overflow-y-auto max-h-72">
-                    {!hasAny ? (
+                    {coords && (
+                      <div className="py-1 border-b border-line/50">
+                        <div className="text-[10px] font-bold tracking-wide text-muted px-3 pt-1.5 pb-1">COORDINATES</div>
+                        <button
+                          onClick={() => goToCoordinates(coords.lat, coords.lng)}
+                          className="w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-cream cursor-pointer flex items-center gap-1.5"
+                        >
+                          <MapPin className="w-3 h-3 text-accent shrink-0" /> Go to {coords.lat}, {coords.lng}
+                        </button>
+                      </div>
+                    )}
+                    {!hasAny && !coords ? (
                       <p className="text-xs text-muted p-3">No matches.</p>
                     ) : groups.map(([level, items]) => items.length === 0 ? null : (
                       <div key={level} className="py-1">
