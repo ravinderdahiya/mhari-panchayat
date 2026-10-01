@@ -69,7 +69,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newUsername, setNewUsername] = useState('');
+  const [editUsername, setEditUsername] = useState('');
 
   const [editName, setEditName] = useState('');
   const [editMobile, setEditMobile] = useState('');
@@ -159,6 +159,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const selectUser = (u: AdminUser) => {
     loadPanchayatsOnce();
     setSelected(u);
+    setEditUsername(u.username);
     setEditName(u.name ?? '');
     setEditMobile(u.mobile ?? '');
     setEditEmail(u.email ?? '');
@@ -179,7 +180,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const openCreate = () => {
     loadPanchayatsOnce();
     setIsCreating(true);
-    setNewUsername('');
+    setEditUsername('');
     setEditName('');
     setEditMobile('');
     setEditEmail('');
@@ -205,7 +206,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
   const isSelf = selected?.id === currentUser.id;
 
   const create = async () => {
-    if (!newUsername.trim() || !editPassword.trim() || !editRole) {
+    if (!editUsername.trim() || !editPassword.trim() || !editRole) {
       setError('Username, password and role are required.');
       return;
     }
@@ -213,7 +214,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
     setError('');
     try {
       const payload: Parameters<typeof api.createUser>[0] = {
-        username: newUsername.trim(),
+        username: editUsername.trim(),
         password: editPassword.trim(),
         name: editName.trim() || null,
         mobile: editMobile.trim() || null,
@@ -249,6 +250,7 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
     setError('');
     try {
       const payload: Parameters<typeof api.updateUser>[1] = {
+        username: editUsername.trim(),
         name: editName.trim() || null,
         mobile: editMobile.trim() || null,
         email: editEmail.trim() || null,
@@ -672,10 +674,8 @@ export default function UsersPage({ currentUser }: UsersPageProps) {
               {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>}
 
               <EditSection title="Identity" icon={<Users2 className="w-3.5 h-3.5" />}>
-                {isCreating && (
-                  <TextField label="Username *" value={newUsername} onChange={setNewUsername} icon={<AtSign className="w-3.5 h-3.5" />} />
-                )}
-                <TextField label="Full Name" value={editName} onChange={setEditName} span={isCreating ? undefined : 2} />
+                <TextField label={`Username${isCreating ? ' *' : ''}`} value={editUsername} onChange={setEditUsername} icon={<AtSign className="w-3.5 h-3.5" />} />
+                <TextField label="Full Name" value={editName} onChange={setEditName} />
                 <TextField label="Phone No." value={editMobile} onChange={setEditMobile} icon={<Phone className="w-3.5 h-3.5" />} />
                 <TextField label="Email" value={editEmail} onChange={setEditEmail} icon={<Mail className="w-3.5 h-3.5" />} />
                 <div>

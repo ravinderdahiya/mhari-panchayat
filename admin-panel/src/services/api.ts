@@ -248,6 +248,7 @@ export const deleteCitizen = (id: number) =>
 export const updateUser = (
   id: number,
   fields: {
+    username?: string;
     name?: string | null;
     mobile?: string | null;
     email?: string | null;
