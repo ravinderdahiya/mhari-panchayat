@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/api_config.dart';
 import '../navigation/app_navigation.dart';
 import '../navigation/navigator_key.dart';
 import '../navigation/role_navigation.dart';
@@ -8,6 +9,7 @@ import '../services/app_preferences.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
+import '../utils/launch_url.dart';
 import '../widgets/common_widgets.dart';
 import 'change_password_screen.dart';
 import 'feedback_screen.dart';
@@ -195,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _NavRow(
                           icon: Icons.policy_rounded,
                           title: _t('गोपनीयता नीति', 'Privacy policy'),
-                          onTap: () {},
+                          onTap: () => openExternalUrl(context, ApiConfig.privacyPolicyUrl),
                         ),
                       ],
                     ),

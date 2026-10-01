@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/api_config.dart';
 import '../models/user_role.dart';
 import '../navigation/app_navigation.dart';
 import '../navigation/role_navigation.dart';
@@ -14,6 +15,7 @@ import '../services/app_preferences.dart';
 import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/launch_url.dart';
 import 'forgot_password_screen.dart';
 import 'registration_screen.dart';
 
@@ -335,7 +337,11 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _TermsFooter(onLinkTap: _showMessage, isEnglish: _isEnglish),
+                child: _TermsFooter(
+                  onTermsTap: _showMessage,
+                  onPrivacyTap: () => openExternalUrl(context, ApiConfig.privacyPolicyUrl),
+                  isEnglish: _isEnglish,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -1099,9 +1105,14 @@ class _PrimaryButton extends StatelessWidget {
 }
 
 class _TermsFooter extends StatelessWidget {
-  const _TermsFooter({required this.onLinkTap, required this.isEnglish});
+  const _TermsFooter({
+    required this.onTermsTap,
+    required this.onPrivacyTap,
+    required this.isEnglish,
+  });
 
-  final ValueChanged<String> onLinkTap;
+  final ValueChanged<String> onTermsTap;
+  final VoidCallback onPrivacyTap;
   final bool isEnglish;
 
   @override
@@ -1125,9 +1136,6 @@ class _TermsFooter extends StatelessWidget {
     final termsMessage = isEnglish
         ? 'Terms of Service will be available soon'
         : 'सेवा की शर्तें जल्द ही उपलब्ध होंगी';
-    final privacyMessage = isEnglish
-        ? 'Privacy Policy will be available soon'
-        : 'गोपनीयता नीति जल्द ही उपलब्ध होगी';
 
     return RichText(
       textAlign: TextAlign.center,
@@ -1143,14 +1151,13 @@ class _TermsFooter extends StatelessWidget {
             text: termsText,
             style: linkStyle,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => onLinkTap(termsMessage),
+              ..onTap = () => onTermsTap(termsMessage),
           ),
           TextSpan(text: isEnglish ? ' and\n' : ' और\n'),
           TextSpan(
             text: privacyText,
             style: linkStyle,
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => onLinkTap(privacyMessage),
+            recognizer: TapGestureRecognizer()..onTap = onPrivacyTap,
           ),
           TextSpan(text: isEnglish ? '.' : ' से सहमत हैं।'),
         ],

@@ -325,6 +325,10 @@ export const getPanchayatOfficials = (code: string) =>
 // HARSAC's Panchayat/district boundary MapServer, reverse-proxied by our own
 // backend (gis.harsac.in doesn't send CORS headers, so the browser can't hit
 // it directly, and the real GIS credentials stay server-side either way).
+// Served as a static file from the Laravel backend's public/ dir - see
+// backend/public/privacy-policy.html.
+export const privacyPolicyUrl = `${API_BASE_URL}/privacy-policy.html`;
+
 export const gisPanchayatMapServerUrl = `${API_BASE_URL}/api/gis/panchayat`;
 
 // Same reasoning, for HARSAC's hosted Panchayat/district boundary vector tile

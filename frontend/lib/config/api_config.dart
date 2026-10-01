@@ -30,6 +30,10 @@ class ApiConfig {
   /// Alias retained for registration API call sites.
   static String get mhariPanchayatBaseUrl => baseUrl;
 
+  /// Served as a static file from the Laravel backend's public/ dir -
+  /// see backend/public/privacy-policy.html.
+  static String get privacyPolicyUrl => '$baseUrl/privacy-policy.html';
+
   /// Boundary overlay uses the same proxy as the live admin dashboard.
   /// Local Laravel cannot mint a GIS token from this LAN (`gis.harsac.in`
   /// times out), which is why the layer vanished after pointing at `:8083`.
