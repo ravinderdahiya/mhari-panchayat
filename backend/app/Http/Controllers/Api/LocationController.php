@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Block;
 use App\Models\District;
 use App\Models\Panchayat;
 use App\Models\Tehsil;
@@ -178,6 +179,46 @@ class LocationController extends Controller
             ],
             $data['panchayat'] ?? null,
         )]);
+    }
+
+    /**
+     * Type-ahead place search for the app's map: districts, blocks, panchayats
+     * and villages whose name contains `q`. Each hit carries the level + id the
+     * map then passes to extent() to zoom to the real boundary.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+            'level' => ['nullable', 'in:district,block,panchayat,village'],
+        ]);
+
+        $q = trim($data['q']);
+        $contains = '%'.addcslashes($q, '\\%_').'%';
+        $prefix = addcslashes($q, '\\%_').'%';
+        $levels = isset($data['level']) ? [$data['level']] : ['district', 'block', 'panchayat', 'village'];
+        $limit = count($levels) === 1 ? 20 : 6;
+
+        // Census codes are appended to some village names, e.g. "Madhi(15)".
+        $clean = fn (?string $name) => trim(preg_replace('/\s*\(\d+\)\s*$/u', '', (string) $name));
+        $order = fn ($query) => $query->orderByRaw('(name ILIKE ?) DESC', [$prefix])->orderBy('name')->limit($limit);
+
+        $results = [];
+        foreach ($levels as $level) {
+            $rows = match ($level) {
+                'district' => $order(District::query()->where('name', 'ILIKE', $contains))->get(['id', 'name'])
+                    ->map(fn ($d) => ['level' => 'district', 'id' => $d->id, 'name' => $clean($d->name), 'subtitle' => 'District']),
+                'block' => $order(Block::query()->with('district:id,name')->where('name', 'ILIKE', $contains))->get(['id', 'name', 'district_id'])
+                    ->map(fn ($b) => ['level' => 'block', 'id' => $b->id, 'name' => $clean($b->name), 'subtitle' => 'Block'.($b->district ? ', '.$b->district->name : '')]),
+                'panchayat' => $order(Panchayat::query()->with('block.district:id,name')->where('name', 'ILIKE', $contains))->get(['id', 'name', 'block_id'])
+                    ->map(fn ($p) => ['level' => 'panchayat', 'id' => $p->id, 'name' => $clean($p->name), 'subtitle' => 'Panchayat'.($p->block ? ', '.$p->block->name : '').($p->block?->district ? ', '.$p->block->district->name : '')]),
+                'village' => $order(Village::query()->with(['tehsil.district:id,name', 'panchayat:id,name'])->where('name', 'ILIKE', $contains))->get(['id', 'name', 'tehsil_id', 'panchayat_id'])
+                    ->map(fn ($v) => ['level' => 'village', 'id' => $v->id, 'name' => $clean($v->name), 'subtitle' => 'Village'.($v->panchayat ? ', '.$v->panchayat->name : '').($v->tehsil?->district ? ', '.$v->tehsil->district->name : '')]),
+            };
+            array_push($results, ...$rows->all());
+        }
+
+        return response()->json(['success' => true, 'results' => $results]);
     }
 
     // Zooms the dashboard map to a searched District/Tehsil/Block/Village
