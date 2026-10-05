@@ -112,7 +112,11 @@ class ShapefileService
     {
         $cols = ['p.geom AS geom'];
         foreach (config('survey.shp_polygon_aliases') as $column => $alias) {
-            $expr = $column === 'uuid' ? 'p.uuid::text' : 'p.'.$column;
+            $expr = match ($column) {
+                'uuid' => 'p.uuid::text',
+                'description' => 'left(p.description, 254)',
+                default => 'p.'.$column,
+            };
             $cols[] = $expr.' AS "'.$alias.'"';
         }
         foreach (config('survey.shp_aliases') as $column => $alias) {
@@ -290,8 +294,8 @@ class ShapefileService
                   AND ST_XMin(g) >= -180 AND ST_XMax(g) <= 180 AND ST_YMin(g) >= -90 AND ST_YMax(g) <= 90
             )
             INSERT INTO survey_polygons
-                (uuid, user_id, geom, track, raw_points, area_sqm, perimeter_m, point_count, source, created_at, updated_at)
-            SELECT gen_random_uuid(), ?::bigint, g, NULL, NULL,
+                (uuid, user_id, description, geom, track, raw_points, area_sqm, perimeter_m, point_count, source, created_at, updated_at)
+            SELECT gen_random_uuid(), ?::bigint, ?::varchar, g, NULL, NULL,
                    ST_Area(g::geography), ST_Perimeter(g::geography), ST_NPoints(g), 'shp_import', now(), now()
             FROM ok WHERE ST_Area(g::geography) >= ?::float8
             RETURNING id
@@ -302,7 +306,9 @@ class ShapefileService
 
         DB::transaction(function () use ($features, $insertSql, $user, $minArea, $reverse, &$imported, &$skipped) {
             foreach ($features as $feature) {
-                $ids = array_map(fn ($r) => (int) $r->id, DB::select($insertSql, [$feature->ogc_fid, $user->id, $minArea]));
+                $props = json_decode($feature->props, true) ?: [];
+                $description = $this->descriptionFrom($props);
+                $ids = array_map(fn ($r) => (int) $r->id, DB::select($insertSql, [$feature->ogc_fid, $user->id, $description, $minArea]));
 
                 if ($ids === []) {
                     $skipped[] = ['feature' => (int) $feature->ogc_fid, 'reason' => 'Empty, non-polygon, out-of-range or zero-area geometry'];
@@ -310,7 +316,7 @@ class ShapefileService
                     continue;
                 }
 
-                $attributes = $this->mapProps(json_decode($feature->props, true) ?: [], $reverse);
+                $attributes = $this->mapProps($props, $reverse);
                 foreach ($ids as $id) {
                     $imported++;
                     if ($attributes) {
@@ -327,6 +333,19 @@ class ShapefileService
             'skipped_details' => array_slice($skipped, 0, 50),
             'warnings' => $warnings,
         ];
+    }
+
+    /** The polygon description from the DBF (alias DESCRIP), cut to the column size. */
+    private function descriptionFrom(array $props): ?string
+    {
+        $alias = strtolower(config('survey.shp_polygon_aliases.description'));
+        foreach ($props as $field => $value) {
+            if (strtolower((string) $field) === $alias && is_string($value) && trim($value) !== '') {
+                return mb_substr(trim($value), 0, 500);
+            }
+        }
+
+        return null;
     }
 
     /** lower-case DBF field => attribute column (null = derived/ignored). */

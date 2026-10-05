@@ -152,9 +152,9 @@ class TrackedPolygonService
                 LIMIT 1
             )
             INSERT INTO survey_polygons
-                (uuid, user_id, geom, track, raw_points, area_sqm, perimeter_m,
+                (uuid, user_id, description, geom, track, raw_points, area_sqm, perimeter_m,
                  point_count, started_at, ended_at, source, created_at, updated_at)
-            SELECT ?::uuid, ?::bigint, geom, track, ?::jsonb,
+            SELECT ?::uuid, ?::bigint, ?::varchar, geom, track, ?::jsonb,
                    ST_Area(geom::geography), ST_Perimeter(geom::geography),
                    ?::int, ?::timestamptz, ?::timestamptz, ?::varchar, now(), now()
             FROM best
@@ -164,6 +164,7 @@ class TrackedPolygonService
             (float) config('tracking.min_area_sqm'),
             $data['uuid'],
             $user->id,
+            isset($data['description']) ? trim((string) $data['description']) ?: null : null,
             json_encode($data['points']),
             count($points),
             $data['started_at'] ?? $first,

@@ -39,9 +39,11 @@ return [
         'remarks' => 'REMARKS',
     ],
 
-    // Polygon-level columns exported to the shapefile (derived on import, so ignored there).
+    // Polygon-level columns exported to the shapefile. uuid / area / perimeter are derived on
+    // import (ignored); `description` is read back into the polygon.
     'shp_polygon_aliases' => [
         'uuid' => 'UUID',
+        'description' => 'DESCRIP',
         'area_sqm' => 'AREA_SQM',
         'perimeter_m' => 'PERIM_M',
     ],

@@ -20,7 +20,7 @@ class SurveyPolygon extends Model
     public const SOURCE_SHP_IMPORT = 'shp_import';
 
     protected $fillable = [
-        'uuid', 'user_id', 'raw_points', 'area_sqm', 'perimeter_m',
+        'uuid', 'user_id', 'description', 'raw_points', 'area_sqm', 'perimeter_m',
         'point_count', 'started_at', 'ended_at', 'source',
     ];
 
@@ -34,7 +34,7 @@ class SurveyPolygon extends Model
     ];
 
     private const SCALAR_COLUMNS = [
-        'survey_polygons.id', 'survey_polygons.uuid', 'survey_polygons.user_id',
+        'survey_polygons.id', 'survey_polygons.uuid', 'survey_polygons.user_id', 'survey_polygons.description',
         'survey_polygons.area_sqm', 'survey_polygons.perimeter_m', 'survey_polygons.point_count',
         'survey_polygons.started_at', 'survey_polygons.ended_at', 'survey_polygons.source',
         'survey_polygons.created_at', 'survey_polygons.updated_at', 'survey_polygons.deleted_at',

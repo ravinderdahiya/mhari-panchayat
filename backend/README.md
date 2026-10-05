@@ -109,6 +109,9 @@ routes are rate limited. Responses use `{ "success", "message", "data" }`; error
 | GET | `/api/polygons/export/shp` | zip of `.shp .shx .dbf .prj .cpg`; `?ids[]=1&ids[]=2`, `?bbox=`, `?village=` |
 | POST | `/api/polygons/import/shp` | multipart `file` = zip; returns imported / skipped summary |
 
+`description` (optional, max 500 chars) is the text typed in the app's "Start route" dialog; it is stored on the polygon,
+returned in list / Feature responses, and exported to / imported from the Shapefile as `DESCRIP`.
+
 Processing: points keep their recorded order (`lng lat`); fixes with `accuracy` above the threshold and
 consecutive duplicates are dropped; the ring is closed automatically; `ST_MakeValid` is applied and the
 largest polygon is kept (a self-intersecting walk becomes a valid polygon). Area / perimeter come from
@@ -122,6 +125,7 @@ curl -X POST http://127.0.0.1:8083/api/polygons \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{
     "uuid": "5b1f0c1e-7a0e-4b53-9d0b-3a8f5f0f2c11",
+    "description": "Boundary walk of the north field",
     "started_at": "2026-10-05T10:00:00+05:30",
     "ended_at": "2026-10-05T10:25:00+05:30",
     "source": "online",
@@ -146,7 +150,7 @@ Response `201` (`area_sqm` / `perimeter_m` are illustrative; real values come fr
     "id": "5b1f0c1e-7a0e-4b53-9d0b-3a8f5f0f2c11",
     "geometry": { "type": "Polygon", "coordinates": [[[75.7217,29.1492],[75.7227,29.1492],[75.7227,29.1501],[75.7217,29.1501],[75.7217,29.1492]]] },
     "properties": {
-      "id": 1, "uuid": "5b1f0c1e-7a0e-4b53-9d0b-3a8f5f0f2c11",
+      "id": 1, "uuid": "5b1f0c1e-7a0e-4b53-9d0b-3a8f5f0f2c11", "description": "Boundary walk of the north field",
       "area_sqm": 9720.4, "perimeter_m": 395.1, "point_count": 4,
       "started_at": "2026-10-05T10:00:00+05:30", "ended_at": "2026-10-05T10:25:00+05:30",
       "source": "online", "created_at": "2026-10-05T10:26:02+05:30", "has_data": true,
@@ -209,7 +213,7 @@ Shapefile notes:
 
 - **Field names are max 10 characters**, so each column is exported under the alias in `config/survey.php`
   (`owner_name` -> `OWNER`, `khasra_no` -> `KHASRA`, `murabba_no` -> `MURABBA`, `area_sqm` -> `AREA_SQM`,
-  `perimeter_m` -> `PERIM_M`, `uuid` -> `UUID`, `extra` -> `EXTRA` as JSON text). On import the same list maps
+  `perimeter_m` -> `PERIM_M`, `uuid` -> `UUID`, `description` -> `DESCRIP`, `extra` -> `EXTRA` as JSON text). On import the same list maps
   DBF fields back to columns (case-insensitive); unmapped fields go to `extra`. `UUID`, `AREA_SQM`, `PERIM_M`
   are derived values and are ignored; imported polygons get fresh uuids and `source = shp_import`.
 - **Hindi text**: export uses `-lco ENCODING=UTF-8` (writes the `.cpg`). On import a missing `.cpg` is treated as

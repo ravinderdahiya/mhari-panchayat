@@ -17,6 +17,7 @@ class SurveyPolygonFeatureResource extends JsonResource
         $properties = [
             'id' => $this->id,
             'uuid' => $this->uuid,
+            'description' => $this->description,
             'area_sqm' => $this->area_sqm,
             'perimeter_m' => $this->perimeter_m,
             'point_count' => $this->point_count,

@@ -18,6 +18,7 @@ class StorePolygonRequest extends ApiFormRequest
     {
         return [
             'uuid' => ['required', 'uuid'],
+            'description' => ['nullable', 'string', 'max:500'],
             'started_at' => ['nullable', 'date'],
             'ended_at' => ['nullable', 'date', 'after_or_equal:started_at'],
             'source' => ['nullable', Rule::in([SurveyPolygon::SOURCE_ONLINE, SurveyPolygon::SOURCE_OFFLINE_SYNC])],

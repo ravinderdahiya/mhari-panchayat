@@ -73,7 +73,7 @@ class SurveyPolygonApiTest extends TestCase
     // already run and migrate everything else once.
     private function ensureSchema(): void
     {
-        if (Schema::hasTable('survey_polygons') && Schema::hasTable('survey_polygon_attributes')) {
+        if (Schema::hasTable('survey_polygons') && Schema::hasColumn('survey_polygons', 'description') && Schema::hasTable('survey_polygon_attributes')) {
             return;
         }
 
@@ -196,12 +196,13 @@ class SurveyPolygonApiTest extends TestCase
 
     public function test_valid_polygon_is_saved_with_area_and_perimeter(): void
     {
-        $payload = $this->payload();
+        $payload = $this->payload(['description' => 'Boundary walk of the north field']);
 
         $response = $this->actingAs($this->user(), 'sanctum')->postJson('/api/polygons', $payload);
 
         $response->assertCreated()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.properties.description', 'Boundary walk of the north field')
             ->assertJsonPath('data.type', 'Feature')
             ->assertJsonPath('data.geometry.type', 'Polygon')
             ->assertJsonPath('data.properties.uuid', $payload['uuid'])
@@ -217,6 +218,18 @@ class SurveyPolygonApiTest extends TestCase
         $this->assertSame(4326, (int) $row->srid);
         $this->assertTrue((bool) $row->valid);
         $this->assertSame('ST_LineString', $row->t);
+    }
+
+    public function test_description_is_optional_but_limited_to_500_characters(): void
+    {
+        $user = $this->user();
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/polygons', $this->payload())
+            ->assertCreated()->assertJsonPath('data.properties.description', null);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/polygons', $this->payload(['description' => str_repeat('a', 501)]))
+            ->assertStatus(422)->assertJsonValidationErrors(['description']);
     }
 
     public function test_ring_is_closed_automatically(): void
@@ -456,7 +469,7 @@ class SurveyPolygonApiTest extends TestCase
     {
         $this->gdal();
         $user = $this->user();
-        $payload = $this->payload(['attributes' => [
+        $payload = $this->payload(['description' => 'उत्तर खेत की सीमा', 'attributes' => [
             'owner_name' => 'रामलाल',
             'father_name' => 'Shyam',
             'khasra_no' => '12/3',
@@ -485,13 +498,14 @@ class SurveyPolygonApiTest extends TestCase
         $info = $this->ogrinfo(['-al', '-so', "/vsizip/{$zipPath}/polygons.shp"]);
         $this->assertStringContainsString('Feature Count: 1', $info);
         $this->assertStringContainsString('Polygon', $info);
-        foreach (['UUID', 'AREA_SQM', 'PERIM_M', 'OWNER', 'FATHER', 'KHASRA', 'MURABBA', 'VILLAGE', 'EXTRA'] as $field) {
+        foreach (['UUID', 'DESCRIP', 'AREA_SQM', 'PERIM_M', 'OWNER', 'FATHER', 'KHASRA', 'MURABBA', 'VILLAGE', 'EXTRA'] as $field) {
             $this->assertStringContainsString($field.':', $info, "missing field {$field}");
         }
 
         // Hindi survives (UTF-8 .cpg).
         $features = $this->ogrinfo(['-al', "/vsizip/{$zipPath}/polygons.shp"]);
         $this->assertStringContainsString('रामलाल', $features);
+        $this->assertStringContainsString('उत्तर खेत की सीमा', $features);
         $this->assertStringContainsString($payload['uuid'], $features);
     }
 
@@ -524,7 +538,7 @@ class SurveyPolygonApiTest extends TestCase
     {
         $this->gdal();
         $user = $this->user();
-        $a = $this->payload(['attributes' => [
+        $a = $this->payload(['description' => 'North field walk', 'attributes' => [
             'owner_name' => 'रामलाल', 'khasra_no' => '12/3', 'village' => 'Satrod', 'seed_variety' => 'PB-1121',
         ]]);
         $b = $this->payload(['points' => $this->squarePoints(latShift: 0.01)]);
@@ -547,6 +561,9 @@ class SurveyPolygonApiTest extends TestCase
         $imported = DB::table('survey_polygons')->where('user_id', $user->id)->where('source', 'shp_import');
         $this->assertSame(2, $imported->count());
         $this->assertEqualsWithDelta($originalArea, (float) $imported->sum('area_sqm'), $originalArea * 0.01);
+
+        // The route description round-trips through the DESCRIP field.
+        $this->assertSame(1, DB::table('survey_polygons')->where('user_id', $user->id)->where('source', 'shp_import')->where('description', 'North field walk')->count());
 
         // Attributes came back through the alias map (UTF-8 intact, extra restored).
         $attr = DB::table('survey_polygon_attributes')
