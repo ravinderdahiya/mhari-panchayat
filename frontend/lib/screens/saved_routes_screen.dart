@@ -70,24 +70,47 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
 
     setState(() => _uploadingIds.addAll(pending.map((r) => r.id)));
     var done = 0;
-    String? firstError;
+    final failures = <String>[];
     for (final route in pending) {
       final (updated, message) = await _uploadRoute(route);
       if (updated != null) {
         done++;
       } else {
-        firstError ??= message;
+        failures.add(
+          '${_formatDateTime(route.startedAt)} (${route.points.length} pts): '
+          '$message',
+        );
       }
       if (!mounted) return;
       setState(() => _uploadingIds.remove(route.id));
     }
 
-    final failed = pending.length - done;
-    final summary = failed == 0
-        ? '$done route${done == 1 ? '' : 's'} uploaded.'
-        : '$done uploaded, $failed failed: $firstError';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(summary)));
     await _load();
+    if (!mounted) return;
+    if (failures.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$done route${done == 1 ? '' : 's'} uploaded.'),
+        ),
+      );
+      return;
+    }
+    // One line per failed route, so each route's own reason is visible.
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$done uploaded, ${failures.length} failed'),
+        content: SingleChildScrollView(
+          child: Text(failures.join('\n\n')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _delete(RouteTrack route) async {

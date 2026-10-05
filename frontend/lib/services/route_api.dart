@@ -26,6 +26,10 @@ class RouteApi {
 
   static Uri get _uri => Uri.parse('${ApiConfig.baseUrl}/api/polygons');
 
+  /// The server rejects polygons with fewer points ("points must have at
+  /// least 3 items"), so don't send those.
+  static const minPoints = 3;
+
   /// Local time with its UTC offset, e.g. `2026-10-05T10:00:03+05:30` - the
   /// format the API documents (a bare `Z` timestamp is not what it shows).
   static String _stamp(DateTime t) {
@@ -56,6 +60,13 @@ class RouteApi {
   /// Returns normally when the route is on the server (including when the
   /// server says it already had it); throws [RouteApiException] otherwise.
   static Future<void> upload(RouteTrack track) async {
+    if (track.points.length < minPoints) {
+      throw RouteApiException(
+        'Needs at least $minPoints points (this route has '
+        '${track.points.length}). Record a longer route.',
+      );
+    }
+
     final session = await AuthService.getSession();
     if (session == null || !session.isValid) {
       throw RouteApiException('Please log in first.');
