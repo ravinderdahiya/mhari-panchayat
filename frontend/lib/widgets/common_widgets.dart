@@ -239,8 +239,12 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      flexibleSpace: const DecoratedBox(
-        decoration: BoxDecoration(gradient: AppGradients.header),
+      // SizedBox.expand: a child-less DecoratedBox otherwise sizes to zero and
+      // the gradient (and the white title on top of it) disappears.
+      flexibleSpace: const SizedBox.expand(
+        child: DecoratedBox(
+          decoration: BoxDecoration(gradient: AppGradients.header),
+        ),
       ),
     );
   }

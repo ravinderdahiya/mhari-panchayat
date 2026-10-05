@@ -14,9 +14,11 @@ import '../models/survey.dart';
 import '../navigation/app_navigation.dart';
 import '../services/asset_api.dart';
 import '../services/complaint_api.dart';
+import '../services/route_tracker.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
 import '../widgets/complaint_widgets.dart';
+import '../widgets/route_recorder.dart';
 import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
 
@@ -85,6 +87,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   @override
   void initState() {
     super.initState();
+    RouteTracker.instance.addListener(_followRoute);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyLocation());
     if (widget.showComplaints) {
       _loadComplaints();
@@ -143,8 +146,24 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     }
   }
 
+  /// Keeps the newest recorded point in view while a route is recording.
+  void _followRoute() {
+    final tracker = RouteTracker.instance;
+    if (!mounted || !tracker.isRecording || tracker.points.isEmpty) return;
+    try {
+      final zoom = _mapController.camera.zoom;
+      _mapController.move(
+        tracker.points.last.latLng,
+        zoom < _myLocationZoom ? _myLocationZoom : zoom,
+      );
+    } catch (_) {
+      // Map not built yet (e.g. tab just switched back) - next point retries.
+    }
+  }
+
   @override
   void dispose() {
+    RouteTracker.instance.removeListener(_followRoute);
     _mapController.dispose();
     super.dispose();
   }
@@ -204,6 +223,55 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
             GisMapImageLayer(
               controller: _mapController,
               mapServerUrl: ApiConfig.gisPanchayatMapServerUrl,
+            ),
+            ListenableBuilder(
+              listenable: RouteTracker.instance,
+              builder: (context, _) {
+                final points = [
+                  for (final p in RouteTracker.instance.points) p.latLng,
+                ];
+                if (points.length < 2) return const SizedBox.shrink();
+                return PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: points,
+                      strokeWidth: 5,
+                      color: const Color(0xFF1565C0),
+                      borderStrokeWidth: 2,
+                      borderColor: Colors.white,
+                    ),
+                  ],
+                );
+              },
+            ),
+            ListenableBuilder(
+              listenable: RouteTracker.instance,
+              builder: (context, _) {
+                final points = RouteTracker.instance.points;
+                if (points.isEmpty) return const SizedBox.shrink();
+                return MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: points.first.latLng,
+                      width: 44,
+                      height: 52,
+                      alignment: Alignment.topCenter,
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Color(0xFF2E7D32),
+                        size: 44,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black38,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             MarkerLayer(
               markers: [
@@ -268,6 +336,12 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
               ),
             ),
           ),
+        const Positioned(
+          right: AppSpacing.screen,
+          // Sits just above the my-location button (56px tall + gap).
+          bottom: AppSpacing.screen + 66,
+          child: RouteRecorderControl(),
+        ),
         Positioned(
           right: AppSpacing.screen,
           bottom: AppSpacing.screen,
