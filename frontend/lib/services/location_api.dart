@@ -27,8 +27,84 @@ class DetectedLocation {
   final String? panchayat;
 }
 
+/// One hit of the map's place search (district / block / panchayat / village).
+class PlaceHit {
+  const PlaceHit({
+    required this.level,
+    required this.id,
+    required this.name,
+    required this.subtitle,
+  });
+
+  final String level;
+  final int id;
+  final String name;
+  final String subtitle;
+}
+
+/// Bounding box in WGS84 degrees.
+typedef GeoExtent = ({double xmin, double ymin, double xmax, double ymax});
+
 class LocationApi {
   LocationApi._();
+
+  /// Type-ahead search over the Haryana hierarchy. [level] narrows it to
+  /// 'district' | 'block' | 'panchayat' | 'village'. Returns [] on any failure.
+  static Future<List<PlaceHit>> search(String query, {String? level}) async {
+    final session = await AuthService.getSession();
+    if (session == null || !session.isValid) return const [];
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/location/search').replace(
+      queryParameters: {'q': query.trim(), if (level != null) 'level': level},
+    );
+    final body = await _getJson(uri, session.token);
+    final results = body?['results'];
+    if (results is! List) return const [];
+
+    return [
+      for (final item in results.whereType<Map<String, dynamic>>())
+        if (int.tryParse('${item['id']}') != null)
+          PlaceHit(
+            level: '${item['level']}',
+            id: int.parse('${item['id']}'),
+            name: '${item['name']}',
+            subtitle: '${item['subtitle'] ?? ''}',
+          ),
+    ];
+  }
+
+  /// Real boundary extent of a searched place, or null when it has none.
+  static Future<GeoExtent?> extent({required String level, required int id}) async {
+    final session = await AuthService.getSession();
+    if (session == null || !session.isValid) return null;
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/location/extent').replace(
+      queryParameters: {'level': level, 'id': '$id'},
+    );
+    final extent = (await _getJson(uri, session.token))?['extent'];
+    if (extent is! Map) return null;
+
+    double? number(String key) => double.tryParse('${extent[key]}');
+    final xmin = number('xmin'), ymin = number('ymin');
+    final xmax = number('xmax'), ymax = number('ymax');
+    if (xmin == null || ymin == null || xmax == null || ymax == null) return null;
+
+    return (xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax);
+  }
+
+  static Future<Map<String, dynamic>?> _getJson(Uri uri, String token) async {
+    try {
+      final response = await http
+          .get(uri, headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      final body = jsonDecode(response.body);
+
+      return body is Map<String, dynamic> ? body : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   static Future<DetectedLocation?> reverse({
     required double latitude,

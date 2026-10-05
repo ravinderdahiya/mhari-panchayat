@@ -1,7 +1,8 @@
-import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -14,6 +15,7 @@ import '../models/survey.dart';
 import '../navigation/app_navigation.dart';
 import '../services/asset_api.dart';
 import '../services/complaint_api.dart';
+import '../services/location_api.dart';
 import '../services/route_tracker.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
@@ -21,6 +23,9 @@ import '../widgets/complaint_widgets.dart';
 import '../widgets/route_recorder.dart';
 import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
+import 'my_complaints_screen.dart';
+import 'notification_screen.dart';
+import 'report_issue_screen.dart';
 
 class ComplaintMapScreen extends StatefulWidget {
   const ComplaintMapScreen({
@@ -44,6 +49,16 @@ class ComplaintMapScreen extends StatefulWidget {
 
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   final _mapController = MapController();
+
+  // --- place search (search bar + Panchayat/Block/District chips)
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  Timer? _searchDebounce;
+  int _searchSeq = 0;
+  String? _searchLevel; // null = all levels
+  List<PlaceHit> _hits = [];
+  bool _searching = false;
+  bool _searchedOnce = false;
 
   /// Same center as the admin dashboard map, but zoomed out a step further
   /// - the dashboard is a wide desktop map, while a phone's narrower
@@ -140,7 +155,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         ),
       );
       if (!mounted) return;
-      setState(() => _myLocation = LatLng(position.latitude, position.longitude));
+      setState(
+        () => _myLocation = LatLng(position.latitude, position.longitude),
+      );
     } catch (_) {
       // Keep showing Haryana if location can't be read.
     }
@@ -164,6 +181,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   @override
   void dispose() {
     RouteTracker.instance.removeListener(_followRoute);
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocus.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -196,201 +216,166 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     };
   }
 
+  /// Quick Access + Recent Activities are citizen-only; staff Map tabs share
+  /// the rest of the dashboard layout (header, search, chips, map controls).
+  bool get _showQuickAccess => widget.showComplaints && !widget.staffQueue;
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(body: _buildMapBody(context));
+  Widget build(BuildContext context) => _buildCitizenHome(context);
+
+  int _countFor(ComplaintBucket bucket) =>
+      _complaints.where((c) => complaintBucket(c.status) == bucket).length;
+
+  void _comingSoon(String what) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('$what will be available soon')));
   }
 
-  Widget _buildMapBody(BuildContext context) {
-    return Stack(
-      children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: const MapOptions(
-            initialCenter: _haryanaCenter,
-            initialZoom: _haryanaZoom,
-            minZoom: 5,
-            maxZoom: 18,
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: _streetsBasemap ? _streetsTiles : _imageryTiles,
-              userAgentPackageName: 'com.example.my_first_app',
-              errorTileCallback: (tile, error, stackTrace) {
-                debugPrint('Tile load failed for ${tile.coordinates}: $error');
-              },
-            ),
-            GisMapImageLayer(
-              controller: _mapController,
-              mapServerUrl: ApiConfig.gisPanchayatMapServerUrl,
-            ),
-            ListenableBuilder(
-              listenable: RouteTracker.instance,
-              builder: (context, _) {
-                final points = [
-                  for (final p in RouteTracker.instance.points) p.latLng,
-                ];
-                if (points.length < 2) return const SizedBox.shrink();
-                return PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: points,
-                      strokeWidth: 5,
-                      color: const Color(0xFF1565C0),
-                      borderStrokeWidth: 2,
-                      borderColor: Colors.white,
-                    ),
-                  ],
-                );
-              },
-            ),
-            ListenableBuilder(
-              listenable: RouteTracker.instance,
-              builder: (context, _) {
-                final points = RouteTracker.instance.points;
-                if (points.isEmpty) return const SizedBox.shrink();
-                return MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: points.first.latLng,
-                      width: 44,
-                      height: 52,
-                      alignment: Alignment.topCenter,
-                      child: const Icon(
-                        Icons.location_on,
-                        color: Color(0xFF2E7D32),
-                        size: 44,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black38,
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            MarkerLayer(
-              markers: [
-                for (final asset in _geoAssets)
-                  Marker(
-                    point: LatLng(asset.latitude!, asset.longitude!),
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    child: _AssetMarker(
-                      color: _conditionColor(asset.condition),
-                      icon: assetTypeIcon(asset.iconKey ?? 'apartment'),
-                      onTap: () =>
-                          push(context, AssetDetailsScreen(assetId: asset.id)),
-                    ),
-                  ),
-                if (widget.showComplaints)
-                  for (final complaint in _geoComplaints)
-                    Marker(
-                      point: LatLng(complaint.latitude!, complaint.longitude!),
-                      width: 44,
-                      height: 52,
-                      alignment: Alignment.topCenter,
-                      child: _TeardropMarker(
-                        color: _markerColor(complaint.status),
-                        onTap: () => push(
-                          context,
-                          ComplaintDetailsScreen(complaint: complaint),
-                        ),
-                      ),
-                    ),
-                if (_myLocation != null)
-                  Marker(
-                    point: _myLocation!,
-                    width: 26,
-                    height: 26,
-                    alignment: Alignment.center,
-                    child: const _MyLocationDot(),
-                  ),
-              ],
-            ),
-          ],
-        ),
-        _buildBasemapToggle(),
-        _buildZoomControls(),
-        if (widget.showComplaints)
-          Positioned(
-            left: AppSpacing.screen,
-            bottom: AppSpacing.screen,
-            child: _MapLegend(selected: _statusFilter, onSelect: _toggleFilter),
-          ),
-        if (_loading)
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 68,
-            left: 0,
-            right: 0,
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              ),
-            ),
-          ),
-        const Positioned(
-          right: AppSpacing.screen,
-          // Sits just above the my-location button (56px tall + gap).
-          bottom: AppSpacing.screen + 66,
-          child: RouteRecorderControl(),
-        ),
-        Positioned(
-          right: AppSpacing.screen,
-          bottom: AppSpacing.screen,
-          child: FloatingActionButton(
-            heroTag: 'my_location',
-            backgroundColor: AppColors.background,
-            foregroundColor: AppColors.primary,
-            onPressed: _recenter,
-            child: const Icon(Icons.my_location_rounded),
-          ),
-        ),
-      ],
+  Future<void> _openAndRefresh(Widget screen) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => screen));
+    if (mounted) _loadComplaints();
+  }
+
+  // ------------------------------------------------------------------ search
+
+  String get _searchHint => switch (_searchLevel) {
+    'panchayat' => 'Search Panchayat...',
+    'block' => 'Search Block...',
+    'district' => 'Search District...',
+    _ => 'Search Panchayat, Village, Block...',
+  };
+
+  void _onSearchChanged(String text) {
+    _searchDebounce?.cancel();
+    final query = text.trim();
+    if (query.length < 2) {
+      _searchSeq++;
+      setState(() {
+        _hits = [];
+        _searching = false;
+        _searchedOnce = false;
+      });
+      return;
+    }
+    setState(() => _searching = true);
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () => _runSearch(query));
+  }
+
+  Future<void> _runSearch(String query) async {
+    final seq = ++_searchSeq;
+    final hits = await LocationApi.search(query, level: _searchLevel);
+    if (!mounted || seq != _searchSeq) return; // a newer search superseded this one
+    setState(() {
+      _hits = hits;
+      _searching = false;
+      _searchedOnce = true;
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchSeq++;
+    _searchController.clear();
+    setState(() {
+      _hits = [];
+      _searching = false;
+      _searchedOnce = false;
+    });
+  }
+
+  /// Panchayat / Block / District chips narrow the search to that level.
+  void _pickSearchLevel(String level) {
+    setState(() => _searchLevel = _searchLevel == level ? null : level);
+    _searchFocus.requestFocus();
+    final query = _searchController.text.trim();
+    if (query.length >= 2) _runSearch(query);
+  }
+
+  Future<void> _openHit(PlaceHit hit) async {
+    _searchFocus.unfocus();
+    _searchController.text = hit.name;
+    setState(() {
+      _hits = [];
+      _searchedOnce = false;
+      _searching = true;
+    });
+
+    final extent = await LocationApi.extent(level: hit.level, id: hit.id);
+    if (!mounted) return;
+    setState(() => _searching = false);
+
+    if (extent == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Boundary for ${hit.name} is not available on the map')));
+      return;
+    }
+
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds(LatLng(extent.ymin, extent.xmin), LatLng(extent.ymax, extent.xmax)),
+        padding: const EdgeInsets.fromLTRB(32, 210, 32, 48),
+        maxZoom: 16,
+      ),
     );
   }
 
-  Widget _buildBasemapToggle() {
-    return Positioned(
-      top: MediaQuery.paddingOf(context).top + 66,
-      right: AppSpacing.screen,
-      child: Material(
-        color: AppColors.background,
-        elevation: 3,
-        shadowColor: Colors.black26,
-        borderRadius: BorderRadius.circular(12),
+  void _showLayers() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _BasemapChip(
-                label: 'Map',
-                selected: _streetsBasemap,
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFDDD3B2), Color(0xFFC9BE96)],
+              Text(
+                'Map layers',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
                 ),
-                onTap: () => setState(() => _streetsBasemap = true),
               ),
-              const SizedBox(width: 6),
-              _BasemapChip(
-                label: 'Satellite',
-                selected: !_streetsBasemap,
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF5A6E4C), Color(0xFF3F5233)],
-                ),
-                onTap: () => setState(() => _streetsBasemap = false),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _BasemapChip(
+                    label: 'Map',
+                    selected: _streetsBasemap,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFDDD3B2), Color(0xFFC9BE96)],
+                    ),
+                    onTap: () {
+                      setState(() => _streetsBasemap = true);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  _BasemapChip(
+                    label: 'Satellite',
+                    selected: !_streetsBasemap,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF5A6E4C), Color(0xFF3F5233)],
+                    ),
+                    onTap: () {
+                      setState(() => _streetsBasemap = false);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -399,51 +384,293 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     );
   }
 
+  Widget _buildCitizenHome(BuildContext context) {
+    final recent = ([
+      ..._complaints,
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt))).take(1).toList();
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          const _CitizenHomeHeader(),
+          Expanded(
+            child: Stack(
+              children: [
+                _buildMap(),
+                Positioned(
+                  top: 10,
+                  left: 12,
+                  right: 12,
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _HomeSearchBar(
+                              controller: _searchController,
+                              focusNode: _searchFocus,
+                              hint: _searchHint,
+                              loading: _searching,
+                              onChanged: _onSearchChanged,
+                              onClear: _clearSearch,
+                              onMic: () => _comingSoon('Voice search'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _LayersButton(onTap: _showLayers),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _QuickChip(
+                              icon: Icons.home_rounded,
+                              label: 'Panchayat',
+                              color: _kGreen,
+                              background: const Color(0xFFE6F3EA),
+                              selected: _searchLevel == 'panchayat',
+                              onTap: () => _pickSearchLevel('panchayat'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _QuickChip(
+                              icon: Icons.apartment_rounded,
+                              label: 'Block',
+                              color: const Color(0xFF2563EB),
+                              background: const Color(0xFFE3EEFA),
+                              selected: _searchLevel == 'block',
+                              onTap: () => _pickSearchLevel('block'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _QuickChip(
+                              icon: Icons.location_on_rounded,
+                              label: 'District',
+                              color: _kOrange,
+                              background: const Color(0xFFFDEEDD),
+                              selected: _searchLevel == 'district',
+                              onTap: () => _pickSearchLevel('district'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _QuickChip(
+                              icon: Icons.map_rounded,
+                              label: 'Find on Map',
+                              color: const Color(0xFF7C4DDB),
+                              background: const Color(0xFFEEE7FA),
+                              onTap: _recenter,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  right: 12,
+                  top: 150,
+                  child: Column(
+                    children: [
+                      _MapSquareButton(
+                        icon: Icons.my_location_rounded,
+                        onTap: _recenter,
+                      ),
+                      const SizedBox(height: 8),
+                      _MapSquareButton(
+                        icon: Icons.add_rounded,
+                        onTap: () => _zoomBy(1),
+                      ),
+                      const SizedBox(height: 2),
+                      _MapSquareButton(
+                        icon: Icons.remove_rounded,
+                        onTap: () => _zoomBy(-1),
+                      ),
+                      const SizedBox(height: 8),
+                      _MapSquareButton(
+                        icon: Icons.fullscreen_rounded,
+                        onTap: _fitHaryana,
+                      ),
+                    ],
+                  ),
+                ),
+                const Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: RouteRecorderControl(),
+                ),
+                if (widget.showComplaints)
+                  Positioned(
+                    left: 12,
+                    bottom: 12,
+                    child: _IssueStatusCard(
+                      selected: _statusFilter,
+                      onSelect: _toggleFilter,
+                      pending: _countFor(ComplaintBucket.pending),
+                      inProgress: _countFor(ComplaintBucket.inProgress),
+                      resolved: _countFor(ComplaintBucket.resolved),
+                    ),
+                  ),
+                if (_loading)
+                  const Positioned(
+                    top: 140,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                      ),
+                    ),
+                  ),
+                if (_hits.isNotEmpty || (_searchedOnce && !_searching))
+                  Positioned(
+                    top: 62,
+                    left: 12,
+                    right: 12,
+                    child: _SearchResults(hits: _hits, onTap: _openHit),
+                  ),
+              ],
+            ),
+          ),
+          if (_showQuickAccess)
+            _QuickAccessPanel(
+              recent: recent,
+              onRaise: () => _openAndRefresh(const ReportIssueScreen()),
+              onTrack: () => _openAndRefresh(const MyComplaintsScreen()),
+              onAlerts: () => _openAndRefresh(const NotificationScreen()),
+              onPanchayat: () => _comingSoon('Panchayat details'),
+              onViewComplaint: (c) =>
+                  push(context, ComplaintDetailsScreen(complaint: c)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMap() {
+    return FlutterMap(
+      mapController: _mapController,
+      options: const MapOptions(
+        initialCenter: _haryanaCenter,
+        initialZoom: _haryanaZoom,
+        minZoom: 5,
+        maxZoom: 18,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: _streetsBasemap ? _streetsTiles : _imageryTiles,
+          userAgentPackageName: 'com.example.my_first_app',
+          errorTileCallback: (tile, error, stackTrace) {
+            debugPrint('Tile load failed for ${tile.coordinates}: $error');
+          },
+        ),
+        GisMapImageLayer(
+          controller: _mapController,
+          mapServerUrl: ApiConfig.gisPanchayatMapServerUrl,
+        ),
+        ListenableBuilder(
+          listenable: RouteTracker.instance,
+          builder: (context, _) {
+            final points = [
+              for (final p in RouteTracker.instance.points) p.latLng,
+            ];
+            if (points.length < 2) return const SizedBox.shrink();
+            return PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: points,
+                  strokeWidth: 5,
+                  color: const Color(0xFF1565C0),
+                  borderStrokeWidth: 2,
+                  borderColor: Colors.white,
+                ),
+              ],
+            );
+          },
+        ),
+        ListenableBuilder(
+          listenable: RouteTracker.instance,
+          builder: (context, _) {
+            final points = RouteTracker.instance.points;
+            if (points.isEmpty) return const SizedBox.shrink();
+            return MarkerLayer(
+              markers: [
+                Marker(
+                  point: points.first.latLng,
+                  width: 44,
+                  height: 52,
+                  alignment: Alignment.topCenter,
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Color(0xFF2E7D32),
+                    size: 44,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black38,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        MarkerLayer(
+          markers: [
+            for (final asset in _geoAssets)
+              Marker(
+                point: LatLng(asset.latitude!, asset.longitude!),
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                child: _AssetMarker(
+                  color: _conditionColor(asset.condition),
+                  icon: assetTypeIcon(asset.iconKey ?? 'apartment'),
+                  onTap: () =>
+                      push(context, AssetDetailsScreen(assetId: asset.id)),
+                ),
+              ),
+            if (widget.showComplaints)
+              for (final complaint in _geoComplaints)
+                Marker(
+                  point: LatLng(complaint.latitude!, complaint.longitude!),
+                  width: 44,
+                  height: 52,
+                  alignment: Alignment.topCenter,
+                  child: _TeardropMarker(
+                    color: _markerColor(complaint.status),
+                    onTap: () => push(
+                      context,
+                      ComplaintDetailsScreen(complaint: complaint),
+                    ),
+                  ),
+                ),
+            if (_myLocation != null)
+              Marker(
+                point: _myLocation!,
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                child: const _MyLocationDot(),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   void _zoomBy(double delta) {
     final camera = _mapController.camera;
     final next = (camera.zoom + delta).clamp(5.0, 18.0);
     _mapController.move(camera.center, next);
-  }
-
-  Widget _buildZoomControls() {
-    return Positioned(
-      top: MediaQuery.paddingOf(context).top + 134,
-      right: AppSpacing.screen,
-      child: Material(
-        color: AppColors.background,
-        elevation: 3,
-        shadowColor: Colors.black26,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ZoomButton(icon: Icons.add_rounded, onTap: () => _zoomBy(1)),
-            Divider(height: 1, color: AppColors.border),
-            _ZoomButton(icon: Icons.remove_rounded, onTap: () => _zoomBy(-1)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ZoomButton extends StatelessWidget {
-  const _ZoomButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: Icon(icon, size: 22, color: AppColors.mutedText),
-      ),
-    );
   }
 }
 
@@ -563,109 +790,248 @@ class _AssetMarker extends StatelessWidget {
   }
 }
 
-class _MapLegend extends StatelessWidget {
-  const _MapLegend({required this.selected, required this.onSelect});
+const _kGreen = Color(0xFF1B6B43);
+const _kOrange = Color(0xFFF58220);
 
-  final ComplaintBucket? selected;
-  final ValueChanged<ComplaintBucket> onSelect;
+TextStyle _pop(
+  double size, {
+  FontWeight weight = FontWeight.w500,
+  Color? color,
+}) => GoogleFonts.poppins(
+  fontSize: size,
+  fontWeight: weight,
+  color: color ?? AppColors.ink,
+);
+
+class _CitizenHomeHeader extends StatelessWidget {
+  const _CitizenHomeHeader();
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.card),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: AppColors.border, width: 0.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'STATUS',
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                  color: AppColors.mutedText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              _legendRow(
-                const Color(0xFFD32F2F),
-                'Pending',
-                ComplaintBucket.pending,
-              ),
-              _legendRow(
-                const Color(0xFFF9A825),
-                'In Progress',
-                ComplaintBucket.inProgress,
-              ),
-              _legendRow(
-                const Color(0xFF2E7D32),
-                'Resolved',
-                ComplaintBucket.resolved,
-              ),
-            ],
-          ),
-        ),
+    final top = MediaQuery.paddingOf(context).top;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.screen,
+        top + 8,
+        AppSpacing.screen,
+        10,
       ),
-    );
-  }
-
-  Widget _legendRow(Color color, String label, ComplaintBucket bucket) {
-    final isSelected = selected == bucket;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => onSelect(bucket),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.12) : null,
-            borderRadius: BorderRadius.circular(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        ],
+      ),
+      child: Row(
+        children: [
+          SvgPicture.asset(
+            'assets/images/haryana_emblem.svg',
+            width: 40,
+            height: 40,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Government\nof Haryana',
+            style: _pop(9, weight: FontWeight.w600).copyWith(height: 1.2),
+          ),
+          const Spacer(),
+          Column(
             children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.5),
-                      blurRadius: 4,
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Mahari ',
+                      style: _pop(20, weight: FontWeight.w700, color: _kGreen),
+                    ),
+                    TextSpan(
+                      text: 'Panchayat',
+                      style: _pop(20, weight: FontWeight.w700, color: _kOrange),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
               Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? color : const Color(0xFF424242),
+                'मेरी पंचायत - सशक्त पंचायत, समृद्ध हरियाणा',
+                style: _pop(8.5, weight: FontWeight.w600, color: AppColors.ink),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Image.asset('assets/images/harsac_logo.png', width: 40, height: 40),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSearchBar extends StatelessWidget {
+  const _HomeSearchBar({
+    required this.controller,
+    required this.focusNode,
+    required this.hint,
+    required this.loading,
+    required this.onChanged,
+    required this.onClear,
+    required this.onMic,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String hint;
+  final bool loading;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final VoidCallback onMic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.only(left: 14, right: 6),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded, color: AppColors.ink, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                onChanged: onChanged,
+                textInputAction: TextInputAction.search,
+                style: _pop(13, weight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintMaxLines: 1,
+                  hintStyle: _pop(12.5, weight: FontWeight.w400, color: AppColors.mutedText),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
                 ),
+              ),
+            ),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.all(10),
+                child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) => value.text.isEmpty
+                  ? IconButton(
+                      onPressed: onMic,
+                      icon: Icon(Icons.mic_none_rounded, color: AppColors.ink, size: 22),
+                    )
+                  : IconButton(
+                      onPressed: onClear,
+                      icon: Icon(Icons.close_rounded, color: AppColors.ink, size: 20),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchResults extends StatelessWidget {
+  const _SearchResults({required this.hits, required this.onTap});
+
+  final List<PlaceHit> hits;
+  final ValueChanged<PlaceHit> onTap;
+
+  IconData _icon(String level) => switch (level) {
+    'district' => Icons.location_on_rounded,
+    'block' => Icons.apartment_rounded,
+    'panchayat' => Icons.home_rounded,
+    _ => Icons.holiday_village_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 6,
+      shadowColor: Colors.black38,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 300),
+        child: hits.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'No places found',
+                  style: _pop(12.5, weight: FontWeight.w400, color: AppColors.mutedText),
+                ),
+              )
+            : ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: hits.length,
+                separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                itemBuilder: (context, index) {
+                  final hit = hits[index];
+
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(_icon(hit.level), color: _kGreen, size: 22),
+                    title: Text(hit.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: _pop(13, weight: FontWeight.w600)),
+                    subtitle: Text(
+                      hit.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: _pop(11, weight: FontWeight.w400, color: AppColors.mutedText),
+                    ),
+                    onTap: () => onTap(hit),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _LayersButton extends StatelessWidget {
+  const _LayersButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _kGreen,
+      elevation: 3,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.layers_rounded, color: Colors.white, size: 21),
+              const SizedBox(width: 6),
+              Text(
+                'Layers',
+                style: _pop(13, weight: FontWeight.w600, color: Colors.white),
               ),
             ],
           ),
@@ -673,4 +1039,508 @@ class _MapLegend extends StatelessWidget {
       ),
     );
   }
+}
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.background,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color background;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      elevation: 2,
+      shadowColor: Colors.black26,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: selected ? BorderSide(color: color, width: 2) : BorderSide.none,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 26),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _pop(11, weight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapSquareButton extends StatelessWidget {
+  const _MapSquareButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, size: 22, color: AppColors.ink),
+        ),
+      ),
+    );
+  }
+}
+
+class _IssueStatusCard extends StatelessWidget {
+  const _IssueStatusCard({
+    required this.selected,
+    required this.onSelect,
+    required this.pending,
+    required this.inProgress,
+    required this.resolved,
+  });
+
+  final ComplaintBucket? selected;
+  final ValueChanged<ComplaintBucket> onSelect;
+  final int pending;
+  final int inProgress;
+  final int resolved;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 160,
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Issue Status',
+                  style: _pop(13, weight: FontWeight.w700),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _row(
+            const Color(0xFFE53935),
+            'Pending',
+            pending,
+            ComplaintBucket.pending,
+          ),
+          _row(
+            const Color(0xFFF9A825),
+            'In Progress',
+            inProgress,
+            ComplaintBucket.inProgress,
+          ),
+          _row(
+            const Color(0xFF2E9D4F),
+            'Resolved',
+            resolved,
+            ComplaintBucket.resolved,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(Color color, String label, int count, ComplaintBucket bucket) {
+    final isSelected = selected == bucket;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => onSelect(bucket),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.12) : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: _pop(
+                  12,
+                  weight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            Text(
+              '($count)',
+              style: _pop(
+                12,
+                weight: FontWeight.w500,
+                color: AppColors.mutedText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAccessPanel extends StatelessWidget {
+  const _QuickAccessPanel({
+    required this.recent,
+    required this.onRaise,
+    required this.onTrack,
+    required this.onAlerts,
+    required this.onPanchayat,
+    required this.onViewComplaint,
+  });
+
+  final List<Complaint> recent;
+  final VoidCallback onRaise;
+  final VoidCallback onTrack;
+  final VoidCallback onAlerts;
+  final VoidCallback onPanchayat;
+  final ValueChanged<Complaint> onViewComplaint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screen,
+        12,
+        AppSpacing.screen,
+        10,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionRow(title: 'Quick Access', onViewAll: onTrack),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _AccessTile(
+                  icon: Icons.note_add_rounded,
+                  label: 'Raise\nComplaint',
+                  color: const Color(0xFFE53935),
+                  background: const Color(0xFFFCE9E8),
+                  onTap: onRaise,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _AccessTile(
+                  icon: Icons.manage_search_rounded,
+                  label: 'Track\nStatus',
+                  color: _kGreen,
+                  background: const Color(0xFFE6F3EA),
+                  onTap: onTrack,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _AccessTile(
+                  icon: Icons.notifications_rounded,
+                  label: 'View\nAlerts',
+                  color: _kOrange,
+                  background: const Color(0xFFFDEEDD),
+                  onTap: onAlerts,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _AccessTile(
+                  icon: Icons.groups_rounded,
+                  label: 'Panchayat\nDetails',
+                  color: const Color(0xFF7C4DDB),
+                  background: const Color(0xFFEEE7FA),
+                  onTap: onPanchayat,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _SectionRow(title: 'Recent Activities', onViewAll: onTrack),
+          const SizedBox(height: 6),
+          if (recent.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No complaints raised yet',
+                style: _pop(
+                  12,
+                  weight: FontWeight.w400,
+                  color: AppColors.mutedText,
+                ),
+              ),
+            )
+          else
+            for (final complaint in recent)
+              _RecentTile(
+                complaint: complaint,
+                onTap: () => onViewComplaint(complaint),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionRow extends StatelessWidget {
+  const _SectionRow({required this.title, required this.onViewAll});
+
+  final String title;
+  final VoidCallback onViewAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(title, style: _pop(15, weight: FontWeight.w700)),
+        ),
+        InkWell(
+          onTap: onViewAll,
+          child: Row(
+            children: [
+              Text('View All', style: _pop(12, weight: FontWeight.w500)),
+              const Icon(Icons.chevron_right_rounded, size: 18),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccessTile extends StatelessWidget {
+  const _AccessTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color background;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 26),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: _pop(
+                  10.5,
+                  weight: FontWeight.w500,
+                ).copyWith(height: 1.2),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentTile extends StatelessWidget {
+  const _RecentTile({required this.complaint, required this.onTap});
+
+  final Complaint complaint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = complaint.photoUrls.isNotEmpty
+        ? complaint.photoUrls.first
+        : null;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: photo == null
+                    ? const _ThumbFallback()
+                    : Image.network(
+                        photo,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const _ThumbFallback(),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    complaint.displaySubject,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _pop(13.5, weight: FontWeight.w700),
+                  ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        size: 13,
+                        color: AppColors.mutedText,
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          complaint.locationLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _pop(
+                            11,
+                            weight: FontWeight.w400,
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusBackgroundColor(complaint.status),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel(complaint.status),
+                    style: _pop(
+                      10.5,
+                      weight: FontWeight.w600,
+                      color: statusTextColor(complaint.status),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  complaint.dateLabel,
+                  style: _pop(
+                    10.5,
+                    weight: FontWeight.w400,
+                    color: AppColors.mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThumbFallback extends StatelessWidget {
+  const _ThumbFallback();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: const Color(0xFFE9ECE7),
+    child: Icon(
+      Icons.report_problem_rounded,
+      color: AppColors.mutedText,
+      size: 24,
+    ),
+  );
 }
