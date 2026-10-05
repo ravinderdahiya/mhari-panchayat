@@ -334,7 +334,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
           title: Text(
             'Check your email',
-            style: GoogleFonts.fraunces(
+            style: GoogleFonts.poppins(
               fontWeight: FontWeight.w700,
               color: _RegColors.header,
             ),
@@ -344,7 +344,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             '1. Open the verification email and tap Verify.\n'
             '2. Set your password in the app that opens.\n'
             '3. Wait for admin approval, then Sign in.',
-            style: GoogleFonts.ibmPlexSans(
+            style: GoogleFonts.poppins(
               height: 1.4,
               fontSize: 14,
               color: _RegColors.ink,
@@ -416,7 +416,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'Create a $roleLabel account. Verify phone with OTP, then verify '
         'your email — after that you set your own password. An admin must '
         'still approve you before Sign in works.',
-        style: GoogleFonts.ibmPlexSans(
+        style: GoogleFonts.poppins(
           fontSize: 13,
           color: _RegColors.muted,
           height: 1.4,
@@ -505,7 +505,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         const SizedBox(height: 10),
         Text(
           'Verify OTP to unlock email and location fields.',
-          style: GoogleFonts.ibmPlexSans(
+          style: GoogleFonts.poppins(
             fontSize: 12.5,
             color: _RegColors.muted,
           ),
@@ -620,7 +620,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         Text(
           'After Sign up, open the verification email on this phone and tap '
           '“Verify email & open app” to set your password.',
-          style: GoogleFonts.ibmPlexSans(
+          style: GoogleFonts.poppins(
             fontSize: 12.5,
             color: _RegColors.muted,
             height: 1.4,
@@ -633,7 +633,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget _label(String text, {required bool required}) {
     return RichText(
       text: TextSpan(
-        style: GoogleFonts.ibmPlexSans(
+        style: GoogleFonts.poppins(
           fontSize: 12.5,
           fontWeight: FontWeight.w600,
           color: _RegColors.ink,
@@ -687,7 +687,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       obscureText: obscure,
       maxLength: maxLength,
       enabled: enabled,
-      style: GoogleFonts.ibmPlexSans(fontSize: 14, color: _RegColors.ink),
+      style: GoogleFonts.poppins(fontSize: 14, color: _RegColors.ink),
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: _RegColors.muted, size: 20),
         hintText: hint,
@@ -740,7 +740,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             Icons.keyboard_arrow_down_rounded,
             color: _RegColors.muted,
           ),
-          style: GoogleFonts.ibmPlexSans(fontSize: 14, color: _RegColors.ink),
+          style: GoogleFonts.poppins(fontSize: 14, color: _RegColors.ink),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: _RegColors.muted, size: 20),
             suffixIcon: onRetry == null
@@ -819,7 +819,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             'Sign up',
-            style: GoogleFonts.fraunces(
+            style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -898,7 +898,7 @@ class _VerifiedChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             'Verified',
-            style: GoogleFonts.ibmPlexSans(
+            style: GoogleFonts.poppins(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: _RegColors.verified,
@@ -946,7 +946,7 @@ class _InlineActionButton extends StatelessWidget {
                 )
               : Text(
                   label,
-                  style: GoogleFonts.ibmPlexSans(
+                  style: GoogleFonts.poppins(
                     color: foreground,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
@@ -996,7 +996,7 @@ class _PrimaryButton extends StatelessWidget {
                 )
               : Text(
                   label,
-                  style: GoogleFonts.ibmPlexSans(
+                  style: GoogleFonts.poppins(
                     color: enabled ? Colors.white : _RegColors.disabledText,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

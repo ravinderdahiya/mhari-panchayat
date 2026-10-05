@@ -99,9 +99,9 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
           ),
           title: Text(
             'Password saved',
-            style: GoogleFonts.fraunces(fontWeight: FontWeight.w700),
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
           ),
-          content: Text(message, style: GoogleFonts.ibmPlexSans(height: 1.4)),
+          content: Text(message, style: GoogleFonts.poppins(height: 1.4)),
           actions: [
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -131,7 +131,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
       appBar: AppBar(
         title: Text(
           'Set password',
-          style: GoogleFonts.fraunces(fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         backgroundColor: _header,
         foregroundColor: Colors.white,
@@ -151,7 +151,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
               children: [
                 Text(
                   'Set your password',
-                  style: GoogleFonts.fraunces(
+                  style: GoogleFonts.poppins(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: _header,
@@ -161,7 +161,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                 Text(
                   'Choose a password for your account. Use it with your email '
                   'to Sign in after admin approval.',
-                  style: GoogleFonts.ibmPlexSans(
+                  style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: _muted,
                     height: 1.4,
@@ -182,7 +182,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                       ),
                       child: Text(
                         widget.accountEmail!,
-                        style: GoogleFonts.ibmPlexSans(fontSize: 15),
+                        style: GoogleFonts.poppins(fontSize: 15),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -208,7 +208,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                         Expanded(
                           child: Text(
                             'Verification link applied',
-                            style: GoogleFonts.ibmPlexSans(
+                            style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: _header,
@@ -287,7 +287,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                 const SizedBox(height: 10),
                 Text(
                   '• At least 8 characters',
-                  style: GoogleFonts.ibmPlexSans(
+                  style: GoogleFonts.poppins(
                     fontSize: 12.5,
                     color: _lenOk ? _header : _muted,
                   ),
@@ -296,7 +296,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                   const SizedBox(height: 12),
                   Text(
                     _error!,
-                    style: GoogleFonts.ibmPlexSans(
+                    style: GoogleFonts.poppins(
                       color: const Color(0xFFC05A3A),
                       fontSize: 13,
                     ),
@@ -324,7 +324,7 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                         )
                       : Text(
                           'Save password',
-                          style: GoogleFonts.ibmPlexSans(
+                          style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w700,
                           ),
                         ),

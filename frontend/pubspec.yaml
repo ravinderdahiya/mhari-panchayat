@@ -86,6 +86,7 @@ flutter:
   assets:
     - assets/images/harsac_logo.png
     - assets/images/haryana_emblem.svg
+    - assets/images/splash_poster.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

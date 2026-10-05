@@ -194,37 +194,37 @@ class AppTheme {
       onSurface: ink,
     );
 
-    final plexSans = GoogleFonts.ibmPlexSansTextTheme();
+    final poppinsTheme = GoogleFonts.poppinsTextTheme();
     final notoDevanagari = GoogleFonts.notoSansDevanagariTextTheme();
     const headingWeight = FontWeight.w600;
 
-    final bodyBase = plexSans.apply(bodyColor: ink, displayColor: ink);
+    final bodyBase = poppinsTheme.apply(bodyColor: ink, displayColor: ink);
     final textTheme = bodyBase.copyWith(
-      displayLarge: GoogleFonts.fraunces(
+      displayLarge: GoogleFonts.poppins(
         textStyle: bodyBase.displayLarge,
         fontWeight: headingWeight,
       ),
-      displayMedium: GoogleFonts.fraunces(
+      displayMedium: GoogleFonts.poppins(
         textStyle: bodyBase.displayMedium,
         fontWeight: headingWeight,
       ),
-      displaySmall: GoogleFonts.fraunces(
+      displaySmall: GoogleFonts.poppins(
         textStyle: bodyBase.displaySmall,
         fontWeight: headingWeight,
       ),
-      headlineLarge: GoogleFonts.fraunces(
+      headlineLarge: GoogleFonts.poppins(
         textStyle: bodyBase.headlineLarge,
         fontWeight: headingWeight,
       ),
-      headlineMedium: GoogleFonts.fraunces(
+      headlineMedium: GoogleFonts.poppins(
         textStyle: bodyBase.headlineMedium,
         fontWeight: headingWeight,
       ),
-      headlineSmall: GoogleFonts.fraunces(
+      headlineSmall: GoogleFonts.poppins(
         textStyle: bodyBase.headlineSmall,
         fontWeight: headingWeight,
       ),
-      titleLarge: GoogleFonts.fraunces(
+      titleLarge: GoogleFonts.poppins(
         textStyle: bodyBase.titleLarge,
         fontWeight: headingWeight,
       ),
@@ -253,7 +253,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         centerTitle: true,
         elevation: 0,
-        titleTextStyle: GoogleFonts.fraunces(
+        titleTextStyle: GoogleFonts.poppins(
           color: Colors.white,
           fontSize: 18,
           fontWeight: headingWeight,
@@ -278,7 +278,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          textStyle: GoogleFonts.ibmPlexSans(
+          textStyle: GoogleFonts.poppins(
             fontWeight: FontWeight.w700,
             fontSize: 15,
           ),
@@ -292,13 +292,13 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -320,8 +320,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        labelStyle: GoogleFonts.ibmPlexSans(color: muted),
-        hintStyle: GoogleFonts.ibmPlexSans(color: muted),
+        labelStyle: GoogleFonts.poppins(color: muted),
+        hintStyle: GoogleFonts.poppins(color: muted),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 64,
