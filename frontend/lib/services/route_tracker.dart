@@ -22,6 +22,7 @@ class RouteTracker extends ChangeNotifier {
 
   Timer? _timer;
   DateTime? _startedAt;
+  String _description = '';
   final List<RoutePoint> _points = [];
   double _distance = 0;
   bool _capturing = false;
@@ -34,9 +35,11 @@ class RouteTracker extends ChangeNotifier {
       ? Duration.zero
       : DateTime.now().difference(_startedAt!);
 
-  /// Starts recording. Returns an error message, or null on success.
-  Future<String?> start() async {
+  /// Starts recording a route described by [description]. Returns an error
+  /// message, or null on success.
+  Future<String?> start(String description) async {
     if (isRecording) return null;
+    _description = description.trim();
 
     if (!await Geolocator.isLocationServiceEnabled()) {
       return 'Please turn on location (GPS) first.';
@@ -78,6 +81,7 @@ class RouteTracker extends ChangeNotifier {
         : RouteTrack(
             id: startedAt.millisecondsSinceEpoch.toString(),
             uuid: generateUuid(),
+            description: _description,
             startedAt: startedAt,
             endedAt: DateTime.now(),
             points: List.of(_points),

@@ -76,10 +76,10 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
       if (updated != null) {
         done++;
       } else {
-        failures.add(
-          '${_formatDateTime(route.startedAt)} (${route.points.length} pts): '
-          '$message',
-        );
+        final label = route.description.isEmpty
+            ? _formatDateTime(route.startedAt)
+            : route.description;
+        failures.add('$label (${route.points.length} pts): $message');
       }
       if (!mounted) return;
       setState(() => _uploadingIds.remove(route.id));
@@ -186,8 +186,15 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
                           : Icons.route_rounded,
                       color: route.isUploaded ? const Color(0xFF2E7D32) : null,
                     ),
-                    title: Text(_formatDateTime(route.startedAt)),
+                    title: Text(
+                      route.description.isEmpty
+                          ? _formatDateTime(route.startedAt)
+                          : route.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text(
+                      '${route.description.isEmpty ? '' : '${_formatDateTime(route.startedAt)}\n'}'
                       '${formatDistance(route.distanceMeters)} · '
                       '${formatDuration(route.duration)} · '
                       '${route.points.length} points'
@@ -385,6 +392,16 @@ class _RouteViewScreenState extends State<RouteViewScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (route.description.isNotEmpty) ...[
+                      Text(
+                        route.description,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     Text(
                       '${formatDistance(route.distanceMeters)}  ·  '
                       '${formatDuration(route.duration)}  ·  '

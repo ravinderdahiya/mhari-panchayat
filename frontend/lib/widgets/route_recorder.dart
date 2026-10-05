@@ -67,8 +67,14 @@ class _RouteRecorderControlState extends State<RouteRecorderControl> {
   }
 
   Future<void> _start() async {
+    final description = await showDialog<String>(
+      context: context,
+      builder: (_) => const _DescriptionDialog(),
+    );
+    if (description == null || !mounted) return;
+
     setState(() => _starting = true);
-    final error = await _tracker.start();
+    final error = await _tracker.start(description);
     if (!mounted) return;
     setState(() => _starting = false);
     if (error != null) _snack(error);
@@ -212,6 +218,64 @@ class _RouteRecorderControlState extends State<RouteRecorderControl> {
   }
 }
 
+/// Asks what the route is for before recording starts. The description is
+/// required - Start stays blocked until something is typed.
+class _DescriptionDialog extends StatefulWidget {
+  const _DescriptionDialog();
+
+  @override
+  State<_DescriptionDialog> createState() => _DescriptionDialogState();
+}
+
+class _DescriptionDialogState extends State<_DescriptionDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.pop(context, _controller.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Start route'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          maxLines: 3,
+          maxLength: 500,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Description *',
+            hintText: 'What is this route for?',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) => (value == null || value.trim().isEmpty)
+              ? 'Description is required'
+              : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Start')),
+      ],
+    );
+  }
+}
+
 class _SaveDialog extends StatelessWidget {
   const _SaveDialog({required this.track});
 
@@ -225,6 +289,15 @@ class _SaveDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (track.description.isNotEmpty) ...[
+            Text(
+              track.description,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+          ],
           Text(
             '${formatDistance(track.distanceMeters)} · '
             '${formatDuration(track.duration)} · '

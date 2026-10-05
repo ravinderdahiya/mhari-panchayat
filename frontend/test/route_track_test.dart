@@ -55,6 +55,22 @@ void main() {
     expect((await RouteStore.load()).map((t) => t.id), ['first']);
   });
 
+  test('description survives JSON and defaults to empty for old routes', () {
+    final withDesc = RouteTrack(
+      id: 'd',
+      uuid: generateUuid(),
+      description: 'Boundary of Ramlal field',
+      startedAt: DateTime.utc(2026, 10, 5),
+      endedAt: DateTime.utc(2026, 10, 5, 0, 1),
+      points: const [],
+    );
+    final json = jsonDecode(jsonEncode(withDesc.toJson())) as Map<String, dynamic>;
+    expect(RouteTrack.fromJson(json).description, 'Boundary of Ramlal field');
+
+    json.remove('description');
+    expect(RouteTrack.fromJson(json).description, '');
+  });
+
   test('uuids are valid and old routes get a stable one', () {
     final uuid = RegExp(
       r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',

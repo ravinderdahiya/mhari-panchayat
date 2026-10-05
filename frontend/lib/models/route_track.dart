@@ -44,8 +44,13 @@ class RouteTrack {
     required this.startedAt,
     required this.endedAt,
     required this.points,
+    this.description = '',
     this.uploadedAt,
   });
+
+  /// What the user said this route is for - asked (and required) at Start.
+  /// Empty only for routes saved before descriptions existed.
+  final String description;
 
   /// Local key (start time in ms) used by the offline store.
   final String id;
@@ -72,12 +77,14 @@ class RouteTrack {
     startedAt: startedAt,
     endedAt: endedAt,
     points: points,
+    description: description,
     uploadedAt: uploadedAt ?? this.uploadedAt,
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'uuid': uuid,
+    'description': description,
     'started_at': startedAt.toUtc().toIso8601String(),
     'ended_at': endedAt.toUtc().toIso8601String(),
     'distance_m': distanceMeters.round(),
@@ -93,6 +100,7 @@ class RouteTrack {
       id: id,
       // Routes saved before uuids existed get a stable one derived from id.
       uuid: json['uuid'] as String? ?? uuidFromId(id),
+      description: json['description'] as String? ?? '',
       startedAt: DateTime.parse(json['started_at'] as String),
       endedAt: DateTime.parse(json['ended_at'] as String),
       points: [
