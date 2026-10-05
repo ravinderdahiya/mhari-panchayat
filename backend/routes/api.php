@@ -14,6 +14,9 @@ use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RolePermissionController;
+use App\Http\Controllers\Api\SurveyPolygonAttributeController;
+use App\Http\Controllers\Api\SurveyPolygonController;
+use App\Http\Controllers\Api\SurveyPolygonShapefileController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VillageAssetController;
 use Illuminate\Support\Facades\Route;
@@ -187,5 +190,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/village-assets', [VillageAssetController::class, 'store']);
         Route::put('/village-assets/{id}', [VillageAssetController::class, 'update']);
         Route::delete('/village-assets/{id}', [VillageAssetController::class, 'destroy']);
+    });
+
+    // GPS-tracked boundaries saved as PostGIS polygons, attribute data in its own
+    // table, Shapefile export/import. Static segments (bulk, geojson, export,
+    // import) are declared before {uuid} so they are never captured by it.
+    Route::prefix('polygons')->group(function () {
+        Route::post('/', [SurveyPolygonController::class, 'store'])->middleware('throttle:polygons');
+        Route::post('/bulk', [SurveyPolygonController::class, 'bulk'])->middleware('throttle:polygons-bulk');
+        Route::get('/', [SurveyPolygonController::class, 'index']);
+        Route::get('/geojson', [SurveyPolygonController::class, 'geojson']);
+
+        Route::get('/export/shp', [SurveyPolygonShapefileController::class, 'export'])->middleware('throttle:polygons-shp');
+        Route::post('/import/shp', [SurveyPolygonShapefileController::class, 'import'])->middleware('throttle:polygons-shp');
+
+        Route::get('/{uuid}', [SurveyPolygonController::class, 'show'])->whereUuid('uuid');
+        Route::delete('/{uuid}', [SurveyPolygonController::class, 'destroy'])->whereUuid('uuid');
+
+        Route::get('/{uuid}/attributes', [SurveyPolygonAttributeController::class, 'show'])->whereUuid('uuid');
+        Route::put('/{uuid}/attributes', [SurveyPolygonAttributeController::class, 'upsert'])->whereUuid('uuid');
+        Route::delete('/{uuid}/attributes', [SurveyPolygonAttributeController::class, 'destroy'])->whereUuid('uuid');
     });
 });

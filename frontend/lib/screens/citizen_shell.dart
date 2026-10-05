@@ -3,10 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/location_gate.dart';
+import 'citizen_profile_screen.dart';
 import 'complaint_map_screen.dart';
 import 'my_complaints_screen.dart';
 import 'notification_screen.dart';
-import 'profile_screen.dart';
 import 'report_issue_screen.dart';
 
 class CitizenShell extends StatefulWidget {
@@ -36,7 +36,7 @@ class _CitizenShellState extends State<CitizenShell> {
       ),
       MyComplaintsScreen(key: ValueKey('complaints_$_refreshTick')),
       const NotificationScreen(showBackButton: false),
-      const ProfileScreen(),
+      const CitizenProfileScreen(),
     ];
 
     return Scaffold(
@@ -130,9 +130,13 @@ class _NavIcon extends StatelessWidget {
     final color = selected ? AppColors.primary : AppColors.navInactive;
     return InkWell(
       onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      customBorder: const StadiumBorder(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFE3F3E6) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -170,14 +174,30 @@ class _NewComplaintButton extends StatelessWidget {
       customBorder: const CircleBorder(),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: AppGradients.header,
-          ),
-          child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF1B6B43),
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Raise Issue',
+              maxLines: 1,
+              softWrap: false,
+              style: GoogleFonts.poppins(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF1B6B43)),
+            ),
+          ],
         ),
       ),
     );

@@ -65,5 +65,19 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinutes(10, 10)->by($key);
         });
+
+        // Polygons: keyed per signed-in user (the routes are auth:sanctum).
+        RateLimiter::for('polygons', function ($request) {
+            return Limit::perMinute(app()->environment('local') ? 120 : 30)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('polygons-bulk', function ($request) {
+            return Limit::perMinute(app()->environment('local') ? 30 : 6)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Shapefile export/import spawn GDAL, so keep these tight.
+        RateLimiter::for('polygons-shp', function ($request) {
+            return Limit::perMinute(app()->environment('local') ? 30 : 10)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

@@ -478,7 +478,7 @@ class _BasemapChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.ibmPlexSans(
+          style: GoogleFonts.poppins(
             fontSize: 10,
             fontWeight: FontWeight.w700,
             color: Colors.white,
