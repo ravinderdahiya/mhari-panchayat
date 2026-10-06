@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/survey.dart';
@@ -9,6 +8,7 @@ import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
 
@@ -253,20 +253,10 @@ class _ProfileHeader extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(color: Color(0xFFFCE9D2), shape: BoxShape.circle),
-                  child: SvgPicture.asset('assets/images/haryana_emblem.svg'),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Government\nof Haryana',
-                  style: _ts(9.5, color: AppColors.ink, weight: FontWeight.w600).copyWith(height: 1.2),
-                ),
-                const Spacer(),
+                const FlippingLogo(),
+                const SizedBox(width: 10),
                 Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Mhari Panchayat', style: _ts(20, color: _green, weight: FontWeight.w700)),
                     Text(
@@ -274,14 +264,6 @@ class _ProfileHeader extends StatelessWidget {
                       style: _ts(8.5, color: _orange, weight: FontWeight.w600),
                     ),
                   ],
-                ),
-                const Spacer(),
-                Container(
-                  width: 40,
-                  height: 40,
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: Color(0xFFE6EEF7), shape: BoxShape.circle),
-                  child: Image.asset('assets/images/harsac_logo.png'),
                 ),
               ],
             ),

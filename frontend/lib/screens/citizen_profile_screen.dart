@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/complaint.dart';
@@ -8,6 +7,7 @@ import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
 import 'my_complaints_screen.dart';
 import 'notification_screen.dart';
@@ -217,14 +217,10 @@ class _CitizenProfileHeader extends StatelessWidget {
           children: [
             Row(
               children: [
-                SvgPicture.asset('assets/images/haryana_emblem.svg', width: 38, height: 38),
-                const SizedBox(width: 6),
-                Text(
-                  'Government\nof Haryana',
-                  style: _subtitleStyle(9, color: AppColors.ink).copyWith(height: 1.15),
-                ),
-                const Spacer(),
+                const FlippingLogo(size: 38),
+                const SizedBox(width: 10),
                 Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text.rich(
                       TextSpan(
@@ -240,8 +236,6 @@ class _CitizenProfileHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const Spacer(),
-                Image.asset('assets/images/harsac_logo.png', width: 38, height: 38),
               ],
             ),
             const SizedBox(height: 26),
