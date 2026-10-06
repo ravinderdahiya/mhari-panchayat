@@ -537,11 +537,11 @@ class _NavCard extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
             ),
             child: ListTile(
+              tileColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               leading: Container(

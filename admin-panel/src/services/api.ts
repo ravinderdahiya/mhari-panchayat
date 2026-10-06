@@ -423,21 +423,41 @@ export const getAssetSurveysForMap = () =>
 export const getFeedback = () =>
   request<{ success: boolean; feedback: Feedback[] }>('/api/feedback');
 
-export const getAssetSurveys = (options: {
-  page?: number;
-  perPage?: number;
+// Filters shared by the Asset Surveys list and its Excel export.
+export interface AssetSurveyFilters {
   query?: string;
   condition?: string;
   reviewStatus?: import('../types').AssetSurveyReviewStatus;
-} = {}) => {
-  const params = new URLSearchParams({
-    paginated: '1',
-    page: String(options.page ?? 1),
-    per_page: String(options.perPage ?? 10),
-  });
+  districtId?: string;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;   // YYYY-MM-DD
+  role?: string;     // role of the submitting surveyor
+}
+
+function assetSurveyFilterParams(options: AssetSurveyFilters, params = new URLSearchParams()) {
   if (options.query?.trim()) params.set('q', options.query.trim());
   if (options.condition && options.condition !== 'ALL') params.set('condition', options.condition);
   if (options.reviewStatus) params.set('review_status', options.reviewStatus);
+  if (options.districtId) params.set('district_id', options.districtId);
+  if (options.dateFrom) params.set('date_from', options.dateFrom);
+  if (options.dateTo) params.set('date_to', options.dateTo);
+  if (options.role) params.set('role', options.role);
+  return params;
+}
+
+// Active districts for filter dropdowns (public registration endpoint).
+export const getDistricts = () =>
+  request<{ success: boolean; districts: { id: number; name: string }[] }>('/api/registrations/districts');
+
+export const getAssetSurveys = (options: AssetSurveyFilters & {
+  page?: number;
+  perPage?: number;
+} = {}) => {
+  const params = assetSurveyFilterParams(options, new URLSearchParams({
+    paginated: '1',
+    page: String(options.page ?? 1),
+    per_page: String(options.perPage ?? 10),
+  }));
 
   return request<{
     success: boolean;
@@ -450,15 +470,8 @@ export const getAssetSurveys = (options: {
 // Excel export (with photos) of the surveys matching the same filters as the list
 // above. The server builds the .xlsx; this fetches it with the auth header (a plain
 // link can't send the token) and hands it to the browser as a download.
-export const downloadAssetSurveysExcel = async (options: {
-  query?: string;
-  condition?: string;
-  reviewStatus?: import('../types').AssetSurveyReviewStatus;
-} = {}) => {
-  const params = new URLSearchParams();
-  if (options.query?.trim()) params.set('q', options.query.trim());
-  if (options.condition && options.condition !== 'ALL') params.set('condition', options.condition);
-  if (options.reviewStatus) params.set('review_status', options.reviewStatus);
+export const downloadAssetSurveysExcel = async (options: AssetSurveyFilters = {}) => {
+  const params = assetSurveyFilterParams(options);
 
   const token = getToken();
   const res = await fetch(`${API_BASE_URL}/api/surveys/export?${params.toString()}`, {

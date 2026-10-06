@@ -402,6 +402,40 @@ class AssetSurveyController extends Controller
         if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
             $query->where('review_status', $reviewStatus);
         }
+
+        if ($request->filled('district_id') && ctype_digit((string) $request->query('district_id'))) {
+            $query->where('district_id', (int) $request->query('district_id'));
+        }
+
+        // Survey date range, inclusive of both days (India time, which is what the
+        // admin panel shows). Malformed dates are ignored rather than failing the list.
+        $from = $this->parseFilterDate($request->query('date_from'));
+        $to = $this->parseFilterDate($request->query('date_to'));
+        if ($from) {
+            $query->where('survey_date', '>=', $from->startOfDay());
+        }
+        if ($to) {
+            $query->where('survey_date', '<=', $to->endOfDay());
+        }
+
+        // Role of the person who submitted the survey (surveyor, cplo, ...).
+        $role = strtolower((string) $request->query('role', ''));
+        if ($role !== '' && preg_match('/^[a-z_]{2,40}$/', $role)) {
+            $query->whereHas('surveyor', fn ($surveyor) => $surveyor->where('role', $role));
+        }
+    }
+
+    private function parseFilterDate(mixed $value): ?\Carbon\CarbonImmutable
+    {
+        if (! is_string($value) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        try {
+            return \Carbon\CarbonImmutable::createFromFormat('!Y-m-d', $value, 'Asia/Kolkata') ?: null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** Excel export of the filtered surveys, with photo thumbnails. */
