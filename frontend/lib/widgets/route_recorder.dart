@@ -12,8 +12,11 @@ import '../theme/app_theme.dart';
 
 enum _StopChoice { offline, discard }
 
-/// Route icon + Start/Stop panel shown over the map. Place it in a
-/// `Positioned` - it sizes itself to its content.
+/// What the user picked in the recorder panel; handled after the panel closes.
+enum _PanelAction { stop, savedRoutes }
+
+/// Route icon over the map. Tapping it opens the recorder panel as a dialog in
+/// the centre of the screen. Place it in a `Positioned` - it sizes itself.
 class RouteRecorderControl extends StatefulWidget {
   const RouteRecorderControl({super.key});
 
@@ -23,9 +26,123 @@ class RouteRecorderControl extends StatefulWidget {
 
 class _RouteRecorderControlState extends State<RouteRecorderControl> {
   final _tracker = RouteTracker.instance;
+  bool _busy = false; // a panel / dialog flow is in progress - ignore extra taps
+
+  @override
+  void initState() {
+    super.initState();
+    _tracker.addListener(_onTrackerChanged);
+  }
+
+  @override
+  void dispose() {
+    _tracker.removeListener(_onTrackerChanged);
+    super.dispose();
+  }
+
+  void _onTrackerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openPanel() async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      // Tapping outside the card or the X pops with null = just close.
+      final action = await showDialog<_PanelAction>(
+        context: context,
+        builder: (_) => _RecorderPanelDialog(tracker: _tracker, onStart: _start),
+      );
+      if (action == null || !mounted) return;
+
+      switch (action) {
+        case _PanelAction.stop:
+          await _stop();
+        case _PanelAction.savedRoutes:
+          push(context, const SavedRoutesScreen());
+      }
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _start() async {
+    final description = await showDialog<String>(
+      context: context,
+      builder: (_) => const _DescriptionDialog(),
+    );
+    if (description == null || !mounted) return;
+
+    final error = await _tracker.start(description);
+    if (!mounted) return;
+    if (error != null) _snack(error);
+  }
+
+  Future<void> _stop() async {
+    final track = _tracker.stop();
+    if (track == null) {
+      _snack('No location was captured, nothing to save.');
+      return;
+    }
+
+    final choice = await showDialog<_StopChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SaveDialog(track: track),
+    );
+    if (!mounted) return;
+
+    if (choice == _StopChoice.offline) {
+      await RouteStore.save(track);
+      if (!mounted) return;
+      _snack('Route saved offline (${track.points.length} points).');
+    } else {
+      _snack('Route discarded.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recording = _tracker.isRecording;
+
+    return FloatingActionButton(
+      heroTag: 'route_recorder',
+      tooltip: 'Record route',
+      backgroundColor: recording ? const Color(0xFFD32F2F) : AppColors.background,
+      foregroundColor: recording ? Colors.white : AppColors.primary,
+      onPressed: _openPanel,
+      child: Icon(recording ? Icons.fiber_manual_record : Icons.route_rounded),
+    );
+  }
+}
+
+/// The Start/Stop panel, shown centred with a close (X) button. It follows the
+/// tracker live (time / distance / points while recording) and hands the chosen
+/// action back to the caller, so no recording logic lives here.
+class _RecorderPanelDialog extends StatefulWidget {
+  const _RecorderPanelDialog({required this.tracker, required this.onStart});
+
+  final RouteTracker tracker;
+
+  /// Asks for the description and starts recording. The panel stays open while
+  /// this runs and then simply switches to its "Recording route…" view.
+  final Future<void> Function() onStart;
+
+  @override
+  State<_RecorderPanelDialog> createState() => _RecorderPanelDialogState();
+}
+
+class _RecorderPanelDialogState extends State<_RecorderPanelDialog> {
   Timer? _clock;
-  bool _open = false;
   bool _starting = false;
+
+  RouteTracker get _tracker => widget.tracker;
 
   @override
   void initState() {
@@ -60,77 +177,24 @@ class _RouteRecorderControlState extends State<RouteRecorderControl> {
     }
   }
 
-  void _snack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _start() async {
-    final description = await showDialog<String>(
-      context: context,
-      builder: (_) => const _DescriptionDialog(),
-    );
-    if (description == null || !mounted) return;
-
+  Future<void> _handleStart() async {
     setState(() => _starting = true);
-    final error = await _tracker.start(description);
-    if (!mounted) return;
-    setState(() => _starting = false);
-    if (error != null) _snack(error);
-  }
-
-  Future<void> _stop() async {
-    final track = _tracker.stop();
-    if (track == null) {
-      _snack('No location was captured, nothing to save.');
-      return;
-    }
-
-    final choice = await showDialog<_StopChoice>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _SaveDialog(track: track),
-    );
-    if (!mounted) return;
-
-    if (choice == _StopChoice.offline) {
-      await RouteStore.save(track);
-      if (!mounted) return;
-      _snack('Route saved offline (${track.points.length} points).');
-    } else {
-      _snack('Route discarded.');
+    try {
+      await widget.onStart();
+    } finally {
+      if (mounted) setState(() => _starting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final recording = _tracker.isRecording;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_open) ...[_buildPanel(recording), const SizedBox(height: 10)],
-        FloatingActionButton(
-          heroTag: 'route_recorder',
-          tooltip: 'Record route',
-          backgroundColor: recording ? const Color(0xFFD32F2F) : AppColors.background,
-          foregroundColor: recording ? Colors.white : AppColors.primary,
-          onPressed: () => setState(() => _open = !_open),
-          child: Icon(recording ? Icons.fiber_manual_record : Icons.route_rounded),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPanel(bool recording) {
     final labelStyle = GoogleFonts.poppins(
-      fontSize: 11,
+      fontSize: 12,
       color: AppColors.mutedText,
     );
     final valueStyle = GoogleFonts.poppins(
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: FontWeight.w700,
       color: AppColors.ink,
     );
@@ -144,74 +208,88 @@ class _RouteRecorderControlState extends State<RouteRecorderControl> {
       ),
     );
 
-    return Material(
-      color: AppColors.background,
-      elevation: 6,
-      shadowColor: Colors.black38,
-      borderRadius: BorderRadius.circular(AppRadius.card),
-      child: Container(
-        width: 250,
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              recording ? 'Recording route…' : 'Route recorder',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: recording ? const Color(0xFFD32F2F) : AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (recording) ...[
+    return Dialog(
+      backgroundColor: AppColors.background,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 44, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card + 6),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 300),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Row(
                 children: [
-                  stat('Time', formatDuration(_tracker.elapsed)),
-                  stat('Distance', formatDistance(_tracker.distanceMeters)),
-                  stat('Points', '${_tracker.points.length}'),
+                  Expanded(
+                    child: Text(
+                      recording ? 'Recording route…' : 'Route recorder',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: recording
+                            ? const Color(0xFFD32F2F)
+                            : AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close_rounded, color: AppColors.ink),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-            ] else
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Press Start and walk. Your location is recorded every '
-                  '${RouteTracker.interval.inSeconds} seconds and drawn as a line.',
-                  style: labelStyle,
+              const SizedBox(height: 4),
+              if (recording) ...[
+                Row(
+                  children: [
+                    stat('Time', formatDuration(_tracker.elapsed)),
+                    stat('Distance', formatDistance(_tracker.distanceMeters)),
+                    stat('Points', '${_tracker.points.length}'),
+                  ],
                 ),
-              ),
-            FilledButton.icon(
-              onPressed: _starting ? null : (recording ? _stop : _start),
-              style: FilledButton.styleFrom(
-                backgroundColor: recording
-                    ? const Color(0xFFD32F2F)
-                    : AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.button),
+                const SizedBox(height: 16),
+              ] else
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Press Start and walk. Your location is recorded every '
+                    '${RouteTracker.interval.inSeconds} seconds and drawn as a line.',
+                    style: labelStyle,
+                  ),
                 ),
+              FilledButton.icon(
+                onPressed: _starting
+                    ? null
+                    : recording
+                    ? () => Navigator.of(context).pop(_PanelAction.stop)
+                    : _handleStart,
+                style: FilledButton.styleFrom(
+                  backgroundColor: recording
+                      ? const Color(0xFFD32F2F)
+                      : AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                icon: Icon(
+                  recording ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                ),
+                label: Text(recording ? 'Stop' : 'Start'),
               ),
-              icon: _starting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Icon(recording ? Icons.stop_rounded : Icons.play_arrow_rounded),
-              label: Text(recording ? 'Stop' : 'Start'),
-            ),
-            const SizedBox(height: 4),
-            TextButton.icon(
-              onPressed: () => push(context, const SavedRoutesScreen()),
-              icon: const Icon(Icons.folder_open_rounded, size: 18),
-              label: const Text('Saved routes'),
-            ),
-          ],
+              const SizedBox(height: 4),
+              TextButton.icon(
+                onPressed: () =>
+                    Navigator.of(context).pop(_PanelAction.savedRoutes),
+                icon: const Icon(Icons.folder_open_rounded, size: 18),
+                label: const Text('Saved routes'),
+              ),
+            ],
+          ),
         ),
       ),
     );

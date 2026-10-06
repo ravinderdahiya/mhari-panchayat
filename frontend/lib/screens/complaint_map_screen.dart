@@ -76,6 +76,15 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   static const _haryanaZoom = 7.7;
 
   static const _myLocationZoom = 15.0;
+
+  /// Deepest zoom the user can reach. The ArcGIS basemaps only have real tiles up
+  /// to a certain level (beyond it they return a "Map data not yet available"
+  /// placeholder image), so the TileLayer is capped at the native levels below
+  /// and the last real tiles are scaled up instead. Measured over Haryana
+  /// villages: imagery has real tiles to z18, the street map to z17.
+  static const _maxZoom = 20.0;
+  static const _imageryNativeZoom = 18;
+  static const _streetsNativeZoom = 17;
   static const _imageryTiles =
       'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
   static const _streetsTiles =
@@ -646,11 +655,14 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         initialCenter: _haryanaCenter,
         initialZoom: _haryanaZoom,
         minZoom: 5,
-        maxZoom: 18,
+        maxZoom: _maxZoom,
       ),
       children: [
         TileLayer(
           urlTemplate: _streetsBasemap ? _streetsTiles : _imageryTiles,
+          // Past this level keep scaling the last real tile instead of fetching
+          // placeholder tiles.
+          maxNativeZoom: _streetsBasemap ? _streetsNativeZoom : _imageryNativeZoom,
           userAgentPackageName: 'com.example.my_first_app',
           errorTileCallback: (tile, error, stackTrace) {
             debugPrint('Tile load failed for ${tile.coordinates}: $error');
@@ -755,7 +767,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
   void _zoomBy(double delta) {
     final camera = _mapController.camera;
-    final next = (camera.zoom + delta).clamp(5.0, 18.0);
+    final next = (camera.zoom + delta).clamp(5.0, _maxZoom);
     _mapController.move(camera.center, next);
   }
 }

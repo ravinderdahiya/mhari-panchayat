@@ -328,6 +328,7 @@ class _RouteViewScreenState extends State<RouteViewScreen> {
             options: MapOptions(
               initialCenter: latLngs.first,
               initialZoom: 17,
+              maxZoom: 20,
               initialCameraFit: single
                   ? null
                   : CameraFit.bounds(
@@ -339,6 +340,9 @@ class _RouteViewScreenState extends State<RouteViewScreen> {
             children: [
               TileLayer(
                 urlTemplate: _streetsTiles,
+                // The street map has no real tiles past z17 ("Map data not yet
+                // available" placeholder) - scale the last real ones instead.
+                maxNativeZoom: 17,
                 userAgentPackageName: 'com.example.my_first_app',
               ),
               PolylineLayer(
