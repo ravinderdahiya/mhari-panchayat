@@ -152,6 +152,16 @@ const EMPTY_STATS: AssetSurveyStats = {
   },
 };
 
+// Roles that submit field surveys (see AssetSurveyController::isSurveyorRole()).
+const SURVEYOR_ROLES: { value: string; label: string }[] = [
+  { value: 'surveyor', label: 'Surveyor' },
+  { value: 'cplo', label: 'CPLO' },
+  { value: 'department_officer', label: 'Department officer' },
+  { value: 'department_head', label: 'Department head' },
+];
+
+const STATUS_OPTIONS = Object.keys(REVIEW_LABEL) as ReviewStatus[];
+
 function visiblePages(currentPage: number, lastPage: number) {
   const count = Math.min(5, lastPage);
   const start = Math.max(1, Math.min(currentPage - 2, lastPage - count + 1));
@@ -188,13 +198,23 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
   // 'all' has no single review_status - the fetch below omits the filter
   // entirely so every survey shows regardless of stage, same as MySurveysPage's
   // own "All" filter for a surveyor's own list.
-  const isAll = childId === 'all';
-  const reviewStatus = isAll ? undefined : (CHILD_TO_REVIEW_STATUS[childId ?? ''] ?? 'pending');
+  const sidebarStatus: ReviewStatus | undefined = childId === 'all' ? undefined : (CHILD_TO_REVIEW_STATUS[childId ?? ''] ?? 'pending');
+  // The sidebar tab picks the starting status; the Status filter can change it
+  // (including to "All statuses") until the user switches tab again.
+  const tabKey = sidebarStatus ?? 'all';
+  const [statusPick, setStatusPick] = useState<{ tab: string; value: ReviewStatus | '' } | null>(null);
+  const statusFilter: ReviewStatus | '' = statusPick && statusPick.tab === tabKey ? statusPick.value : (sidebarStatus ?? '');
+  const reviewStatus: ReviewStatus | undefined = statusFilter || undefined;
 
   const [surveys, setSurveys] = useState<AssetSurvey[]>([]);
   const [selected, setSelected] = useState<AssetSurvey | null>(null);
   const [query, setQuery] = useState('');
   const [condition, setCondition] = useState('ALL');
+  const [districtId, setDistrictId] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [role, setRole] = useState('');
+  const [districts, setDistricts] = useState<{ id: number; name: string }[]>([]);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [pagination, setPagination] = useState<AssetSurveyPagination>(EMPTY_PAGINATION);
@@ -211,6 +231,17 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
   // not a page you scrolled down on.
   useEffect(() => { setPage(1); }, [reviewStatus]);
 
+  useEffect(() => {
+    api.getDistricts().then((response) => setDistricts(response.districts)).catch(() => setDistricts([]));
+  }, []);
+
+  const filtersActive = condition !== 'ALL' || districtId !== '' || dateFrom !== '' || dateTo !== '' || role !== ''
+    || query.trim() !== '' || statusFilter !== (sidebarStatus ?? '');
+  const clearFilters = () => {
+    setQuery(''); setCondition('ALL'); setDistrictId(''); setDateFrom(''); setDateTo(''); setRole('');
+    setStatusPick(null); setPage(1);
+  };
+
   // Bumped after a stage action or reject to force the fetch effect below to
   // re-run (the surveyed-out row is also removed from local state
   // immediately, so this mainly re-syncs stats/pagination with the server).
@@ -221,7 +252,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
     setLoading(true);
     setError('');
     const timer = window.setTimeout(() => {
-      api.getAssetSurveys({ page, perPage, query, condition, reviewStatus })
+      api.getAssetSurveys({ page, perPage, query, condition, reviewStatus, districtId, dateFrom, dateTo, role })
         .then((response) => {
           if (cancelled) return;
           setSurveys(response.surveys);
@@ -240,7 +271,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [page, perPage, query, condition, reviewStatus, refreshTick]);
+  }, [page, perPage, query, condition, reviewStatus, districtId, dateFrom, dateTo, role, refreshTick]);
 
   const runStageAction = async (survey: AssetSurvey, action: () => Promise<unknown>) => {
     setActioningId(survey.id);
@@ -263,7 +294,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
     setExporting(true);
     setActionError('');
     try {
-      await api.downloadAssetSurveysExcel({ query, condition, reviewStatus });
+      await api.downloadAssetSurveysExcel({ query, condition, reviewStatus, districtId, dateFrom, dateTo, role });
     } catch (err) {
       setActionError((err as Error).message);
     } finally {
@@ -325,9 +356,9 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
-          {isAll ? 'All surveys' : REVIEW_LABEL[reviewStatus!]}
+          {reviewStatus ? REVIEW_LABEL[reviewStatus] : 'All surveys'}
           <span className="text-[11px] font-normal text-muted">
-            ({isAll ? stats.totalSurveys : stats.statusCounts[reviewStatus!]})
+            ({pagination.total})
           </span>
         </h2>
         <button type="button" onClick={handleExport} disabled={exporting || loading || pagination.total === 0}
@@ -349,6 +380,38 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
           <option value="ALL">All conditions</option><option value="GOOD">Good</option>
           <option value="FAIR">Fair</option><option value="POOR">Poor</option><option value="DAMAGED">Damaged</option>
         </select>
+        <div className="basis-full grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 items-end border-t border-line pt-3">
+          <FilterField label="District">
+            <select value={districtId} onChange={(event) => { setDistrictId(event.target.value); setPage(1); }} className={FILTER_INPUT}>
+              <option value="">All districts</option>
+              {districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Start date">
+            <input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} className={FILTER_INPUT} />
+          </FilterField>
+          <FilterField label="End date">
+            <input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(event) => { setDateTo(event.target.value); setPage(1); }} className={FILTER_INPUT} />
+          </FilterField>
+          <FilterField label="Status">
+            <select value={statusFilter} onChange={(event) => { setStatusPick({ tab: tabKey, value: event.target.value as ReviewStatus | '' }); setPage(1); }} className={FILTER_INPUT}>
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{REVIEW_LABEL[status]}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Surveyor role">
+            <select value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }} className={FILTER_INPUT}>
+              <option value="">All roles</option>
+              {SURVEYOR_ROLES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </FilterField>
+          <button type="button" onClick={clearFilters} disabled={!filtersActive}
+            className="text-xs font-semibold text-accent border border-line rounded-lg px-3 py-2 bg-white hover:bg-cream disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+            Clear filters
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
@@ -356,7 +419,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
 
       <div className="bg-white border border-line rounded-xl overflow-hidden">
         {loading ? <p className="p-8 text-sm text-muted text-center">Loading asset surveys…</p>
-          : surveys.length === 0 ? <p className="p-8 text-sm text-muted text-center">No {isAll ? '' : `${REVIEW_LABEL[reviewStatus!].toLowerCase()} `}surveys found.</p>
+          : surveys.length === 0 ? <p className="p-8 text-sm text-muted text-center">No {reviewStatus ? `${REVIEW_LABEL[reviewStatus].toLowerCase()} ` : ''}surveys found{filtersActive ? ' for the selected filters' : ''}.</p>
           : <div className="overflow-x-auto"><table className="w-full text-left">
             <thead className="bg-cream border-b border-line text-[10px] uppercase tracking-wide text-muted"><tr>
               <th className="px-4 py-3 w-16">S.No.</th><th className="px-4 py-3">Asset</th><th className="px-4 py-3">Surveyor</th>
@@ -479,6 +542,15 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
       )}
     </div>
   );
+}
+
+const FILTER_INPUT = 'w-full text-xs border border-line rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-accent/30';
+
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block">
+    <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted mb-1">{label}</span>
+    {children}
+  </label>;
 }
 
 function Stat({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {

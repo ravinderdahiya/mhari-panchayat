@@ -451,13 +451,13 @@ class _CitizenNavCard extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 6),
             decoration: BoxDecoration(
-              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2)),
               ],
             ),
             child: ListTile(
+              tileColor: Colors.white,
               dense: true,
               visualDensity: const VisualDensity(vertical: -2),
               contentPadding: const EdgeInsets.symmetric(horizontal: 10),
