@@ -229,3 +229,14 @@ Shapefile notes:
 `tests/Feature/SurveyPolygonApiTest.php` needs a PostGIS database, by default `mhari_panchayat_test` on
 127.0.0.1:5432 (override with `TRACKING_TEST_DB_*`), and GDAL for the Shapefile tests. Tests skip when these
 are unavailable. They commit real rows (ogr2ogr uses its own DB connection) and clean up the users they create.
+
+## Asset survey Excel export
+
+`GET /api/surveys/export` (Bearer token) downloads an `.xlsx` of the asset surveys that match the same
+filters as the Asset Surveys list: `q` (search), `condition` (GOOD/FAIR/POOR/DAMAGED) and `review_status`.
+It respects the same visibility rules as the list (a surveyor only gets their own, reviewers only their
+jurisdiction). Each row has the survey details, review status, the first 3 photos embedded as pictures and a
+column with links to all photos. Photos over 800 KB (or past a 150 MB workbook budget) become clickable links
+instead, so the file stays small. At most 1500 surveys per export - narrow the filters beyond that (422).
+No image library is needed (the workbook is written with ext-zip only), so it also works without GD.
+The admin panel's Asset Surveys screen has an **Export Excel** button that passes its current filters.

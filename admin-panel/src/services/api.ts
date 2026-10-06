@@ -447,6 +447,44 @@ export const getAssetSurveys = (options: {
   }>(`/api/surveys?${params.toString()}`);
 };
 
+// Excel export (with photos) of the surveys matching the same filters as the list
+// above. The server builds the .xlsx; this fetches it with the auth header (a plain
+// link can't send the token) and hands it to the browser as a download.
+export const downloadAssetSurveysExcel = async (options: {
+  query?: string;
+  condition?: string;
+  reviewStatus?: import('../types').AssetSurveyReviewStatus;
+} = {}) => {
+  const params = new URLSearchParams();
+  if (options.query?.trim()) params.set('q', options.query.trim());
+  if (options.condition && options.condition !== 'ALL') params.set('condition', options.condition);
+  if (options.reviewStatus) params.set('review_status', options.reviewStatus);
+
+  const token = getToken();
+  const res = await fetch(`${API_BASE_URL}/api/surveys/export?${params.toString()}`, {
+    headers: {
+      Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Export failed (${res.status})`);
+  }
+
+  const filename = /filename="?([^";]+)"?/i.exec(res.headers.get('Content-Disposition') ?? '')?.[1]
+    ?? `asset-surveys-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+};
+
 // The surveyor (CPLO/surveyor/...) reviews their own submission and sends
 // it on to Gram Sachiv - the only action they take after submitting.
 export const forwardSubmissionAssetSurvey = (id: string) =>

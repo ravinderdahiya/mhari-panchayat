@@ -321,7 +321,11 @@ class AssetSurveyController extends Controller
         ];
     }
 
-    public function index(Request $request): JsonResponse
+    /**
+     * Surveys the signed-in user may see: a surveyor only their own, each reviewer stage
+     * only its own jurisdiction. Shared by the list and the Excel export.
+     */
+    private function scopedQuery(Request $request): \Illuminate\Database\Eloquent\Builder
     {
         $user = $request->user();
 
@@ -364,33 +368,12 @@ class AssetSurveyController extends Controller
             $query->where('district_id', $user->district_id ?: 0);
         }
 
-        if (! $request->boolean('paginated')) {
-            $reviewStatus = strtolower((string) $request->query('review_status', ''));
-            if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
-                $query->where('review_status', $reviewStatus);
-            }
+        return $query;
+    }
 
-            $surveys = $query->with(self::WITH)
-                ->latest('survey_date')
-                ->latest('id')
-                ->get()
-                ->map(fn (AssetSurvey $survey) => $this->mapSurvey($request, $survey));
-
-            return response()->json(['success' => true, 'surveys' => $surveys]);
-        }
-
-        $statsQuery = clone $query;
-        $stats = [
-            'totalSurveys' => (clone $statsQuery)->count(),
-            'activeSurveyors' => (clone $statsQuery)->distinct()->count('surveyor_id'),
-            'poorDamaged' => (clone $statsQuery)->whereIn('condition', ['POOR', 'DAMAGED'])->count(),
-            // Unfiltered by review_status so all tab counts show
-            // simultaneously, regardless of which tab is currently open.
-            'statusCounts' => collect(self::REVIEW_STATUSES)->mapWithKeys(
-                fn (string $status) => [$status => (clone $statsQuery)->where('review_status', $status)->count()]
-            ),
-        ];
-
+    /** The search / condition / review-status filters of the Asset Surveys screen. */
+    private function applyListFilters(\Illuminate\Database\Eloquent\Builder $query, Request $request): void
+    {
         $search = trim((string) $request->query('q', ''));
         if ($search !== '') {
             $like = '%'.$search.'%';
@@ -419,6 +402,66 @@ class AssetSurveyController extends Controller
         if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
             $query->where('review_status', $reviewStatus);
         }
+    }
+
+    /** Excel export of the filtered surveys, with photo thumbnails. */
+    public function export(Request $request, \App\Services\AssetSurveyExcelExport $exporter)
+    {
+        $query = $this->scopedQuery($request);
+        $this->applyListFilters($query, $request);
+
+        $total = (clone $query)->count();
+        if ($total === 0) {
+            return response()->json(['success' => false, 'message' => 'No surveys match the current filters.'], 404);
+        }
+        $max = \App\Services\AssetSurveyExcelExport::MAX_ROWS;
+        if ($total > $max) {
+            return response()->json([
+                'success' => false,
+                'message' => "{$total} surveys match - the Excel export is limited to {$max}. Narrow the filters and try again.",
+            ], 422);
+        }
+
+        $surveys = $query->with(self::WITH)->latest('survey_date')->latest('id')->get();
+        $path = $exporter->build($surveys);
+
+        return response()->download($path, 'asset-surveys-'.now('Asia/Kolkata')->format('Ymd-His').'.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $query = $this->scopedQuery($request);
+
+        if (! $request->boolean('paginated')) {
+            $reviewStatus = strtolower((string) $request->query('review_status', ''));
+            if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
+                $query->where('review_status', $reviewStatus);
+            }
+
+            $surveys = $query->with(self::WITH)
+                ->latest('survey_date')
+                ->latest('id')
+                ->get()
+                ->map(fn (AssetSurvey $survey) => $this->mapSurvey($request, $survey));
+
+            return response()->json(['success' => true, 'surveys' => $surveys]);
+        }
+
+        $statsQuery = clone $query;
+        $stats = [
+            'totalSurveys' => (clone $statsQuery)->count(),
+            'activeSurveyors' => (clone $statsQuery)->distinct()->count('surveyor_id'),
+            'poorDamaged' => (clone $statsQuery)->whereIn('condition', ['POOR', 'DAMAGED'])->count(),
+            // Unfiltered by review_status so all tab counts show
+            // simultaneously, regardless of which tab is currently open.
+            'statusCounts' => collect(self::REVIEW_STATUSES)->mapWithKeys(
+                fn (string $status) => [$status => (clone $statsQuery)->where('review_status', $status)->count()]
+            ),
+        ];
+
+        $this->applyListFilters($query, $request);
 
         $perPage = max(5, min(100, $request->integer('per_page', 10)));
         $paginator = $query->with(self::WITH)

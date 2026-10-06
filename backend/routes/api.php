@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/assets/{id}', [AssetController::class, 'show']);
     Route::get('/complaint-categories', [ComplaintController::class, 'categories']);
     Route::get('/surveys', [AssetSurveyController::class, 'index']);
+    Route::get('/surveys/export', [AssetSurveyController::class, 'export'])->middleware('throttle:20,1');
     Route::post('/surveys', [AssetSurveyController::class, 'store']);
     Route::get('/surveys/{id}', [AssetSurveyController::class, 'show']);
     Route::put('/surveys/{id}', [AssetSurveyController::class, 'update']);

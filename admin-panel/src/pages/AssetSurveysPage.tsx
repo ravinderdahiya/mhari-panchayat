@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, Forward, MapPin, RotateCcw, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
+import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Download, Eye, Forward, MapPin, RotateCcw, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
 import * as api from '../services/api';
 import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 import type { AssetSurvey, AssetSurveyPagination, AssetSurveyReviewStatus, AssetSurveyStats, User } from '../types';
@@ -202,6 +202,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
   const [reasonText, setReasonText] = useState('');
@@ -253,6 +254,20 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
       setActionError((err as Error).message);
     } finally {
       setActioningId(null);
+    }
+  };
+
+  // Exports exactly what the filters above select (search text, condition and the
+  // sidebar's review-status tab), not just the current page.
+  const handleExport = async () => {
+    setExporting(true);
+    setActionError('');
+    try {
+      await api.downloadAssetSurveysExcel({ query, condition, reviewStatus });
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -315,6 +330,11 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
             ({isAll ? stats.totalSurveys : stats.statusCounts[reviewStatus!]})
           </span>
         </h2>
+        <button type="button" onClick={handleExport} disabled={exporting || loading || pagination.total === 0}
+          title="Download the surveys matching the current filters as an Excel file, with photos"
+          className="flex items-center gap-1.5 bg-accent hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer disabled:cursor-not-allowed">
+          <Download className="w-3.5 h-3.5" /> {exporting ? 'Preparing Excel…' : 'Export Excel'}
+        </button>
       </div>
 
       <div className="bg-white border border-line rounded-xl p-3 flex flex-wrap gap-3 items-center">
