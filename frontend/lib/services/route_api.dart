@@ -18,12 +18,12 @@ class RouteApiException implements Exception {
   String toString() => message;
 }
 
-/// Uploads recorded routes to the `/api/polygons` API in two steps:
-/// 1. `POST /api/polygons` - the GPS points become a polygon. Sends the
-///    route's client-generated uuid, so uploading the same route twice is
-///    treated as a duplicate by the server, not a second polygon.
-/// 2. `PUT /api/polygons/{uuid}/attributes` - the description the user typed
-///    at Start, stored with the polygon in the database.
+/// Uploads recorded routes via `POST /api/polygons` - the GPS points become a
+/// polygon, and the description the user typed at Start is stored in the same
+/// request (the server column lives on the polygon itself, so it must be sent
+/// here, not patched on afterwards). Sends the route's client-generated uuid,
+/// so uploading the same route twice is treated as a duplicate by the server,
+/// not a second polygon.
 class RouteApi {
   RouteApi._();
 
@@ -47,6 +47,7 @@ class RouteApi {
 
   static Map<String, dynamic> _polygonBody(RouteTrack track) => {
     'uuid': track.uuid,
+    if (track.description.isNotEmpty) 'description': track.description,
     'started_at': _stamp(track.startedAt),
     'ended_at': _stamp(track.endedAt),
     'points': [
@@ -83,24 +84,6 @@ class RouteApi {
       _polygonBody(track),
       allowDuplicate: true,
     );
-
-    if (track.description.isNotEmpty) {
-      try {
-        await _send(
-          'PUT',
-          Uri.parse('$_base/${track.uuid}/attributes'),
-          session.token,
-          {'description': track.description},
-        );
-      } on RouteApiException catch (e) {
-        // The polygon is already on the server; a retry sees "duplicate" and
-        // only redoes this step.
-        throw RouteApiException(
-          'Route uploaded, but its description was not saved: ${e.message}',
-          statusCode: e.statusCode,
-        );
-      }
-    }
   }
 
   static Future<void> _send(
