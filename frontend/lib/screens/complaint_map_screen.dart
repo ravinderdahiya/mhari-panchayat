@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -20,6 +19,7 @@ import '../services/route_tracker.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
 import '../widgets/complaint_widgets.dart';
+import '../widgets/flipping_logo.dart';
 import '../widgets/route_recorder.dart';
 import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
@@ -301,14 +301,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     });
   }
 
-  /// Panchayat / Block / District chips narrow the search to that level.
-  void _pickSearchLevel(String level) {
-    setState(() => _searchLevel = _searchLevel == level ? null : level);
-    _searchFocus.requestFocus();
-    final query = _searchController.text.trim();
-    if (query.length >= 2) _runSearch(query);
-  }
-
   Future<void> _openHit(PlaceHit hit) async {
     _searchFocus.unfocus();
     _searchController.text = hit.name;
@@ -506,100 +498,30 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   top: 10,
                   left: 12,
                   right: 12,
-                  child: Column(
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _HomeSearchBar(
-                              controller: _searchController,
-                              focusNode: _searchFocus,
-                              hint: _searchHint,
-                              loading: _searching,
-                              onChanged: _onSearchChanged,
-                              onClear: _clearSearch,
-                              onMic: () => _comingSoon('Voice search'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          _LayersButton(onTap: _showLayers),
-                        ],
+                      Expanded(
+                        child: _HomeSearchBar(
+                          controller: _searchController,
+                          focusNode: _searchFocus,
+                          hint: _searchHint,
+                          loading: _searching,
+                          onChanged: _onSearchChanged,
+                          onClear: _clearSearch,
+                          onMic: () => _comingSoon('Voice search'),
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QuickChip(
-                              icon: Icons.home_rounded,
-                              label: 'Panchayat',
-                              color: _kGreen,
-                              background: const Color(0xFFE6F3EA),
-                              selected: _searchLevel == 'panchayat',
-                              onTap: () => _pickSearchLevel('panchayat'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _QuickChip(
-                              icon: Icons.apartment_rounded,
-                              label: 'Block',
-                              color: const Color(0xFF2563EB),
-                              background: const Color(0xFFE3EEFA),
-                              selected: _searchLevel == 'block',
-                              onTap: () => _pickSearchLevel('block'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _QuickChip(
-                              icon: Icons.location_on_rounded,
-                              label: 'District',
-                              color: _kOrange,
-                              background: const Color(0xFFFDEEDD),
-                              selected: _searchLevel == 'district',
-                              onTap: () => _pickSearchLevel('district'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _QuickChip(
-                              icon: Icons.map_rounded,
-                              label: 'Find on Map',
-                              color: const Color(0xFF7C4DDB),
-                              background: const Color(0xFFEEE7FA),
-                              onTap: _recenter,
-                            ),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(width: 10),
+                      _LayersButton(onTap: _showLayers),
                     ],
                   ),
                 ),
                 Positioned(
                   right: 12,
-                  top: 150,
-                  child: Column(
-                    children: [
-                      _MapSquareButton(
-                        icon: Icons.my_location_rounded,
-                        onTap: _recenter,
-                      ),
-                      const SizedBox(height: 8),
-                      _MapSquareButton(
-                        icon: Icons.add_rounded,
-                        onTap: () => _zoomBy(1),
-                      ),
-                      const SizedBox(height: 2),
-                      _MapSquareButton(
-                        icon: Icons.remove_rounded,
-                        onTap: () => _zoomBy(-1),
-                      ),
-                      const SizedBox(height: 8),
-                      _MapSquareButton(
-                        icon: Icons.fullscreen_rounded,
-                        onTap: _fitHaryana,
-                      ),
-                    ],
+                  top: 78,
+                  child: _MapSquareButton(
+                    icon: Icons.my_location_rounded,
+                    onTap: _recenter,
                   ),
                 ),
                 Positioned(
@@ -621,7 +543,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   ),
                 if (_loading)
                   const Positioned(
-                    top: 140,
+                    top: 78,
                     left: 0,
                     right: 0,
                     child: Center(
@@ -634,7 +556,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   ),
                 if (_hits.isNotEmpty || (_searchedOnce && !_searching))
                   Positioned(
-                    top: 62,
+                    top: 68,
                     left: 12,
                     right: 12,
                     child: _SearchResults(hits: _hits, onTap: _openHit),
@@ -763,12 +685,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         ),
       ],
     );
-  }
-
-  void _zoomBy(double delta) {
-    final camera = _mapController.camera;
-    final next = (camera.zoom + delta).clamp(5.0, _maxZoom);
-    _mapController.move(camera.center, next);
   }
 }
 
@@ -932,18 +848,10 @@ class _CitizenHomeHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          SvgPicture.asset(
-            'assets/images/haryana_emblem.svg',
-            width: 40,
-            height: 40,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            'Government\nof Haryana',
-            style: _pop(9, weight: FontWeight.w600).copyWith(height: 1.2),
-          ),
-          const Spacer(),
+          const FlippingLogo(),
+          const SizedBox(width: 10),
           Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text.rich(
                 TextSpan(
@@ -965,8 +873,6 @@ class _CitizenHomeHeader extends StatelessWidget {
               ),
             ],
           ),
-          const Spacer(),
-          Image.asset('assets/images/harsac_logo.png', width: 40, height: 40),
         ],
       ),
     );
@@ -1000,11 +906,11 @@ class _HomeSearchBar extends StatelessWidget {
       shadowColor: Colors.black26,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        height: 48,
-        padding: const EdgeInsets.only(left: 14, right: 6),
+        height: 54,
+        padding: const EdgeInsets.only(left: 16, right: 6),
         child: Row(
           children: [
-            Icon(Icons.search_rounded, color: AppColors.ink, size: 24),
+            Icon(Icons.search_rounded, color: AppColors.ink, size: 26),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -1012,12 +918,12 @@ class _HomeSearchBar extends StatelessWidget {
                 focusNode: focusNode,
                 onChanged: onChanged,
                 textInputAction: TextInputAction.search,
-                style: _pop(13, weight: FontWeight.w500),
+                style: _pop(14, weight: FontWeight.w500),
                 decoration: InputDecoration(
                   hintText: hint,
                   hintMaxLines: 1,
                   hintStyle: _pop(
-                    12.5,
+                    13.5,
                     weight: FontWeight.w400,
                     color: AppColors.mutedText,
                   ),
@@ -1147,78 +1053,20 @@ class _LayersButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: _kGreen,
-      elevation: 3,
-      shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.layers_rounded, color: Colors.white, size: 21),
-              const SizedBox(width: 6),
-              Text(
-                'Layers',
-                style: _pop(13, weight: FontWeight.w600, color: Colors.white),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickChip extends StatelessWidget {
-  const _QuickChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.background,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color background;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      elevation: 2,
-      shadowColor: Colors.black26,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: selected ? BorderSide(color: color, width: 2) : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 26),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: _pop(11, weight: FontWeight.w600),
-              ),
-            ],
+    return Tooltip(
+      message: 'Layers',
+      child: Material(
+        color: _kGreen,
+        elevation: 3,
+        shadowColor: Colors.black26,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: const SizedBox(
+            width: 54,
+            height: 54,
+            child: Icon(Icons.layers_rounded, color: Colors.white, size: 26),
           ),
         ),
       ),
