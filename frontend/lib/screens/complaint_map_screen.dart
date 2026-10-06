@@ -49,6 +49,7 @@ class ComplaintMapScreen extends StatefulWidget {
 
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   final _mapController = MapController();
+  final _sheetController = DraggableScrollableController();
 
   // --- place search (search bar + Panchayat/Block/District chips)
   final _searchController = TextEditingController();
@@ -182,6 +183,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   void dispose() {
     RouteTracker.instance.removeListener(_followRoute);
     _searchDebounce?.cancel();
+    _sheetController.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     _mapController.dispose();
@@ -261,13 +263,17 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
       return;
     }
     setState(() => _searching = true);
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () => _runSearch(query));
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _runSearch(query),
+    );
   }
 
   Future<void> _runSearch(String query) async {
     final seq = ++_searchSeq;
     final hits = await LocationApi.search(query, level: _searchLevel);
-    if (!mounted || seq != _searchSeq) return; // a newer search superseded this one
+    if (!mounted || seq != _searchSeq)
+      return; // a newer search superseded this one
     setState(() {
       _hits = hits;
       _searching = false;
@@ -310,13 +316,22 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     if (extent == null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Boundary for ${hit.name} is not available on the map')));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Boundary for ${hit.name} is not available on the map',
+            ),
+          ),
+        );
       return;
     }
 
     _mapController.fitCamera(
       CameraFit.bounds(
-        bounds: LatLngBounds(LatLng(extent.ymin, extent.xmin), LatLng(extent.ymax, extent.xmax)),
+        bounds: LatLngBounds(
+          LatLng(extent.ymin, extent.xmin),
+          LatLng(extent.ymax, extent.xmax),
+        ),
         padding: const EdgeInsets.fromLTRB(32, 210, 32, 48),
         maxZoom: 16,
       ),
@@ -381,6 +396,86 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Distance the map overlays keep from the bottom: just above the collapsed
+  /// handle when the Quick Access sheet exists.
+  double get _overlayBottom => _showQuickAccess ? 12 + _kHandleHeight : 12;
+
+  /// Quick Access + Recent Activities live in a bottom sheet that starts as just
+  /// a small handle (map fully visible); swipe up or tap the handle to open it.
+  Widget _buildQuickSheet(List<Complaint> recent) {
+    // Stable key: the Stack's other children appear/disappear (loading spinner,
+    // search results), and without it the sheet would be re-created while the
+    // old one still holds the controller.
+    return Positioned.fill(
+      key: const ValueKey('quick_access_sheet'),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final height = constraints.maxHeight;
+          final minFraction = _kHandleHeight / height;
+          final maxFraction = (_kPanelHeight / height).clamp(
+            minFraction + 0.1,
+            0.9,
+          );
+
+          return DraggableScrollableSheet(
+            controller: _sheetController,
+            initialChildSize: minFraction,
+            minChildSize: minFraction,
+            maxChildSize: maxFraction,
+            snap: true,
+            snapSizes: [minFraction, maxFraction],
+            builder: (context, scrollController) => Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(22),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.14),
+                    blurRadius: 14,
+                    offset: const Offset(0, -3),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                child: Column(
+                  children: [
+                    _SheetHandle(
+                      onTap: () => _toggleSheet(minFraction, maxFraction),
+                    ),
+                    _QuickAccessPanel(
+                      recent: recent,
+                      onRaise: () => _openAndRefresh(const ReportIssueScreen()),
+                      onTrack: () =>
+                          _openAndRefresh(const MyComplaintsScreen()),
+                      onAlerts: () =>
+                          _openAndRefresh(const NotificationScreen()),
+                      onPanchayat: () => _comingSoon('Panchayat details'),
+                      onViewComplaint: (c) =>
+                          push(context, ComplaintDetailsScreen(complaint: c)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _toggleSheet(double minFraction, double maxFraction) {
+    if (!_sheetController.isAttached) return;
+    final open = _sheetController.size > (minFraction + maxFraction) / 2;
+    _sheetController.animateTo(
+      open ? minFraction : maxFraction,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
     );
   }
 
@@ -498,15 +593,15 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     ],
                   ),
                 ),
-                const Positioned(
+                Positioned(
                   right: 12,
-                  bottom: 12,
-                  child: RouteRecorderControl(),
+                  bottom: _overlayBottom,
+                  child: const RouteRecorderControl(),
                 ),
                 if (widget.showComplaints)
                   Positioned(
                     left: 12,
-                    bottom: 12,
+                    bottom: _overlayBottom,
                     child: _IssueStatusCard(
                       selected: _statusFilter,
                       onSelect: _toggleFilter,
@@ -535,19 +630,10 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     right: 12,
                     child: _SearchResults(hits: _hits, onTap: _openHit),
                   ),
+                if (_showQuickAccess) _buildQuickSheet(recent),
               ],
             ),
           ),
-          if (_showQuickAccess)
-            _QuickAccessPanel(
-              recent: recent,
-              onRaise: () => _openAndRefresh(const ReportIssueScreen()),
-              onTrack: () => _openAndRefresh(const MyComplaintsScreen()),
-              onAlerts: () => _openAndRefresh(const NotificationScreen()),
-              onPanchayat: () => _comingSoon('Panchayat details'),
-              onViewComplaint: (c) =>
-                  push(context, ComplaintDetailsScreen(complaint: c)),
-            ),
         ],
       ),
     );
@@ -791,6 +877,10 @@ class _AssetMarker extends StatelessWidget {
 }
 
 const _kGreen = Color(0xFF1B6B43);
+
+/// Height of the collapsed Quick Access sheet (the handle) and of the open panel.
+const _kHandleHeight = 30.0;
+const _kPanelHeight = 330.0;
 const _kOrange = Color(0xFFF58220);
 
 TextStyle _pop(
@@ -914,7 +1004,11 @@ class _HomeSearchBar extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: hint,
                   hintMaxLines: 1,
-                  hintStyle: _pop(12.5, weight: FontWeight.w400, color: AppColors.mutedText),
+                  hintStyle: _pop(
+                    12.5,
+                    weight: FontWeight.w400,
+                    color: AppColors.mutedText,
+                  ),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -927,18 +1021,30 @@ class _HomeSearchBar extends StatelessWidget {
             if (loading)
               const Padding(
                 padding: EdgeInsets.all(10),
-                child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: controller,
               builder: (context, value, _) => value.text.isEmpty
                   ? IconButton(
                       onPressed: onMic,
-                      icon: Icon(Icons.mic_none_rounded, color: AppColors.ink, size: 22),
+                      icon: Icon(
+                        Icons.mic_none_rounded,
+                        color: AppColors.ink,
+                        size: 22,
+                      ),
                     )
                   : IconButton(
                       onPressed: onClear,
-                      icon: Icon(Icons.close_rounded, color: AppColors.ink, size: 20),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: AppColors.ink,
+                        size: 20,
+                      ),
                     ),
             ),
           ],
@@ -976,26 +1082,42 @@ class _SearchResults extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   'No places found',
-                  style: _pop(12.5, weight: FontWeight.w400, color: AppColors.mutedText),
+                  style: _pop(
+                    12.5,
+                    weight: FontWeight.w400,
+                    color: AppColors.mutedText,
+                  ),
                 ),
               )
             : ListView.separated(
                 padding: EdgeInsets.zero,
                 shrinkWrap: true,
                 itemCount: hits.length,
-                separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                separatorBuilder: (_, _) => Divider(
+                  height: 1,
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
                 itemBuilder: (context, index) {
                   final hit = hits[index];
 
                   return ListTile(
                     dense: true,
                     leading: Icon(_icon(hit.level), color: _kGreen, size: 22),
-                    title: Text(hit.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: _pop(13, weight: FontWeight.w600)),
+                    title: Text(
+                      hit.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: _pop(13, weight: FontWeight.w600),
+                    ),
                     subtitle: Text(
                       hit.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: _pop(11, weight: FontWeight.w400, color: AppColors.mutedText),
+                      style: _pop(
+                        11,
+                        weight: FontWeight.w400,
+                        color: AppColors.mutedText,
+                      ),
                     ),
                     onTap: () => onTap(hit),
                   );
@@ -1232,6 +1354,34 @@ class _IssueStatusCard extends StatelessWidget {
   }
 }
 
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        height: _kHandleHeight,
+        width: double.infinity,
+        child: Center(
+          child: Container(
+            width: 42,
+            height: 5,
+            decoration: BoxDecoration(
+              color: const Color(0xFFCFD4CC),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _QuickAccessPanel extends StatelessWidget {
   const _QuickAccessPanel({
     required this.recent,
@@ -1251,23 +1401,12 @@ class _QuickAccessPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.screen,
-        12,
+        2,
         AppSpacing.screen,
-        10,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 14,
-            offset: const Offset(0, -3),
-          ),
-        ],
+        16,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
