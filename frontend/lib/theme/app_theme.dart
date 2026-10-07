@@ -70,8 +70,9 @@ class AppColors {
 
   // Brand colors - unchanged across light/dark.
   static const primary = Color(0xFF1F4A38); // paddy
-  static const secondary = Color(0xFFC68A1F); // gold
-  static const brandBlue = Color(0xFF1F4A38); // paddy
+  static const secondary = Color(0xFFF58220); // orange (citizen profile accent)
+  static const brandGreen = Color(0xFF1B6B43); // leaf (citizen profile text)
+  static const brandBlue = Color(0xFF1B6B43); // leaf (citizen profile green)
   static const splashGradientEnd = Color(0xFF153228); // paddyDark
 
   // Surface/neutral/status tokens - flip with the current theme.
@@ -115,16 +116,42 @@ class AppColors {
 class AppGradients {
   AppGradients._();
 
+  static const _mint = Color(0xFFE4EFE0);
+  static const _sage = Color(0xFFB9D3B4);
+  static const _headerGreen = Color(0xFF3F7D55);
+  static const _headerGreenDark = Color(0xFF1E5A3A);
+
+  /// Solid green for surfaces that carry white text (app bars, dashboard
+  /// cards, selected chips).
   static const header = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [AppColors.primary, AppColors.secondary],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [_headerGreen, _headerGreenDark],
   );
 
+  /// Citizen-profile style: mint only behind the status bar, already green
+  /// by the time the (white) title starts. Stops are tuned per header height
+  /// so the title never lands on the light band.
+  static const tallHeader = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.1, 0.28, 1.0],
+    colors: [_mint, _sage, _headerGreen, _headerGreenDark],
+  );
+
+  /// Title-only variant (shorter header, so the status bar is a larger share).
+  static const shortHeader = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.14, 0.38, 1.0],
+    colors: [_mint, _sage, _headerGreen, _headerGreenDark],
+  );
+
+  /// Primary CTA - orange, so it pops against the green/cream screens.
   static const cta = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
-    colors: [AppColors.primary, AppColors.secondary],
+    colors: [Color(0xFFF58220), Color(0xFFFF9F43)],
   );
 }
 

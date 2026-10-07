@@ -100,7 +100,11 @@ class GradientHeader extends StatelessWidget {
         8,
         28,
       ),
-      decoration: const BoxDecoration(gradient: AppGradients.header),
+      decoration: BoxDecoration(
+        gradient: child != null
+            ? AppGradients.tallHeader
+            : AppGradients.shortHeader,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -124,11 +128,20 @@ class GradientHeader extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: 19,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 28,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                         subtitle!,
                         style: GoogleFonts.poppins(
