@@ -2,147 +2,212 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Privacy Policy – Mhari Panchayat</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --teal: #0F6E56; --teal-dark: #0A4F3E; --ochre: #BA7517;
-    --cream: #FAF7F0; --paper: #FFFFFF; --ink: #1F2A26; --muted: #5C6B65; --rule: #E4DDCC;
+    --green: #1B6B43; --orange: #F58220; --tint: #E3F0E6;
+    --bg: #FFFDF7; --ink: #22281F; --muted: #5B6357; --rule: #E4DDCC;
     box-sizing: border-box;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --cream: #121A17; --paper: #18221E; --ink: #E8EEEA; --muted: #9DB0A8; --rule: #2A3833; --teal: #3FB894; --ochre: #E0A548;
-    }
-  }
   *, *::before, *::after { box-sizing: inherit; }
-  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
   body {
-    margin: 0; background: var(--cream); color: var(--ink);
-    font: 400 16px/1.7 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 15px/1.7 Poppins, system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  header { background: var(--teal-dark); color: #fff; padding: 2.5rem 1.25rem 2rem; }
-  .wrap { max-width: 46rem; margin: 0 auto; }
-  .org { font-size: 0.875rem; color: #CFE7DE; margin: 0 0 0.5rem; }
-  h1 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; margin: 0; }
-  .updated { margin: 0.75rem 0 0; font-size: 0.875rem; color: #CFE7DE; }
-  .band { height: 4px; background: var(--ochre); }
-  main { padding: 2rem 1.25rem 3rem; }
-  section { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
-  h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; font-size: 1.3rem; color: var(--teal); margin: 0 0 0.5rem; display: flex; gap: 0.6rem; align-items: baseline; }
-  h2 span { color: var(--ochre); font-size: 1rem; min-width: 1.5rem; }
-  p, li { margin: 0 0 0.75rem; max-width: 70ch; }
-  ul { padding-left: 1.2rem; margin: 0 0 0.75rem; }
-  li::marker { color: var(--ochre); }
-  strong { font-weight: 500; }
-  a { color: var(--teal); }
-  .note { border-left: 3px solid var(--ochre); padding: 0.25rem 0 0.25rem 0.9rem; color: var(--muted); }
-  footer { text-align: center; font-size: 0.875rem; color: var(--muted); padding: 0 1.25rem 2.5rem; }
+  .wrap { max-width: 44rem; margin: 0 auto; padding: 0 1rem; }
+  header { text-align: center; padding: 1.75rem 0 1.25rem; }
+  header img { width: 64px; height: 64px; display: block; margin: 0 auto 0.75rem; }
+  h1 { font-weight: 700; font-size: clamp(1.6rem, 6vw, 2rem); line-height: 1.2; margin: 0; }
+  .sub { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--muted); }
+  .sub b { color: var(--green); font-weight: 600; }
+  .sub b + b { color: var(--orange); }
+  .bar { width: 40px; height: 3px; border-radius: 2px; background: var(--orange); margin: 0.9rem auto 0; }
+  main { padding-bottom: 2rem; }
+  section { display: grid; grid-template-columns: 34px 1fr; gap: 0 0.85rem; padding: 1rem 0; border-top: 1px solid var(--rule); }
+  section:first-child { border-top: 0; }
+  .ic { width: 30px; height: 30px; border-radius: 50%; background: var(--tint); color: var(--green); display: grid; place-items: center; margin-top: 2px; }
+  .ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  h2 { font-weight: 600; font-size: 1rem; margin: 0 0 0.25rem; line-height: 1.5; }
+  p, li { margin: 0 0 0.6rem; color: var(--muted); text-align: justify; hyphens: auto; }
+  p:last-child, li:last-child { margin-bottom: 0; }
+  ul { padding-left: 1.1rem; margin: 0.4rem 0 0.6rem; }
+  li { margin-bottom: 0.35rem; }
+  li::marker { color: var(--orange); }
+  strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--green); font-weight: 600; }
+  footer { text-align: center; font-size: 0.8rem; color: var(--muted); padding: 1rem 1rem 2rem; border-top: 1px solid var(--rule); }
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <p class="org">Development and Panchayats Department, Government of Haryana</p>
-    <h1>Privacy Policy – Mhari Panchayat</h1>
-    <p class="updated">Last updated: October 2026</p>
-  </div>
-</header>
-<div class="band"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9zM9 11h6M9 15h4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.7-4.3L4 8M4 4v4h4M4 13a8 8 0 0 0 14.7 4.3L20 16M20 20v-4h-4"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0L5 7ZM19 7l-3 7a3 3 0 0 0 6 0l-3-7Z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-offline" viewBox="0 0 24 24"><path d="M2 2l20 20M8.5 16.4a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 4.2-2.5M19 12.9a10 10 0 0 0-2-1.5M12 20h.01"/></symbol>
+  <symbol id="i-cookie" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 4 4 0 0 1-5-4 4 4 0 0 1-4-5Z"/><path d="M8.5 9.5h.01M9 15h.01M14 15.5h.01"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></symbol>
+</svg>
 
-<main class="wrap">
-  <section>
-    <h2><span>1</span>Overview</h2>
-    <p>Mhari Panchayat ("the Service") is a Government of Haryana platform for Gram Panchayat governance. It lets citizens register complaints about village services and lets authorised officers — CPLO, Surveyor, Gram Sachiv, BDPO and DDPO — survey, verify and manage Panchayat assets and resolve complaints. The Service is operated by the Development and Panchayats Department, Haryana, with technical support from HARSAC (Haryana Space Applications Centre).</p>
-    <p>We collect only the information described in this policy and do not share it with anyone outside the relevant Government Administration.</p>
-    <p>The terms used here have the same meaning as in our Terms and Conditions, available within the app, unless defined otherwise.</p>
-  </section>
+<div class="wrap">
+  <header>
+    <img src="harsac-logo.png" alt="HARSAC logo">
+    <h1>Privacy Policy</h1>
+    <p class="sub"><b>Mhari</b> <b>Panchayat</b> · Development and Panchayats Department, Haryana</p>
+    <p class="sub">Last updated: October 2026</p>
+    <div class="bar"></div>
+  </header>
 
-  <section>
-    <h2><span>2</span>Information we collect</h2>
-    <p><strong>Citizens.</strong> To register a complaint, we collect your mobile number (verified by OTP), your name, the village or ward the complaint relates to, the complaint description, and any photos you choose to attach. If you use "Use my location", your device location is recorded with the complaint so officers can find the site.</p>
-    <p><strong>Officers and surveyors.</strong> Accounts are created by an administrator. For each account we hold your name, official email address, mobile number, designation, and assigned jurisdiction (district, block and village as per LGD codes). We also record login activity for security audit.</p>
-    <p><strong>Survey and asset data.</strong> During field surveys, the app records asset details, photos, GPS coordinates and GPS accuracy, and the date and time of capture, along with the officer who captured, verified or approved the record.</p>
-    <p class="note">The app asks for location, camera and storage permissions only when you use a feature that needs them, such as capturing an asset photo or tagging a complaint location. You can deny a permission, but the related feature may not work.</p>
-  </section>
+  <main>
+    <section>
+      <span class="ic"><svg><use href="#i-info"/></svg></span>
+      <div>
+        <h2>1. Overview</h2>
+        <p>Mhari Panchayat ("the Service") is a Government of Haryana platform for Gram Panchayat governance. It lets citizens register complaints about village services and lets authorised officers — CPLO, Surveyor, Gram Sachiv, BDPO and DDPO — survey, verify and manage Panchayat assets and resolve complaints. The Service is operated by the Development and Panchayats Department, Haryana, with technical support from HARSAC (Haryana Space Applications Centre).</p>
+        <p>We collect only the information described in this policy and do not share it with anyone outside the relevant Government Administration.</p>
+        <p>The terms used here have the same meaning as in our <a href="terms-of-service.html">Terms of Service</a>, unless defined otherwise.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>3</span>Offline use and storage on your device</h2>
-    <p>Officers can capture survey data without network coverage. This data is stored temporarily in an encrypted local database on the device and is uploaded automatically once a connection is available. After a successful upload, the local copy is cleared on the next sync. Logging out removes locally stored data from the device.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-phone"/></svg></span>
+      <div>
+        <h2>2. Information We Collect</h2>
+        <p><strong>Citizens.</strong> To register a complaint, we collect your mobile number (verified by OTP), your name, the village or ward the complaint relates to, the complaint description, and any photos you choose to attach. If you use "Use my location", your device location is recorded with the complaint so officers can find the site.</p>
+        <p><strong>Officers and surveyors.</strong> Accounts are created by an administrator. For each account we hold your name, official email address, mobile number, designation, and assigned jurisdiction (district, block and village as per LGD codes). We also record login activity for security audit.</p>
+        <p><strong>Survey and asset data.</strong> During field surveys, the app records asset details, photos, GPS coordinates and GPS accuracy, and the date and time of capture, along with the officer who captured, verified or approved the record.</p>
+        <p>The app asks for location, camera and storage permissions only when you use a feature that needs them, such as capturing an asset photo or tagging a complaint location. You can deny a permission, but the related feature may not work.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>4</span>Tracking and cookies</h2>
-    <p>The Service does not use cookies for tracking or advertising. The web admin panel may use essential session cookies to keep you signed in. The app may use third-party libraries, such as mapping SDKs, that use similar technology to function. Declining them may limit features such as the map display.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-offline"/></svg></span>
+      <div>
+        <h2>3. Offline Use and Storage on Your Device</h2>
+        <p>Officers can capture survey data without network coverage. This data is stored temporarily in an encrypted local database on the device and is uploaded automatically once a connection is available. After a successful upload, the local copy is cleared on the next sync. Logging out removes locally stored data from the device.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>5</span>How we use your data</h2>
-    <ul>
-      <li>To register, route and track complaints to the responsible officer, and to escalate them when they are not resolved in time.</li>
-      <li>To maintain an accurate, verified register of Gram Panchayat assets.</li>
-      <li>To send you updates about the status of your complaint by SMS or in-app notification.</li>
-      <li>To keep an audit trail of who created, verified or changed a record.</li>
-      <li>To improve the Service and produce aggregated, non-identifying reports for planning.</li>
-    </ul>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-cookie"/></svg></span>
+      <div>
+        <h2>4. Tracking and Cookies</h2>
+        <p>The Service does not use cookies for tracking or advertising. The web admin panel may use essential session cookies to keep you signed in. The app may use third-party libraries, such as mapping SDKs, that use similar technology to function. Declining them may limit features such as the map display.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>6</span>Data accuracy</h2>
-    <p>Village, block and district boundaries and master data are based on the Local Government Directory (LGD) and records of the Government of Haryana. Information shown in the Service is for administrative and viewing purposes only and is not valid as evidence in any dispute in a court of law.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-db"/></svg></span>
+      <div>
+        <h2>5. How We Use Your Data</h2>
+        <ul>
+          <li>To register, route and track complaints to the responsible officer, and to escalate them when they are not resolved in time.</li>
+          <li>To maintain an accurate, verified register of Gram Panchayat assets.</li>
+          <li>To send you updates about the status of your complaint by SMS or in-app notification.</li>
+          <li>To keep an audit trail of who created, verified or changed a record.</li>
+          <li>To improve the Service and produce aggregated, non-identifying reports for planning.</li>
+        </ul>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>7</span>Sharing of data</h2>
-    <p>Data collected through the Service is used only by the Government. It may be shared between Haryana state government departments, such as the Development and Panchayats Department and HARSAC, and, where required, with the Union Government, for Panchayat administration and e-governance purposes. Complaint details are visible only to the officers responsible for resolving them.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-alert"/></svg></span>
+      <div>
+        <h2>6. Data Accuracy</h2>
+        <p>Village, block and district boundaries and master data are based on the Local Government Directory (LGD) and records of the Government of Haryana. Information shown in the Service is for administrative and viewing purposes only and is not valid as evidence in any dispute in a court of law.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>8</span>Service providers</h2>
-    <p>We may engage third parties — developers, hosting providers, SMS gateways and mapping service providers — to:</p>
-    <ul>
-      <li>Facilitate or provide the Service on our behalf;</li>
-      <li>Perform Service-related functions; or</li>
-      <li>Help us analyse how the Service is used.</li>
-    </ul>
-    <p>These parties act only under Government direction and may not use your data for any other purpose.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-share"/></svg></span>
+      <div>
+        <h2>7. Sharing of Data</h2>
+        <p>Data collected through the Service is used only by the Government. It may be shared between Haryana state government departments, such as the Development and Panchayats Department and HARSAC, and, where required, with the Union Government, for Panchayat administration and e-governance purposes. Complaint details are visible only to the officers responsible for resolving them.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>9</span>Data storage and security</h2>
-    <p>Data is stored on servers located in India. We use measures such as encrypted connections (HTTPS), hashed passwords, account lockout after repeated failed logins, role-based access, and regular security audits. However, no method of transmission over the internet or electronic storage is 100% secure, and we cannot guarantee absolute security.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-users"/></svg></span>
+      <div>
+        <h2>8. Service Providers</h2>
+        <p>We may engage third parties — developers, hosting providers, SMS gateways and mapping service providers — to:</p>
+        <ul>
+          <li>Facilitate or provide the Service on our behalf;</li>
+          <li>Perform Service-related functions; or</li>
+          <li>Help us analyse how the Service is used.</li>
+        </ul>
+        <p>These parties act only under Government direction and may not use your data for any other purpose.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>10</span>Data retention</h2>
-    <p>Complaint and asset records are kept as long as required for Panchayat administration and as per applicable government record-retention rules. Officer accounts are deactivated when an officer leaves the assigned role.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-lock"/></svg></span>
+      <div>
+        <h2>9. Data Storage and Security</h2>
+        <p>Data is stored on servers located in India. We use measures such as encrypted connections (HTTPS), hashed passwords, account lockout after repeated failed logins, role-based access, and regular security audits. However, no method of transmission over the internet or electronic storage is 100% secure, and we cannot guarantee absolute security.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>11</span>Links to other sites</h2>
-    <p>The Service may link to other government or department portals. These sites are not operated by us, and we are not responsible for their content or practices. Please review their privacy policies.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-clock"/></svg></span>
+      <div>
+        <h2>10. Data Retention</h2>
+        <p>Complaint and asset records are kept as long as required for Panchayat administration and as per applicable government record-retention rules. Officer accounts are deactivated when an officer leaves the assigned role.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>12</span>Your rights</h2>
-    <p>You may ask us to correct details in a complaint you submitted. The Government retains the right to correct or delete data collected through the Service.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-link"/></svg></span>
+      <div>
+        <h2>11. Links to Other Sites</h2>
+        <p>The Service may link to other government or department portals. These sites are not operated by us, and we are not responsible for their content or practices. Please review their privacy policies.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>13</span>Changes to this policy</h2>
-    <p>We may update this Privacy Policy from time to time. Changes take effect as soon as they are posted on this page. Please review it periodically.</p>
-  </section>
+    <section>
+      <span class="ic"><svg><use href="#i-shield"/></svg></span>
+      <div>
+        <h2>12. Your Rights</h2>
+        <p>You may ask us to correct details in a complaint you submitted. The Government retains the right to correct or delete data collected through the Service.</p>
+      </div>
+    </section>
 
-  <section>
-    <h2><span>14</span>Contact us</h2>
-    <p>For questions or suggestions about this Privacy Policy, contact us at <a href="mailto:contact@harsac.org.in">contact@harsac.org.in</a>.</p>
-  </section>
-</main>
+    <section>
+      <span class="ic"><svg><use href="#i-refresh"/></svg></span>
+      <div>
+        <h2>13. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. Changes take effect as soon as they are posted on this page. Please review it periodically.</p>
+      </div>
+    </section>
+
+    <section>
+      <span class="ic"><svg><use href="#i-mail"/></svg></span>
+      <div>
+        <h2>14. Contact Us</h2>
+        <p>For questions or suggestions about this Privacy Policy, contact us at <a href="mailto:contact@harsac.org.in">contact@harsac.org.in</a>.</p>
+      </div>
+    </section>
+  </main>
+</div>
 
 <footer>© 2026 Development and Panchayats Department, Government of Haryana</footer>
 </body>

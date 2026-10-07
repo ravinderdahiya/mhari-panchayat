@@ -338,8 +338,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: _TermsFooter(
-                  onTermsTap: _showMessage,
-                  onPrivacyTap: () => openExternalUrl(context, ApiConfig.privacyPolicyUrl),
+                  onTermsTap: () => openInAppUrl(context, ApiConfig.termsOfServiceUrl),
+                  onPrivacyTap: () => openInAppUrl(context, ApiConfig.privacyPolicyUrl),
                   isEnglish: _isEnglish,
                 ),
               ),
@@ -1121,7 +1121,7 @@ class _TermsFooter extends StatelessWidget {
     required this.isEnglish,
   });
 
-  final ValueChanged<String> onTermsTap;
+  final VoidCallback onTermsTap;
   final VoidCallback onPrivacyTap;
   final bool isEnglish;
 
@@ -1143,9 +1143,6 @@ class _TermsFooter extends StatelessWidget {
 
     final termsText = isEnglish ? 'Terms of Service' : 'सेवा की शर्तें';
     final privacyText = isEnglish ? 'Privacy Policy' : 'गोपनीयता नीति';
-    final termsMessage = isEnglish
-        ? 'Terms of Service will be available soon'
-        : 'सेवा की शर्तें जल्द ही उपलब्ध होंगी';
 
     return RichText(
       textAlign: TextAlign.center,
@@ -1161,7 +1158,7 @@ class _TermsFooter extends StatelessWidget {
             text: termsText,
             style: linkStyle,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => onTermsTap(termsMessage),
+              ..onTap = onTermsTap,
           ),
           TextSpan(text: isEnglish ? ' and\n' : ' और\n'),
           TextSpan(

@@ -197,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _NavRow(
                           icon: Icons.policy_rounded,
                           title: _t('गोपनीयता नीति', 'Privacy policy'),
-                          onTap: () => openExternalUrl(context, ApiConfig.privacyPolicyUrl),
+                          onTap: () => openInAppUrl(context, ApiConfig.privacyPolicyUrl),
                         ),
                       ],
                     ),

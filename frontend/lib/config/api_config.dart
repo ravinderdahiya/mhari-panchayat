@@ -34,6 +34,9 @@ class ApiConfig {
   /// see backend/public/privacy-policy.html.
   static String get privacyPolicyUrl => '$baseUrl/privacy-policy.html';
 
+  /// Terms of Service page served from `backend/public/terms-of-service.html`.
+  static String get termsOfServiceUrl => '$baseUrl/terms-of-service.html';
+
   /// Boundary overlay uses the same proxy as the live admin dashboard.
   /// Local Laravel cannot mint a GIS token from this LAN (`gis.harsac.in`
   /// times out), which is why the layer vanished after pointing at `:8083`.
