@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/api_config.dart';
 import '../map/gis_map_image_layer.dart';
+import '../map/marker_clusterer.dart';
 import '../models/asset.dart';
 import '../models/complaint.dart';
 import '../models/survey.dart';
@@ -50,6 +52,11 @@ class ComplaintMapScreen extends StatefulWidget {
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   final _mapController = MapController();
   final _sheetController = DraggableScrollableController();
+
+  // Marker clustering: the camera is read at build time, so the map just asks
+  // for a (throttled) rebuild whenever it moves or zooms.
+  StreamSubscription<MapEvent>? _mapSub;
+  Timer? _clusterTimer;
 
   // --- place search (search bar + Panchayat/Block/District chips)
   final _searchController = TextEditingController();
@@ -114,6 +121,12 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     super.initState();
     RouteTracker.instance.addListener(_followRoute);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyLocation());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // The map controller only exists once FlutterMap has been built.
+      _mapSub = _mapController.mapEventStream.listen(_onMapEvent);
+      setState(() {}); // first real camera -> first clustering
+    });
     if (widget.showComplaints) {
       _loadComplaints();
     } else {
@@ -192,6 +205,8 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   void dispose() {
     RouteTracker.instance.removeListener(_followRoute);
     _searchDebounce?.cancel();
+    _mapSub?.cancel();
+    _clusterTimer?.cancel();
     _sheetController.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -207,6 +222,189 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
       _fitHaryana();
       _loadMyLocation();
     }
+  }
+
+  // ------------------------------------------------------------- clustering
+
+  void _onMapEvent(MapEvent event) {
+    if (_clusterTimer?.isActive ?? false) return;
+    _clusterTimer = Timer(const Duration(milliseconds: 120), () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  int _conditionSeverity(SurveyCondition condition) => switch (condition) {
+    SurveyCondition.good => 0,
+    SurveyCondition.fair => 1,
+    SurveyCondition.poor => 2,
+    SurveyCondition.damaged => 3,
+  };
+
+  int _complaintSeverity(ComplaintStatus status) => switch (complaintBucket(status)) {
+    ComplaintBucket.pending => 3,
+    ComplaintBucket.inProgress => 1,
+    ComplaintBucket.resolved => 0,
+    ComplaintBucket.rejected => 0,
+  };
+
+  List<MapPoint> _mapPoints() => [
+    for (final asset in _geoAssets)
+      MapPoint(
+        id: 'asset_${asset.id}',
+        position: LatLng(asset.latitude!, asset.longitude!),
+        color: _conditionColor(asset.condition),
+        severity: _conditionSeverity(asset.condition),
+        title: asset.assetName,
+        subtitle: '${asset.assetTypeName ?? 'Asset'} · ${asset.condition.name}',
+        icon: assetTypeIcon(asset.iconKey ?? 'apartment'),
+        isComplaint: false,
+        onTap: () => push(context, AssetDetailsScreen(assetId: asset.id)),
+      ),
+    if (widget.showComplaints)
+      for (final complaint in _geoComplaints)
+        MapPoint(
+          id: 'complaint_${complaint.id}',
+          position: LatLng(complaint.latitude!, complaint.longitude!),
+          color: _markerColor(complaint.status),
+          severity: _complaintSeverity(complaint.status),
+          title: complaint.displaySubject,
+          subtitle: '${statusLabel(complaint.status)} · ${complaint.locationLabel}',
+          icon: Icons.report_problem_rounded,
+          isComplaint: true,
+          onTap: () => push(context, ComplaintDetailsScreen(complaint: complaint)),
+        ),
+  ];
+
+  /// Asset / complaint markers for the current camera: nearby ones merged into
+  /// count bubbles, the rest drawn at a size that suits the zoom level.
+  List<Marker> _clusterMarkers() {
+    MapCamera camera;
+    try {
+      camera = _mapController.camera;
+    } catch (_) {
+      return const []; // FlutterMap not laid out yet - the post-frame rebuild fills this in
+    }
+
+    final size = markerSizeForZoom(camera.zoom);
+
+    return [
+      for (final cluster in clusterPoints(_mapPoints(), camera))
+        cluster.isSingle ? _singleMarker(cluster.points.first, size) : _clusterMarker(cluster),
+    ];
+  }
+
+  Marker _singleMarker(MapPoint point, double size) {
+    if (point.isComplaint) {
+      final pin = size * 1.1;
+
+      return Marker(
+        point: point.position,
+        width: math.max(pin, 30),
+        height: math.max(pin * 1.18, 34),
+        alignment: Alignment.topCenter,
+        child: _TeardropMarker(color: point.color, onTap: point.onTap, size: pin),
+      );
+    }
+
+    final tapSize = math.max(size, 30.0); // keep small dots easy to tap
+
+    return Marker(
+      point: point.position,
+      width: tapSize,
+      height: tapSize,
+      alignment: Alignment.center,
+      child: _AssetMarker(color: point.color, icon: point.icon, onTap: point.onTap, size: size),
+    );
+  }
+
+  Marker _clusterMarker(MapCluster cluster) {
+    final diameter = clusterSizeFor(cluster.count);
+
+    return Marker(
+      point: cluster.center,
+      width: diameter + 10,
+      height: diameter + 10,
+      alignment: Alignment.center,
+      child: _ClusterBubble(
+        count: cluster.count,
+        color: cluster.worst.color,
+        size: diameter,
+        onTap: () => _openCluster(cluster),
+      ),
+    );
+  }
+
+  /// Tapping a bubble zooms in to its members; if they can never separate (same
+  /// spot, or already at maximum zoom) it lists them instead.
+  void _openCluster(MapCluster cluster) {
+    final camera = _mapController.camera;
+    if (cluster.isCoLocated || camera.zoom >= _maxZoom - 0.5) {
+      _showClusterList(cluster);
+      return;
+    }
+
+    final fitted = CameraFit.bounds(
+      bounds: LatLngBounds.fromPoints([for (final p in cluster.points) p.position]),
+      padding: const EdgeInsets.all(72),
+      maxZoom: _maxZoom,
+    ).fit(camera);
+    final zoom = math.max(fitted.zoom, camera.zoom + 1).clamp(5.0, _maxZoom);
+    _mapController.move(fitted.center, zoom);
+  }
+
+  void _showClusterList(MapCluster cluster) {
+    final points = [...cluster.points]..sort((a, b) => b.severity.compareTo(a.severity));
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text(
+                  '${cluster.count} items here',
+                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink),
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: points.length,
+                  separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                  itemBuilder: (context, index) {
+                    final point = points[index];
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 16,
+                        backgroundColor: point.color,
+                        child: Icon(point.icon, color: Colors.white, size: 17),
+                      ),
+                      title: Text(point.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(point.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        point.onTap();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Color _markerColor(ComplaintStatus status) {
@@ -645,34 +843,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         ),
         MarkerLayer(
           markers: [
-            for (final asset in _geoAssets)
-              Marker(
-                point: LatLng(asset.latitude!, asset.longitude!),
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                child: _AssetMarker(
-                  color: _conditionColor(asset.condition),
-                  icon: assetTypeIcon(asset.iconKey ?? 'apartment'),
-                  onTap: () =>
-                      push(context, AssetDetailsScreen(assetId: asset.id)),
-                ),
-              ),
-            if (widget.showComplaints)
-              for (final complaint in _geoComplaints)
-                Marker(
-                  point: LatLng(complaint.latitude!, complaint.longitude!),
-                  width: 44,
-                  height: 52,
-                  alignment: Alignment.topCenter,
-                  child: _TeardropMarker(
-                    color: _markerColor(complaint.status),
-                    onTap: () => push(
-                      context,
-                      ComplaintDetailsScreen(complaint: complaint),
-                    ),
-                  ),
-                ),
+            ..._clusterMarkers(),
             if (_myLocation != null)
               Marker(
                 point: _myLocation!,
@@ -749,10 +920,11 @@ class _MyLocationDot extends StatelessWidget {
 }
 
 class _TeardropMarker extends StatelessWidget {
-  const _TeardropMarker({required this.color, required this.onTap});
+  const _TeardropMarker({required this.color, required this.onTap, this.size = 44});
 
   final Color color;
   final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -761,7 +933,7 @@ class _TeardropMarker extends StatelessWidget {
       child: Icon(
         Icons.location_on,
         color: color,
-        size: 44,
+        size: size,
         shadows: const [
           Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
         ],
@@ -775,30 +947,91 @@ class _AssetMarker extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.onTap,
+    this.size = 40,
   });
 
   final Color color;
   final IconData icon;
   final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
+    final showIcon = size >= 18; // tiny zoomed-out dots carry colour only
+
     return GestureDetector(
+      behavior: HitTestBehavior.translucent,
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2.5),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black38,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
+      child: Center(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: size < 18 ? 1.5 : 2),
+            boxShadow: const [
+              BoxShadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
+            ],
+          ),
+          child: showIcon ? Icon(icon, color: Colors.white, size: size * 0.5) : null,
         ),
-        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+/// Count bubble for a group of nearby markers: a soft halo, a solid disc in the
+/// colour of the group's worst item, and the number of items inside.
+class _ClusterBubble extends StatelessWidget {
+  const _ClusterBubble({
+    required this.count,
+    required this.color,
+    required this.size,
+    required this.onTap,
+  });
+
+  final int count;
+  final Color color;
+  final double size;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 999 ? '999+' : '$count';
+    final dark = ThemeData.estimateBrightnessForColor(color) == Brightness.dark;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onTap,
+      child: Center(
+        child: Container(
+          width: size + 10,
+          height: size + 10,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.30)),
+          alignment: Alignment.center,
+          child: Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: const [
+                BoxShadow(color: Colors.black38, blurRadius: 5, offset: Offset(0, 2)),
+              ],
+            ),
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: label.length > 3 ? 10 : (label.length > 2 ? 11 : 12.5),
+                fontWeight: FontWeight.w700,
+                color: dark ? Colors.white : const Color(0xFF22281F),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

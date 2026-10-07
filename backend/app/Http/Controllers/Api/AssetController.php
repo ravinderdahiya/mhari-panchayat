@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AssetSurvey;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,9 +27,31 @@ class AssetController extends Controller
         ];
     }
 
-    public function index(): JsonResponse
+    /**
+     * Assets the signed-in user may see. A CPLO works one assigned panchayat, so
+     * they only get the assets of that area (nothing if none is assigned yet) -
+     * never other panchayats'. Every other role keeps the full set, as before
+     * (citizens need it to report an issue against any asset).
+     */
+    private function visibleAssets(Request $request): Builder
     {
-        $assets = AssetSurvey::with(self::WITH)
+        $query = AssetSurvey::query();
+        $user = $request->user();
+
+        if ($user?->role === 'cplo') {
+            $assigned = $user->panchayats()->pluck('panchayats.id')->all();
+            if ($user->panchayat_id) {
+                $assigned[] = (int) $user->panchayat_id;
+            }
+            $query->whereIn('panchayat_id', array_values(array_unique(array_filter($assigned))) ?: [0]);
+        }
+
+        return $query;
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $assets = $this->visibleAssets($request)->with(self::WITH)
             ->latest('survey_date')
             ->get()
             ->map(fn (AssetSurvey $survey) => $this->summary($survey));
@@ -47,7 +70,7 @@ class AssetController extends Controller
         $longitude = (float) $data['longitude'];
         $radius = (float) ($data['radius'] ?? 100);
 
-        $assets = AssetSurvey::with(self::WITH)->get()
+        $assets = $this->visibleAssets($request)->with(self::WITH)->get()
             ->map(function (AssetSurvey $survey) use ($latitude, $longitude) {
                 $lat1 = deg2rad($latitude);
                 $lat2 = deg2rad($survey->latitude);
@@ -66,9 +89,9 @@ class AssetController extends Controller
         return response()->json(['success' => true, 'assets' => $assets]);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
-        $survey = AssetSurvey::with(self::WITH)->findOrFail($id);
+        $survey = $this->visibleAssets($request)->with(self::WITH)->findOrFail($id);
         $photoUrls = collect($survey->photo_paths ?? [])
             ->map(fn (string $path) => '/storage/'.ltrim($path, '/'))
             ->values();
