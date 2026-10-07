@@ -72,7 +72,7 @@ class AppColors {
   static const primary = Color(0xFF1F4A38); // paddy
   static const secondary = Color(0xFFF58220); // orange (citizen profile accent)
   static const brandGreen = Color(0xFF1B6B43); // leaf (citizen profile text)
-  static const brandBlue = Color(0xFF1F4A38); // paddy
+  static const brandBlue = Color(0xFF1B6B43); // leaf (citizen profile green)
   static const splashGradientEnd = Color(0xFF153228); // paddyDark
 
   // Surface/neutral/status tokens - flip with the current theme.

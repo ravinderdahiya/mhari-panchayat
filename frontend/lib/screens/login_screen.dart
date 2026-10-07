@@ -736,9 +736,9 @@ class _LoginHero extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.greenTint, AppColors.orangeTint],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [const Color(0xFFE4EFE0), AppColors.greyBg],
           ),
         ),
         child: Stack(
@@ -766,14 +766,24 @@ class _LoginHero extends StatelessWidget {
                 const SizedBox(height: 10),
                 const _AuthorityFlipBadge(size: 96),
                 const SizedBox(height: 14),
-                Text(
-                  'म्हारी पंचायत',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.notoSansDevanagari(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.secondary,
+                Text.rich(
+                  TextSpan(
+                    style: GoogleFonts.notoSansDevanagari(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    children: const [
+                      TextSpan(
+                        text: 'म्हारी ',
+                        style: TextStyle(color: AppColors.brandGreen),
+                      ),
+                      TextSpan(
+                        text: 'पंचायत',
+                        style: TextStyle(color: AppColors.secondary),
+                      ),
+                    ],
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
                 Text(
