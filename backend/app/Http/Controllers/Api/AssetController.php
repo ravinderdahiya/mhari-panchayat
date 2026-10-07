@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AssetSurvey;
+use App\Support\SurveyJurisdiction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,22 +29,24 @@ class AssetController extends Controller
     }
 
     /**
-     * Assets the signed-in user may see. A CPLO works one assigned panchayat, so
-     * they only get the assets of that area (nothing if none is assigned yet) -
-     * never other panchayats'. Every other role keeps the full set, as before
-     * (citizens need it to report an issue against any asset).
+     * Assets the signed-in user may see on the map. A CPLO works one assigned
+     * panchayat, so they only get that area's assets; a reviewer (Gram Sachiv, BDPO,
+     * DDPO, XEN-PR, CEO-ZP) only their own jurisdiction, exactly like their survey
+     * list. Nobody with no area assigned yet sees anything. Every other role keeps
+     * the full set, as before (citizens need it to report an issue on any asset).
      */
     private function visibleAssets(Request $request): Builder
     {
         $query = AssetSurvey::query();
         $user = $request->user();
+        if (! $user) {
+            return $query;
+        }
 
-        if ($user?->role === 'cplo') {
-            $assigned = $user->panchayats()->pluck('panchayats.id')->all();
-            if ($user->panchayat_id) {
-                $assigned[] = (int) $user->panchayat_id;
-            }
-            $query->whereIn('panchayat_id', array_values(array_unique(array_filter($assigned))) ?: [0]);
+        if ($user->role === 'cplo') {
+            $query->whereIn('panchayat_id', SurveyJurisdiction::panchayatIds($user) ?: [0]);
+        } else {
+            SurveyJurisdiction::apply($query, $user);
         }
 
         return $query;

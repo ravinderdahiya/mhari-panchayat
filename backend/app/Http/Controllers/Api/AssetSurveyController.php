@@ -342,31 +342,8 @@ class AssetSurveyController extends Controller
             $query->where('asset_type_id', $request->integer('asset_type_id'));
         }
 
-        // Each reviewer stage only ever sees surveys from their own
-        // jurisdiction - no jurisdiction assigned means nothing to review
-        // yet, not everything. Admin/super_admin stay unrestricted.
-        if ($user->role === 'gram_sachiv') {
-            $query->whereIn('panchayat_id', $this->allowedPanchayatIds($user) ?: [0]);
-        } elseif ($user->role === 'bdpo') {
-            $blockIds = $user->blocks()->pluck('blocks.id')->all();
-            if ($user->block_id) {
-                $blockIds[] = $user->block_id;
-            }
-            $query->whereIn('block_id', $blockIds ?: [0]);
-        } elseif ($user->role === 'ddpo') {
-            $query->where('district_id', $user->district_id ?: 0);
-        } elseif ($user->role === 'xen_pr') {
-            // Only ever actionable on 'ddpo_approved' surveys whose asset
-            // type actually needs technical review - other statuses (their
-            // own forwarded/history) still show regardless.
-            $query->where('district_id', $user->district_id ?: 0)
-                ->where(function ($jurisdiction) {
-                    $jurisdiction->where('review_status', '!=', 'ddpo_approved')
-                        ->orWhereHas('assetType', fn ($assetType) => $assetType->where('requires_technical_review', true));
-                });
-        } elseif ($user->role === 'ceo_zp') {
-            $query->where('district_id', $user->district_id ?: 0);
-        }
+        // Each reviewer stage only ever sees surveys from their own jurisdiction.
+        \App\Support\SurveyJurisdiction::apply($query, $user);
 
         return $query;
     }
