@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdminSurveyPolygonController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AssetTypeController;
 use App\Http\Controllers\Api\AssetController;
@@ -115,6 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // (not permission:) so an admin can never misconfigure permissions
     // into locking themselves out of the permission editor itself.
     Route::middleware('role:admin')->group(function () {
+        // Road Map: every user's survey polygons (admin / super admin only).
+        Route::get('/admin/polygons', [AdminSurveyPolygonController::class, 'index']);
+        Route::get('/admin/polygons/{uuid}', [AdminSurveyPolygonController::class, 'show'])->whereUuid('uuid');
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);
         Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'update']);
         Route::get('/users', [UserController::class, 'index']);

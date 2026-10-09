@@ -449,6 +449,57 @@ function assetSurveyFilterParams(options: AssetSurveyFilters, params = new URLSe
 export const getDistricts = () =>
   request<{ success: boolean; districts: { id: number; name: string }[] }>('/api/registrations/districts');
 
+// ---- Road Map: every user's survey polygons (admin only, GeoJSON) ----------------
+
+export interface RoadMapFeature {
+  type: 'Feature';
+  id: string;
+  geometry: { type: 'Polygon'; coordinates: [number, number][][] }; // [lng, lat]
+  properties: {
+    id: number;
+    uuid: string;
+    description: string | null;
+    area_sqm: number;
+    perimeter_m: number;
+    point_count: number;
+    started_at: string | null;
+    ended_at: string | null;
+    source: 'online' | 'offline_sync' | 'shp_import' | string;
+    created_at: string;
+    has_data: boolean;
+    extra?: Record<string, unknown>;
+    track?: { type: 'LineString'; coordinates: [number, number][] } | null;
+    user: { id: number; name: string; username: string; role: string } | null;
+    [attribute: string]: any; // owner_name, village, khasra_no ... (flat attribute columns)
+  };
+}
+
+export interface RoadMapResponse {
+  type: 'FeatureCollection';
+  features: RoadMapFeature[];
+  meta: { total: number; returned: number; limit: number; total_area_sqm: number; users: number };
+  users: { id: number; name: string; username: string; role: string; polygons: number }[];
+}
+
+export const getRoadMapPolygons = async (options: {
+  query?: string; userId?: string; source?: string; dateFrom?: string; dateTo?: string;
+} = {}) => {
+  const params = new URLSearchParams();
+  if (options.query?.trim()) params.set('q', options.query.trim());
+  if (options.userId) params.set('user_id', options.userId);
+  if (options.source) params.set('source', options.source);
+  if (options.dateFrom) params.set('date_from', options.dateFrom);
+  if (options.dateTo) params.set('date_to', options.dateTo);
+  const response = await request<{ success: boolean; data: RoadMapResponse }>(`/api/admin/polygons?${params.toString()}`);
+  return response.data;
+};
+
+// One polygon including its raw walked track (fetched when it is selected).
+export const getRoadMapPolygon = async (uuid: string) => {
+  const response = await request<{ success: boolean; data: RoadMapFeature }>(`/api/admin/polygons/${uuid}`);
+  return response.data;
+};
+
 export const getAssetSurveys = (options: AssetSurveyFilters & {
   page?: number;
   perPage?: number;

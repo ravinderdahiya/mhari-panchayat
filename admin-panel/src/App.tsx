@@ -18,6 +18,7 @@ import VillageAssetsPage from './pages/VillageAssetsPage';
 import AssetTypesPage from './pages/AssetTypesPage';
 import AssetSurveysPage from './pages/AssetSurveysPage';
 import ProjectMeetingPage from './pages/ProjectMeetingPage';
+import RoadMapPage from './pages/RoadMapPage';
 import ProfilePage from './pages/ProfilePage';
 import FeedbackPage from './pages/FeedbackPage';
 import ComingSoon from './components/ComingSoon';
@@ -122,6 +123,7 @@ export default function App() {
       {activeView === 'citizens' && <CitizensPage />}
       {activeView === 'feedback' && <FeedbackPage />}
       {activeView === 'project-meeting' && <ProjectMeetingPage />}
+      {activeView === 'road-map' && <RoadMapPage />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>
