@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\SurveyPolygonAttributeController;
 use App\Http\Controllers\Api\SurveyPolygonController;
@@ -117,6 +118,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // into locking themselves out of the permission editor itself.
     Route::middleware('role:admin')->group(function () {
         // Road Map: every user's survey polygons (admin / super admin only).
+        // Reports screen: filterable complaint / asset-survey summaries (admin / super admin).
+        Route::get('/reports/complaints', [ReportController::class, 'complaints']);
+        Route::get('/reports/complaints/export', [ReportController::class, 'complaintsExport'])->middleware('throttle:20,1');
+        Route::get('/reports/asset-surveys', [ReportController::class, 'assetSurveys']);
         Route::get('/admin/polygons', [AdminSurveyPolygonController::class, 'index']);
         Route::get('/admin/polygons/{uuid}', [AdminSurveyPolygonController::class, 'show'])->whereUuid('uuid');
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);

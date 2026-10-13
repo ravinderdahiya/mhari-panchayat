@@ -240,3 +240,16 @@ column with links to all photos. Photos over 800 KB (or past a 150 MB workbook b
 instead, so the file stays small. At most 1500 surveys per export - narrow the filters beyond that (422).
 No image library is needed (the workbook is written with ext-zip only), so it also works without GD.
 The admin panel's Asset Surveys screen has an **Export Excel** button that passes its current filters.
+
+## Reports API (admin only)
+
+Behind `role:admin` (admin + super admin), system-wide. All accept `date_from` / `date_to` (YYYY-MM-DD, India time, inclusive) and `district_id`.
+
+| Method | Path | Extra filters | Returns |
+|---|---|---|---|
+| GET | `/api/reports/asset-surveys` | `department_id`, `asset_type_id`, `condition`, `review_status` | KPIs, breakdowns (review status, condition, department, asset type, district), top surveyors, daily trend |
+| GET | `/api/reports/complaints` | `department_id`, `category_id`, `priority_id`, `status` = `pending\|in_progress\|resolved\|rejected` | KPIs (resolution rate, avg resolution time, SLA breached, avg rating), breakdowns (status, category, priority, department, district), top resolvers, created-vs-resolved daily trend |
+| GET | `/api/reports/complaints/export` | same as above | `.xlsx` of the matching complaints (max 5000) |
+
+The daily trend covers the selected dates (max 366 days) or, with no dates, the last 30 days; every other number covers all
+time unless dates are given. Asset surveys are exported with `GET /api/surveys/export` (same filters, with photos).

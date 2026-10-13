@@ -449,6 +449,76 @@ function assetSurveyFilterParams(options: AssetSurveyFilters, params = new URLSe
 export const getDistricts = () =>
   request<{ success: boolean; districts: { id: number; name: string }[] }>('/api/registrations/districts');
 
+// ---- Reports (admin only) ---------------------------------------------------------
+
+export interface ReportCount { name: string; count: number }
+export interface TrendPoint { date: string; [line: string]: number | string }
+interface ReportRange { from: string; to: string }
+
+export interface ComplaintReport {
+  kpi: {
+    total: number; pending: number; in_progress: number; resolved: number; rejected: number; escalated: number;
+    sla_breached: number; resolution_rate: number; avg_resolution_hours: number | null; avg_rating: number | null;
+  };
+  by_status: ReportCount[]; by_category: ReportCount[]; by_priority: ReportCount[]; by_department: ReportCount[]; by_district: ReportCount[];
+  top_resolvers: { id: number; name: string; role: string; count: number; avg_hours: number }[];
+  trend: (TrendPoint & { created?: number; resolved?: number })[];
+  range: ReportRange;
+}
+
+export interface AssetSurveyReport {
+  kpi: {
+    total: number; surveyors: number; good: number; fair: number; poor: number; damaged: number;
+    submitted: number; in_review: number; returned: number; approved: number; rejected: number; approval_rate: number;
+  };
+  by_review_status: ReportCount[]; by_condition: ReportCount[]; by_department: ReportCount[]; by_asset_type: ReportCount[]; by_district: ReportCount[];
+  top_surveyors: { id: number; name: string; role: string; count: number; approved: number; rejected_or_returned: number }[];
+  trend: (TrendPoint & { surveys?: number })[];
+  range: ReportRange;
+}
+
+export interface ComplaintReportFilters { dateFrom?: string; dateTo?: string; districtId?: string; status?: string }
+
+function complaintReportParams(options: ComplaintReportFilters) {
+  const params = new URLSearchParams();
+  if (options.dateFrom) params.set('date_from', options.dateFrom);
+  if (options.dateTo) params.set('date_to', options.dateTo);
+  if (options.districtId) params.set('district_id', options.districtId);
+  if (options.status) params.set('status', options.status);
+  return params;
+}
+
+export const getComplaintReport = async (options: ComplaintReportFilters = {}) =>
+  (await request<{ success: boolean; data: ComplaintReport }>(`/api/reports/complaints?${complaintReportParams(options)}`)).data;
+
+export const getAssetSurveyReport = async (options: AssetSurveyFilters = {}) =>
+  (await request<{ success: boolean; data: AssetSurveyReport }>(`/api/reports/asset-surveys?${assetSurveyFilterParams(options)}`)).data;
+
+// Same fetch-with-auth-header download trick as downloadAssetSurveysExcel.
+export const downloadComplaintsExcel = async (options: ComplaintReportFilters = {}) => {
+  const token = getToken();
+  const res = await fetch(`${API_BASE_URL}/api/reports/complaints/export?${complaintReportParams(options)}`, {
+    headers: {
+      Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Export failed (${res.status})`);
+  }
+  const filename = /filename="?([^";]+)"?/i.exec(res.headers.get('Content-Disposition') ?? '')?.[1]
+    ?? `complaints-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+};
+
 // ---- Road Map: every user's survey polygons (admin only, GeoJSON) ----------------
 
 export interface RoadMapFeature {

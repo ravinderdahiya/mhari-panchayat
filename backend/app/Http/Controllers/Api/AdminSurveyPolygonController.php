@@ -100,10 +100,10 @@ class AdminSurveyPolygonController extends Controller
         $from = $this->date($request->query('date_from'));
         $to = $this->date($request->query('date_to'));
         if ($from) {
-            $query->whereRaw('COALESCE(survey_polygons.started_at, survey_polygons.created_at) >= ?', [$from->startOfDay()]);
+            $query->whereRaw('COALESCE(survey_polygons.started_at, survey_polygons.created_at) >= ?', [$from->startOfDay()->setTimezone(config('app.timezone'))]);
         }
         if ($to) {
-            $query->whereRaw('COALESCE(survey_polygons.started_at, survey_polygons.created_at) <= ?', [$to->endOfDay()]);
+            $query->whereRaw('COALESCE(survey_polygons.started_at, survey_polygons.created_at) <= ?', [$to->endOfDay()->setTimezone(config('app.timezone'))]);
         }
 
         // Free-text search over the description, the polygon's attributes and the user.

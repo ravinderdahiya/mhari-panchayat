@@ -389,10 +389,10 @@ class AssetSurveyController extends Controller
         $from = $this->parseFilterDate($request->query('date_from'));
         $to = $this->parseFilterDate($request->query('date_to'));
         if ($from) {
-            $query->where('survey_date', '>=', $from->startOfDay());
+            $query->where('survey_date', '>=', $from->startOfDay()->setTimezone(config('app.timezone')));
         }
         if ($to) {
-            $query->where('survey_date', '<=', $to->endOfDay());
+            $query->where('survey_date', '<=', $to->endOfDay()->setTimezone(config('app.timezone')));
         }
 
         // Role of the person who submitted the survey (surveyor, cplo, ...).

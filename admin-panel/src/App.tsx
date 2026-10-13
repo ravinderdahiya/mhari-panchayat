@@ -19,6 +19,7 @@ import AssetTypesPage from './pages/AssetTypesPage';
 import AssetSurveysPage from './pages/AssetSurveysPage';
 import ProjectMeetingPage from './pages/ProjectMeetingPage';
 import RoadMapPage from './pages/RoadMapPage';
+import ReportsPage from './pages/ReportsPage';
 import ProfilePage from './pages/ProfilePage';
 import FeedbackPage from './pages/FeedbackPage';
 import ComingSoon from './components/ComingSoon';
@@ -28,7 +29,6 @@ import type { View } from './components/Layout';
 type PreAuthView = 'login' | 'register' | 'forgot';
 
 const PLACEHOLDER_TITLES: Partial<Record<View, string>> = {
-  reports: 'Reports',
   settings: 'Settings',
   'audit-log': 'Audit Log',
 };
@@ -124,6 +124,7 @@ export default function App() {
       {activeView === 'feedback' && <FeedbackPage />}
       {activeView === 'project-meeting' && <ProjectMeetingPage />}
       {activeView === 'road-map' && <RoadMapPage />}
+      {activeView === 'reports' && <ReportsPage />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>

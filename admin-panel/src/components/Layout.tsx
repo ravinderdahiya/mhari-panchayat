@@ -66,7 +66,7 @@ const NAV_ITEMS: NavItem[] = [
       { id: 'complaint-statuses', label: 'Complaint Statuses' },
     ] },
   ] },
-  { id: 'reports', label: 'Reports', icon: FileBarChart },
+  { id: 'reports', label: 'Reports', icon: FileBarChart, adminOnly: true },
   { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, section: 'operations' },
   { id: 'my-surveys', label: 'My Surveys', icon: ClipboardCheck, roles: ['surveyor', 'cplo'], section: 'operations' },
   { id: 'surveyors', label: 'Surveyors', icon: HardHat, adminOnly: true, section: 'operations' },
@@ -106,7 +106,7 @@ const NAV_ITEMS: NavItem[] = [
 const PAGE_SUBTITLES: Record<View, string> = {
   dashboard: 'Grievance overview across all panchayats',
   master: 'Manage master data used across the system',
-  reports: 'Generate and view system reports',
+  reports: 'Asset survey and complaint reports with charts and Excel export',
   complaints: 'Track and resolve citizen grievances',
   'my-surveys': 'Field surveys you submitted from the app',
   'village-assets': 'GIS infrastructure tracking',
