@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/notification_center.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notification_badge.dart';
 import '../widgets/location_gate.dart';
 import 'citizen_profile_screen.dart';
 import 'complaint_map_screen.dart';
@@ -19,6 +21,18 @@ class CitizenShell extends StatefulWidget {
 class _CitizenShellState extends State<CitizenShell> {
   int _index = 0;
   int _refreshTick = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    NotificationCenter.instance.start();
+  }
+
+  @override
+  void dispose() {
+    NotificationCenter.instance.stop();
+    super.dispose();
+  }
 
   Future<void> _openNewComplaint() async {
     await Navigator.of(
@@ -83,6 +97,7 @@ class _CitizenShellState extends State<CitizenShell> {
                       child: _NavIcon(
                         icon: Icons.notifications_outlined,
                         selectedIcon: Icons.notifications_rounded,
+                        badged: true,
                         label: 'Alerts',
                         selected: _index == 2,
                         onTap: () => setState(() => _index = 2),
@@ -117,6 +132,7 @@ class _NavIcon extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badged = false,
   });
 
   final IconData icon;
@@ -124,6 +140,9 @@ class _NavIcon extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Show the unread-notification count on the icon.
+  final bool badged;
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +159,12 @@ class _NavIcon extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(selected ? selectedIcon : icon, color: color, size: 24),
+            badged
+                ? IconTheme(
+                    data: IconThemeData(color: color),
+                    child: NotificationBadgeIcon(icon: selected ? selectedIcon : icon),
+                  )
+                : Icon(selected ? selectedIcon : icon, color: color, size: 24),
             const SizedBox(height: 2),
             FittedBox(
               fit: BoxFit.scaleDown,

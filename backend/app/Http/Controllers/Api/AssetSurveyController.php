@@ -924,5 +924,12 @@ class AssetSurveyController extends Controller
             'action' => $pastTense,
             'remarks' => $reason,
         ]);
+
+        // Tell the next reviewers / the surveyor. A notification failure must never undo the review.
+        try {
+            app(\App\Services\NotificationService::class)->surveyTransitioned($survey->fresh(), $action, $user, $reason);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

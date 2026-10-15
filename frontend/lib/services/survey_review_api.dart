@@ -78,6 +78,23 @@ class SurveyReviewApi {
         .toList();
   }
 
+  /// One survey (the server only returns it if it is within the caller's jurisdiction).
+  static Future<Survey> getById(String surveyId) async {
+    final headers = await _authHeaders();
+    late final http.Response response;
+    try {
+      response = await http
+          .get(_uri('/$surveyId'), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw SurveyReviewApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+    final body = await _decode(response);
+    return Survey.fromJson(body['survey'] as Map<String, dynamic>? ?? const {});
+  }
+
   /// The surveyor's (CPLO/surveyor/...) own action after submitting: sends
   /// their reviewed survey on to Gram Sachiv.
   static Future<Survey> forwardSubmission(String surveyId) async {

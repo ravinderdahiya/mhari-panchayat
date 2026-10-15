@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'user_id',
     'complaint_id',
+    'asset_survey_id',
     'type',
     'title',
     'message',
@@ -21,6 +22,7 @@ class UserNotification extends Model
         return [
             'is_read' => 'boolean',
             'complaint_id' => 'integer',
+            'asset_survey_id' => 'integer',
             'user_id' => 'integer',
         ];
     }
@@ -41,6 +43,7 @@ class UserNotification extends Model
         return [
             'id' => (string) $this->id,
             'complaintId' => $this->complaint_id !== null ? (string) $this->complaint_id : '',
+            'assetSurveyId' => $this->asset_survey_id !== null ? (string) $this->asset_survey_id : '',
             'type' => $this->type,
             'title' => $this->title,
             'message' => $this->message,

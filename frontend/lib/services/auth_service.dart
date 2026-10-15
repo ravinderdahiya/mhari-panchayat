@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_role.dart';
+import 'push_service.dart';
 
 class AuthSession {
   const AuthSession({
@@ -184,6 +185,8 @@ class AuthService {
   }
 
   static Future<void> logout() async {
+    // Needs the still-valid token, so it must run before the session is cleared.
+    await PushService.instance.unregister();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_loggedInKey);
     await prefs.remove(_tokenKey);

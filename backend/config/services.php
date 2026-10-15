@@ -70,4 +70,12 @@ return [
         'token_ttl_minutes' => (int) env('HSAC_TOKEN_EXPIRATION_MINUTES', 60),
     ],
 
+    // Firebase Cloud Messaging (push notifications). Path to the service-account JSON
+    // downloaded from Firebase console > Project settings > Service accounts.
+    // Unset = push is skipped and only the in-app inbox is used.
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+        'ca_bundle' => env('FIREBASE_CA_BUNDLE'),
+    ],
+
 ];

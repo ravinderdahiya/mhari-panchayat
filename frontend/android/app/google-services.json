@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "549058454914",
+    "firebase_url": "https://push-notifications-e2116.firebaseio.com",
+    "project_id": "push-notifications-e2116",
+    "storage_bucket": "push-notifications-e2116.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549058454914:android:315dd1fcca8007878c1b9b",
+        "android_client_info": {
+          "package_name": "hsac.in"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASkiS6a7SAyWdjcjxvY_Vd0QNxbVx_AS8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

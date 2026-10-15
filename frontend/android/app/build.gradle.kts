@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.my_first_app"
+        applicationId = "hsac.in"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -42,4 +42,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// Push notifications: the Firebase config file is per-project and not committed.
+// Without it the app still builds and runs; push is simply switched off.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }

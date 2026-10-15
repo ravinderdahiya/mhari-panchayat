@@ -1,4 +1,14 @@
-enum NotificationKind { submitted, assigned, resolved, rejected }
+enum NotificationKind {
+  submitted,
+  assigned,
+  resolved,
+  rejected,
+  // Asset-survey review workflow
+  surveyReview,
+  surveyReturned,
+  surveyRejected,
+  surveyApproved,
+}
 
 extension NotificationKindWire on NotificationKind {
   static NotificationKind fromWireValue(String? value) {
@@ -9,6 +19,14 @@ extension NotificationKindWire on NotificationKind {
         return NotificationKind.resolved;
       case 'COMPLAINT_REJECTED':
         return NotificationKind.rejected;
+      case 'SURVEY_REVIEW_NEEDED':
+        return NotificationKind.surveyReview;
+      case 'SURVEY_RETURNED':
+        return NotificationKind.surveyReturned;
+      case 'SURVEY_REJECTED':
+        return NotificationKind.surveyRejected;
+      case 'SURVEY_APPROVED':
+        return NotificationKind.surveyApproved;
       case 'COMPLAINT_SUBMITTED':
       default:
         return NotificationKind.submitted;
@@ -20,6 +38,7 @@ class AppNotification {
   const AppNotification({
     required this.id,
     required this.complaintId,
+    this.assetSurveyId = '',
     required this.kind,
     required this.title,
     required this.message,
@@ -29,6 +48,9 @@ class AppNotification {
 
   final String id;
   final String complaintId;
+
+  /// Set for asset-survey notifications (empty for complaint ones).
+  final String assetSurveyId;
   final NotificationKind kind;
   final String title;
   final String message;
@@ -39,6 +61,7 @@ class AppNotification {
     return AppNotification(
       id: _asString(json['id']),
       complaintId: _asString(json['complaintId'] ?? json['complaint_id']),
+      assetSurveyId: _asString(json['assetSurveyId'] ?? json['asset_survey_id']),
       kind: NotificationKindWire.fromWireValue(json['type'] as String?),
       title: json['title'] as String? ?? '',
       message: json['message'] as String? ?? '',
@@ -58,6 +81,7 @@ class AppNotification {
     return AppNotification(
       id: id,
       complaintId: complaintId,
+      assetSurveyId: assetSurveyId,
       kind: kind,
       title: title,
       message: message,
