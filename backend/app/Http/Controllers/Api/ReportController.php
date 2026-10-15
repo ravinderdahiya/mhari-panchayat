@@ -5,13 +5,18 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Concerns\RespondsWithEnvelope;
 use App\Http\Controllers\Controller;
 use App\Models\AssetSurvey;
+use App\Models\AssetType;
 use App\Models\Complaint;
 use App\Services\ComplaintExcelExport;
+use App\Support\XlsxWriter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 // Admin "Reports" screen: filterable summaries (KPIs, breakdowns, daily trend) of
 // complaints and asset surveys. Behind role:admin (admin + super admin), so these
@@ -214,6 +219,8 @@ class ReportController extends Controller
                 'rejected' => (int) $kpi->rejected,
                 'approval_rate' => $decided ? round((int) $kpi->approved / $decided * 100, 1) : 0.0,
             ],
+            'asset_stats' => $this->assetStats($request, $base),
+            'asset_types' => $this->assetTypeOptions(),
             'by_review_status' => (clone $base)->toBase()->selectRaw('asset_surveys.review_status AS name, COUNT(*) AS count')
                 ->groupBy('asset_surveys.review_status')->orderByDesc('count')->get()
                 ->map(fn ($r) => ['name' => $r->name, 'count' => (int) $r->count])->values(),
@@ -238,6 +245,11 @@ class ReportController extends Controller
             }
         }
 
+        // One or several asset types: ?asset_type_ids=3,7,12 (none = all types).
+        if ($typeIds = $this->idList($request->query('asset_type_ids'))) {
+            $query->whereIn('asset_surveys.asset_type_id', $typeIds);
+        }
+
         $condition = strtoupper((string) $request->query('condition', ''));
         if (in_array($condition, ['GOOD', 'FAIR', 'POOR', 'DAMAGED'], true)) {
             $query->where('asset_surveys.condition', $condition);
@@ -251,6 +263,135 @@ class ReportController extends Controller
         $this->applyDateRange($query, 'asset_surveys.survey_date', $request);
 
         return $query;
+    }
+
+    // ----------------------------------------------------------- asset statistics
+
+    /**
+     * Count of surveys for every enlisted asset (asset type) with its department.
+     * "Enlisted" = every active asset type attached to an ACTIVE department in master
+     * data (today only Panchayati Raj), so assets with no survey yet show up with 0. Honours the same filters as the report;
+     * with an asset-type filter only those types are listed.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, totals: array<string, int>}
+     */
+    private function assetStats(Request $request, Builder $base): array
+    {
+        $counts = (clone $base)->toBase()
+            ->selectRaw("asset_surveys.department_id, asset_surveys.asset_type_id, COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE asset_surveys.condition = 'GOOD') AS good,
+                COUNT(*) FILTER (WHERE asset_surveys.condition = 'FAIR') AS fair,
+                COUNT(*) FILTER (WHERE asset_surveys.condition = 'POOR') AS poor,
+                COUNT(*) FILTER (WHERE asset_surveys.condition = 'DAMAGED') AS damaged")
+            ->groupBy('asset_surveys.department_id', 'asset_surveys.asset_type_id')
+            ->get()->keyBy(fn ($r) => "{$r->department_id}:{$r->asset_type_id}");
+
+        $typeIds = $this->idList($request->query('asset_type_ids'));
+        if ($request->filled('asset_type_id') && ctype_digit((string) $request->query('asset_type_id'))) {
+            $typeIds[] = (int) $request->query('asset_type_id');
+        }
+        $departmentId = $request->filled('department_id') && ctype_digit((string) $request->query('department_id'))
+            ? (int) $request->query('department_id') : null;
+
+        $enlisted = DB::table('asset_type_department')
+            ->join('asset_types', 'asset_types.id', '=', 'asset_type_department.asset_type_id')
+            ->join('departments', 'departments.id', '=', 'asset_type_department.department_id')
+            ->where('asset_types.is_active', true)
+            ->where('departments.is_active', true)
+            ->when($typeIds, fn ($q) => $q->whereIn('asset_types.id', $typeIds))
+            ->when($departmentId, fn ($q) => $q->where('departments.id', $departmentId))
+            ->get(['departments.id AS department_id', 'departments.name AS department', 'asset_types.id AS asset_type_id', 'asset_types.name AS asset_type']);
+
+        $rows = [];
+        foreach ($enlisted as $e) {
+            $key = "{$e->department_id}:{$e->asset_type_id}";
+            $rows[$key] = ['department_id' => (int) $e->department_id, 'department' => $e->department, 'department_active' => true, 'asset_type_id' => (int) $e->asset_type_id, 'asset_type' => $e->asset_type];
+        }
+
+        // Surveys that carry a department/type pair that is not enlisted (e.g. a department that is not
+        // active) still count - hiding them would make the totals disagree with the KPIs - and are flagged.
+        $missingDepartments = $counts->keys()->reject(fn ($k) => isset($rows[$k]))->map(fn ($k) => (int) explode(':', $k)[0])->unique()->filter()->all();
+        $missingTypes = $counts->keys()->reject(fn ($k) => isset($rows[$k]))->map(fn ($k) => (int) explode(':', $k)[1])->unique()->filter()->all();
+        $departmentInfo = DB::table('departments')->whereIn('id', $missingDepartments)->get(['id', 'name', 'is_active'])->keyBy('id');
+        $typeNames = DB::table('asset_types')->whereIn('id', $missingTypes)->pluck('name', 'id');
+        foreach ($counts as $key => $r) {
+            if (! isset($rows[$key])) {
+                $rows[$key] = [
+                    'department_id' => $r->department_id ? (int) $r->department_id : null,
+                    'department' => $departmentInfo[$r->department_id]->name ?? 'No department',
+                    'department_active' => (bool) ($departmentInfo[$r->department_id]->is_active ?? false),
+                    'asset_type_id' => $r->asset_type_id ? (int) $r->asset_type_id : null,
+                    'asset_type' => $typeNames[$r->asset_type_id] ?? 'No type',
+                ];
+            }
+        }
+
+        $out = [];
+        $totals = ['total' => 0, 'good' => 0, 'fair' => 0, 'poor' => 0, 'damaged' => 0];
+        foreach ($rows as $key => $row) {
+            $c = $counts->get($key);
+            $row += [
+                'total' => (int) ($c->total ?? 0), 'good' => (int) ($c->good ?? 0), 'fair' => (int) ($c->fair ?? 0),
+                'poor' => (int) ($c->poor ?? 0), 'damaged' => (int) ($c->damaged ?? 0),
+            ];
+            foreach ($totals as $k => $_) {
+                $totals[$k] += $row[$k];
+            }
+            $out[] = $row;
+        }
+        usort($out, fn ($a, $b) => [mb_strtolower($a['department']), mb_strtolower($a['asset_type'])] <=> [mb_strtolower($b['department']), mb_strtolower($b['asset_type'])]);
+
+        return ['rows' => $out, 'totals' => $totals];
+    }
+
+    /** Active asset types enlisted under an active department (with those departments) - feeds the filter list. @return Collection<int, array<string, mixed>> */
+    private function assetTypeOptions(): Collection
+    {
+        return AssetType::query()->where('is_active', true)
+            ->whereHas('departments', fn ($d) => $d->where('departments.is_active', true))
+            ->with(['departments' => fn ($d) => $d->where('departments.is_active', true)->select('departments.id', 'departments.name')])
+            ->orderBy('sort_order')->orderBy('name')->get(['id', 'name'])
+            ->map(fn (AssetType $t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'departments' => $t->departments->map(fn ($d) => ['id' => $d->id, 'name' => $d->name])->values(),
+            ])->values();
+    }
+
+    /** Excel of the asset statistics (department, asset, counts) for the current filters. */
+    public function assetStatsExport(Request $request)
+    {
+        $stats = $this->assetStats($request, $this->surveyQuery($request));
+
+        $sheet = new XlsxWriter('Asset statistics');
+        $sheet->addRow(['S.No.', 'Department', 'Asset type', 'Total surveys', 'Good', 'Fair', 'Poor', 'Damaged'], 28);
+        foreach ([7, 34, 34, 14, 10, 10, 10, 10] as $col => $width) {
+            $sheet->setColumnWidth($col, $width);
+        }
+        foreach ($stats['rows'] as $i => $r) {
+            $sheet->addRow([$i + 1, $r['department'].($r['department_active'] ? '' : ' (inactive)'), $r['asset_type'], $r['total'], $r['good'], $r['fair'], $r['poor'], $r['damaged']]);
+        }
+        $t = $stats['totals'];
+        $sheet->addRow([null, 'TOTAL', count($stats['rows']).' asset types', $t['total'], $t['good'], $t['fair'], $t['poor'], $t['damaged']]);
+
+        $dir = storage_path('app/tmp');
+        File::ensureDirectoryExists($dir);
+        $path = $dir.DIRECTORY_SEPARATOR.'asset_stats_'.Str::random(16).'.xlsx';
+        $sheet->save($path);
+
+        return response()->download($path, 'asset-statistics-'.now('Asia/Kolkata')->format('Ymd-His').'.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /** "3,7,12" -> [3, 7, 12] (digits only, capped). @return array<int, int> */
+    private function idList(mixed $value): array
+    {
+        if (! is_string($value) || $value === '') {
+            return [];
+        }
+
+        return array_slice(array_values(array_unique(array_map('intval', array_filter(explode(',', $value), 'ctype_digit')))), 0, 300);
     }
 
     // --------------------------------------------------------------------- helpers

@@ -96,7 +96,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   Future<void> _reject() async {
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => _ReasonDialog(
+      builder: (context) => ReasonDialog(
         title: 'Reject survey',
         actionLabel: 'Reject',
         actionColor: AppColors.rejectedText,
@@ -124,7 +124,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   Future<void> _returnForCorrection() async {
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => _ReasonDialog(
+      builder: (context) => ReasonDialog(
         title: 'Return for correction',
         actionLabel: 'Return',
         actionColor: AppColors.pendingText,
@@ -200,57 +200,60 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  Row(
-                    children: [
-                      if (canReject)
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _submitting ? null : _reject,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.rejectedText,
-                              side: BorderSide(
-                                color: AppColors.rejectedText,
+                  // Main action on its own full-width row (its label can be long, e.g.
+                  // "Forward to BDPO"), the secondary Reject / Return side by side below.
+                  if (action != null)
+                    GradientButton(
+                      onPressed: _submitting
+                          ? null
+                          : () => _performAction(action.kind),
+                      label: _submitting
+                          ? 'कृपया प्रतीक्षा करें...'
+                          : action.label,
+                      icon: Icons.check_rounded,
+                    ),
+                  if (action != null && (canReject || canReturn))
+                    const SizedBox(height: 10),
+                  if (canReject || canReturn)
+                    Row(
+                      children: [
+                        if (canReject)
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _submitting ? null : _reject,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.rejectedText,
+                                side: BorderSide(color: AppColors.rejectedText),
+                                minimumSize: const Size.fromHeight(48),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
-                              minimumSize: const Size.fromHeight(48),
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              label: const Text('Reject'),
                             ),
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            label: const Text('Reject'),
                           ),
-                        ),
-                      if (canReject && canReturn) const SizedBox(width: 8),
-                      if (canReturn)
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _submitting
-                                ? null
-                                : _returnForCorrection,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.pendingText,
-                              side: BorderSide(
-                                color: AppColors.pendingText,
+                        if (canReject && canReturn) const SizedBox(width: 10),
+                        if (canReturn)
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _submitting
+                                  ? null
+                                  : _returnForCorrection,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.pendingText,
+                                side: BorderSide(color: AppColors.pendingText),
+                                minimumSize: const Size.fromHeight(48),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
-                              minimumSize: const Size.fromHeight(48),
+                              icon: const Icon(Icons.undo_rounded, size: 18),
+                              label: const Text('Return'),
                             ),
-                            icon: const Icon(Icons.undo_rounded, size: 18),
-                            label: const Text('Return'),
                           ),
-                        ),
-                      if ((canReject || canReturn) && action != null)
-                        const SizedBox(width: 12),
-                      if (action != null)
-                        Expanded(
-                          child: GradientButton(
-                            onPressed: _submitting
-                                ? null
-                                : () => _performAction(action.kind),
-                            label: _submitting
-                                ? 'कृपया प्रतीक्षा करें...'
-                                : action.label,
-                            icon: Icons.check_rounded,
-                          ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -394,8 +397,11 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
   }
 }
 
-class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({
+/// Asks for a mandatory reason (reject / return for correction). The action
+/// button stays disabled until something is typed.
+class ReasonDialog extends StatefulWidget {
+  const ReasonDialog({
+    super.key,
     required this.title,
     required this.actionLabel,
     required this.actionColor,
@@ -406,10 +412,10 @@ class _ReasonDialog extends StatefulWidget {
   final Color actionColor;
 
   @override
-  State<_ReasonDialog> createState() => _ReasonDialogState();
+  State<ReasonDialog> createState() => _ReasonDialogState();
 }
 
-class _ReasonDialogState extends State<_ReasonDialog> {
+class _ReasonDialogState extends State<ReasonDialog> {
   final _controller = TextEditingController();
 
   @override
@@ -427,6 +433,9 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         autofocus: true,
         minLines: 2,
         maxLines: 4,
+        // The button's enabled state reads the controller, so rebuild on every edit -
+        // without this it stayed greyed out no matter what was typed.
+        onChanged: (_) => setState(() {}),
         decoration: const InputDecoration(
           hintText: 'Reason…',
         ),
@@ -439,7 +448,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         FilledButton(
           onPressed: _controller.text.trim().isEmpty
               ? null
-              : () => Navigator.of(context).pop(_controller.text),
+              : () => Navigator.of(context).pop(_controller.text.trim()),
           style: FilledButton.styleFrom(
             backgroundColor: widget.actionColor,
           ),

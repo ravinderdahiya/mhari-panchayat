@@ -122,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reports/complaints', [ReportController::class, 'complaints']);
         Route::get('/reports/complaints/export', [ReportController::class, 'complaintsExport'])->middleware('throttle:20,1');
         Route::get('/reports/asset-surveys', [ReportController::class, 'assetSurveys']);
+        Route::get('/reports/asset-surveys/stats/export', [ReportController::class, 'assetStatsExport'])->middleware('throttle:20,1');
         Route::get('/admin/polygons', [AdminSurveyPolygonController::class, 'index']);
         Route::get('/admin/polygons/{uuid}', [AdminSurveyPolygonController::class, 'show'])->whereUuid('uuid');
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);

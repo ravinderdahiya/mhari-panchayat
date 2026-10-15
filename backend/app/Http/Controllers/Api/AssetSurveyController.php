@@ -370,6 +370,12 @@ class AssetSurveyController extends Controller
             });
         }
 
+        // Several asset types at once: ?asset_type_ids=3,7,12 (used by the report's Excel export).
+        $typeIds = array_filter(array_map('intval', array_filter(explode(',', (string) $request->query('asset_type_ids', '')), 'ctype_digit')));
+        if ($typeIds) {
+            $query->whereIn('asset_type_id', array_slice(array_values(array_unique($typeIds)), 0, 300));
+        }
+
         $condition = strtoupper((string) $request->query('condition', ''));
         if (in_array($condition, ['GOOD', 'FAIR', 'POOR', 'DAMAGED'], true)) {
             $query->where('condition', $condition);

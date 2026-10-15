@@ -253,3 +253,7 @@ Behind `role:admin` (admin + super admin), system-wide. All accept `date_from` /
 
 The daily trend covers the selected dates (max 366 days) or, with no dates, the last 30 days; every other number covers all
 time unless dates are given. Asset surveys are exported with `GET /api/surveys/export` (same filters, with photos).
+
+The asset-survey report also takes `asset_type_ids=3,7,12` (one or several asset types; none = all) and returns `asset_stats`
+(survey count per enlisted asset with its department, plus Good/Fair/Poor/Damaged) and `asset_types` (the filter list).
+`GET /api/reports/asset-surveys/stats/export` downloads the same statistics as Excel; `/api/surveys/export` accepts `asset_type_ids` too.

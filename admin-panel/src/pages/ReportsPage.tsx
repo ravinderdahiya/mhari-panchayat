@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, Legend, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { Download, FileBarChart } from 'lucide-react';
+import { ChevronDown, Download, FileBarChart, Search } from 'lucide-react';
 import * as api from '../services/api';
-import type { AssetSurveyReport, ComplaintReport, ReportCount } from '../services/api';
+import type { AssetStatRow, AssetSurveyReport, ComplaintReport, ReportCount } from '../services/api';
 import type { AssetSurveyReviewStatus } from '../types';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, Legend, LineElement, LinearScale, PointElement, Tooltip);
@@ -62,6 +62,8 @@ export default function ReportsPage() {
   const [districtId, setDistrictId] = useState('');
   const [condition, setCondition] = useState('ALL');
   const [reviewStatus, setReviewStatus] = useState<AssetSurveyReviewStatus | ''>('');
+  const [assetTypeIds, setAssetTypeIds] = useState<string[]>([]);
+  const [assetTypeOptions, setAssetTypeOptions] = useState<AssetSurveyReport['asset_types']>([]);
   const [complaintStatus, setComplaintStatus] = useState('');
 
   const [surveyReport, setSurveyReport] = useState<AssetSurveyReport | null>(null);
@@ -69,14 +71,15 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [exportingStats, setExportingStats] = useState(false);
 
   useEffect(() => {
     api.getDistricts().then((r) => setDistricts(r.districts)).catch(() => setDistricts([]));
   }, []);
 
   const filtersActive = dateFrom !== '' || dateTo !== '' || districtId !== ''
-    || (tab === 'surveys' ? condition !== 'ALL' || reviewStatus !== '' : complaintStatus !== '');
-  const clearFilters = () => { setDateFrom(''); setDateTo(''); setDistrictId(''); setCondition('ALL'); setReviewStatus(''); setComplaintStatus(''); };
+    || (tab === 'surveys' ? condition !== 'ALL' || reviewStatus !== '' || assetTypeIds.length > 0 : complaintStatus !== '');
+  const clearFilters = () => { setDateFrom(''); setDateTo(''); setDistrictId(''); setCondition('ALL'); setReviewStatus(''); setAssetTypeIds([]); setComplaintStatus(''); };
 
   // Reload the active report whenever its filters change.
   useEffect(() => {
@@ -85,25 +88,37 @@ export default function ReportsPage() {
     setError('');
     const timer = window.setTimeout(() => {
       const request = tab === 'surveys'
-        ? api.getAssetSurveyReport({ dateFrom, dateTo, districtId, condition, reviewStatus: reviewStatus || undefined }).then((r) => { if (!cancelled) setSurveyReport(r); })
+        ? api.getAssetSurveyReport({ dateFrom, dateTo, districtId, condition, reviewStatus: reviewStatus || undefined, assetTypeIds }).then((r) => { if (!cancelled) { setSurveyReport(r); setAssetTypeOptions(r.asset_types); } })
         : api.getComplaintReport({ dateFrom, dateTo, districtId, status: complaintStatus }).then((r) => { if (!cancelled) setComplaintReport(r); });
       request
         .catch((err) => { if (!cancelled) setError((err as Error).message); })
         .finally(() => { if (!cancelled) setLoading(false); });
     }, 200);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [tab, dateFrom, dateTo, districtId, condition, reviewStatus, complaintStatus]);
+  }, [tab, dateFrom, dateTo, districtId, condition, reviewStatus, assetTypeIds, complaintStatus]);
 
   const handleExport = async () => {
     setExporting(true);
     setError('');
     try {
-      if (tab === 'surveys') await api.downloadAssetSurveysExcel({ dateFrom, dateTo, districtId, condition, reviewStatus: reviewStatus || undefined });
+      if (tab === 'surveys') await api.downloadAssetSurveysExcel({ dateFrom, dateTo, districtId, condition, reviewStatus: reviewStatus || undefined, assetTypeIds });
       else await api.downloadComplaintsExcel({ dateFrom, dateTo, districtId, status: complaintStatus });
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleStatsExport = async () => {
+    setExportingStats(true);
+    setError('');
+    try {
+      await api.downloadAssetStatsExcel({ dateFrom, dateTo, districtId, condition, reviewStatus: reviewStatus || undefined, assetTypeIds });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setExportingStats(false);
     }
   };
 
@@ -154,6 +169,9 @@ export default function ReportsPage() {
                 {SURVEY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </Field>
+            <Field label="Asset type">
+              <AssetTypeFilter options={assetTypeOptions} selected={assetTypeIds} onChange={setAssetTypeIds} />
+            </Field>
           </>
         ) : (
           <Field label="Status">
@@ -172,7 +190,7 @@ export default function ReportsPage() {
       {error && <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
       {loading && <p className="text-xs text-muted">Loading report…</p>}
 
-      {tab === 'surveys' && surveyReport && <SurveyReportView report={surveyReport} dim={loading} />}
+      {tab === 'surveys' && surveyReport && <SurveyReportView report={surveyReport} dim={loading} onDownloadStats={handleStatsExport} downloadingStats={exportingStats} />}
       {tab === 'complaints' && complaintReport && <ComplaintReportView report={complaintReport} dim={loading} />}
 
       {range && <p className="text-[11px] text-muted">Daily trend covers {dayLabel(range.from)} – {dayLabel(range.to)} {dateFrom || dateTo ? '(selected dates)' : '(last 30 days)'}; every other number covers {dateFrom || dateTo ? 'the selected dates' : 'all time'}.</p>}
@@ -182,7 +200,7 @@ export default function ReportsPage() {
 
 // ------------------------------------------------------------------ asset surveys
 
-function SurveyReportView({ report, dim }: { report: AssetSurveyReport; dim: boolean }) {
+function SurveyReportView({ report, dim, onDownloadStats, downloadingStats }: { report: AssetSurveyReport; dim: boolean; onDownloadStats: () => void; downloadingStats: boolean }) {
   const { kpi } = report;
   const trend = useMemo(() => ({
     labels: report.trend.map((p) => dayLabel(p.date)),
@@ -201,6 +219,8 @@ function SurveyReportView({ report, dim }: { report: AssetSurveyReport; dim: boo
         <Kpi label="Poor / damaged" value={num(kpi.poor + kpi.damaged)} tone="red" />
         <Kpi label="Approval rate" value={`${kpi.approval_rate}%`} hint="approved ÷ (approved + rejected)" />
       </div>
+
+      <AssetStatistics stats={report.asset_stats} onDownload={onDownloadStats} downloading={downloadingStats} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card title="Surveys per day" className="xl:col-span-2"><div className="h-64"><Line data={trend} options={LINE_OPTIONS} /></div></Card>
@@ -378,5 +398,148 @@ function Table({ head, rows, empty }: { head: string[]; rows: string[][]; empty:
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ----------------------------------------------------------- asset type filter + statistics
+
+/** "All asset types", or tick one / several. Searchable; closes on an outside click. */
+function AssetTypeFilter({ options, selected, onChange }: {
+  options: AssetSurveyReport['asset_types']; selected: string[]; onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  const chosen = useMemo(() => new Set(selected), [selected]);
+  const visible = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return needle
+      ? options.filter((o) => o.name.toLowerCase().includes(needle) || o.departments.some((d) => d.name.toLowerCase().includes(needle)))
+      : options;
+  }, [options, search]);
+
+  const toggle = (id: string) => onChange(chosen.has(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const label = selected.length === 0
+    ? 'All asset types'
+    : selected.length === 1 ? (options.find((o) => String(o.id) === selected[0])?.name ?? '1 selected') : `${selected.length} asset types`;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} disabled={options.length === 0}
+        className={`${INPUT} flex items-center justify-between gap-2 text-left cursor-pointer disabled:opacity-60`}>
+        <span className="truncate">{label}</span><ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted" />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-80 max-w-[85vw] bg-white border border-line rounded-xl shadow-lg">
+          <div className="p-2 border-b border-line">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
+              <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search asset type or department"
+                className="w-full text-xs border border-line rounded-lg pl-8 pr-2 py-1.5 outline-none focus:ring-2 focus:ring-accent/30" />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-ink border-b border-line cursor-pointer hover:bg-cream/60">
+            <input type="checkbox" checked={selected.length === 0} onChange={() => onChange([])} /> All asset types
+          </label>
+          <div className="max-h-64 overflow-y-auto">
+            {visible.map((option) => (
+              <label key={option.id} className="flex items-start gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-cream/60">
+                <input type="checkbox" className="mt-0.5" checked={chosen.has(String(option.id))} onChange={() => toggle(String(option.id))} />
+                <span className="min-w-0">
+                  <span className="block text-ink">{option.name}</span>
+                  {option.departments.length > 0 && <span className="block text-[10px] text-muted truncate">{option.departments.map((d) => d.name).join(', ')}</span>}
+                </span>
+              </label>
+            ))}
+            {visible.length === 0 && <p className="px-3 py-4 text-xs text-muted text-center">No asset type matches “{search}”.</p>}
+          </div>
+          <div className="flex items-center justify-between px-3 py-2 border-t border-line text-[11px]">
+            <span className="text-muted">{selected.length ? `${selected.length} selected` : 'Showing every asset type'}</span>
+            <button type="button" onClick={() => setOpen(false)} className="font-semibold text-accent cursor-pointer">Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Survey count for every enlisted asset with its department, downloadable as Excel. */
+function AssetStatistics({ stats, onDownload, downloading }: {
+  stats: AssetSurveyReport['asset_stats']; onDownload: () => void; downloading: boolean;
+}) {
+  const [search, setSearch] = useState('');
+  const [onlyWithSurveys, setOnlyWithSurveys] = useState(false);
+
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return stats.rows.filter((r: AssetStatRow) =>
+      (!onlyWithSurveys || r.total > 0)
+      && (!needle || r.asset_type.toLowerCase().includes(needle) || r.department.toLowerCase().includes(needle)));
+  }, [stats.rows, search, onlyWithSurveys]);
+
+  const withSurveys = stats.rows.filter((r) => r.total > 0).length;
+  const t = stats.totals;
+  const cell = 'py-2 pr-4 text-right tabular-nums';
+
+  return (
+    <Card title="Asset statistics - every enlisted asset">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search department or asset"
+            className="w-full text-xs border border-line rounded-lg pl-9 pr-3 py-2 bg-white outline-none focus:ring-2 focus:ring-accent/30" />
+        </div>
+        <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+          <input type="checkbox" checked={onlyWithSurveys} onChange={(e) => setOnlyWithSurveys(e.target.checked)} /> Only assets with surveys
+        </label>
+        <span className="text-[11px] text-muted">{stats.rows.length} enlisted · {withSurveys} with surveys</span>
+        <button type="button" onClick={onDownload} disabled={downloading || stats.rows.length === 0}
+          className="flex items-center gap-1.5 bg-accent hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer disabled:cursor-not-allowed">
+          <Download className="w-3.5 h-3.5" /> {downloading ? 'Preparing Excel…' : 'Download statistics (Excel)'}
+        </button>
+      </div>
+
+      <div className="overflow-auto max-h-[28rem] border border-line rounded-lg">
+        <table className="w-full text-left text-xs">
+          <thead className="sticky top-0 bg-cream text-[10px] uppercase tracking-wide text-muted">
+            <tr>
+              <th className="py-2 px-3 w-12">S.No.</th><th className="py-2 pr-4">Department</th><th className="py-2 pr-4">Asset type</th>
+              <th className="py-2 pr-4 text-right">Total</th><th className="py-2 pr-4 text-right">Good</th><th className="py-2 pr-4 text-right">Fair</th>
+              <th className="py-2 pr-4 text-right">Poor</th><th className="py-2 pr-4 text-right">Damaged</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((r, i) => (
+              <tr key={`${r.department_id}:${r.asset_type_id}`} className={r.total === 0 ? 'text-muted' : ''}>
+                <td className="py-2 px-3 text-muted">{i + 1}</td>
+                <td className="py-2 pr-4">{r.department}{!r.department_active && <span title="This department is not active, but it has surveys" className="ml-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">inactive</span>}</td>
+                <td className="py-2 pr-4 font-medium text-ink">{r.asset_type}</td>
+                <td className={`${cell} font-semibold`}>{num(r.total)}</td>
+                <td className={cell}>{num(r.good)}</td><td className={cell}>{num(r.fair)}</td>
+                <td className={cell}>{num(r.poor)}</td><td className={cell}>{num(r.damaged)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-muted">No assets match.</td></tr>}
+          </tbody>
+          {stats.rows.length > 0 && (
+            <tfoot className="sticky bottom-0 bg-cream font-semibold text-ink">
+              <tr>
+                <td className="py-2 px-3" /><td className="py-2 pr-4">Total</td><td className="py-2 pr-4">{stats.rows.length} asset types</td>
+                <td className={cell}>{num(t.total)}</td><td className={cell}>{num(t.good)}</td><td className={cell}>{num(t.fair)}</td>
+                <td className={cell}>{num(t.poor)}</td><td className={cell}>{num(t.damaged)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </Card>
   );
 }
