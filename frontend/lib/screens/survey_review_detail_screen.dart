@@ -334,8 +334,10 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
             ('Survey Date', _formatDate(survey.surveyDate)),
           ],
         ),
-        if (survey.rejectionReason != null &&
-            survey.rejectionReason!.isNotEmpty) ...[
+        // Only while the survey is actually returned/rejected: once the surveyor
+        // resubmits, a leftover remark must not follow it back up the chain.
+        if ((survey.reviewStatus == 'returned' || survey.reviewStatus == 'rejected') &&
+            (survey.rejectionReason?.trim().isNotEmpty ?? false)) ...[
           const SizedBox(height: AppSpacing.gap),
           InfoStrip(
             icon: Icons.info_outline_rounded,

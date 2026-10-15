@@ -93,9 +93,15 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
   ({int assigned, int pending, int completed})? get _stats {
     final surveys = _surveys;
     if (surveys == null) return null;
-    final approved = surveys.where((s) => s.reviewStatus == 'approved').length;
-    final pending = surveys
-        .where((s) => const {'submitted', 'pending', 'returned'}.contains(s.reviewStatus))
+    // Pending = still waiting on (or sent back to) the surveyor's own side.
+    // Approved = accepted by at least the first reviewer and not rejected: a survey
+    // climbs gram_sachiv_reviewed -> ... -> bdpo_forwarded -> ... -> approved, and
+    // only the last step is CEO-ZP's final sign-off, so matching just 'approved'
+    // left every in-flight (already reviewed) survey uncounted.
+    const waiting = {'submitted', 'pending', 'returned'};
+    final pending = surveys.where((s) => waiting.contains(s.reviewStatus)).length;
+    final approved = surveys
+        .where((s) => s.reviewStatus != null && !waiting.contains(s.reviewStatus) && s.reviewStatus != 'rejected')
         .length;
     return (assigned: surveys.length, pending: pending, completed: approved);
   }

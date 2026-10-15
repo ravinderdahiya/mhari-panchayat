@@ -621,8 +621,11 @@ class AssetSurveyController extends Controller
         // A correction the surveyor makes on a returned survey resubmits it
         // to the front of the chain rather than leaving it stuck as
         // 'returned' forever.
+        // The old remark is dropped with it (it stays in the review history),
+        // otherwise reviewers keep seeing it on a survey that is no longer returned.
         if ($survey->review_status === 'returned') {
             $updates['review_status'] = 'pending';
+            $updates['rejection_reason'] = null;
         }
 
         $survey->update($updates);
