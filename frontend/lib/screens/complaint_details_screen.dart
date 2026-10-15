@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/complaint.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 import '../widgets/photo_viewer.dart';
@@ -117,131 +118,170 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     final timeline = _timelineStages(complaint);
     final needsVerification =
         complaint.status == ComplaintStatus.citizenVerification;
+    // Tablet landscape: details on the left, verification/timeline right.
+    final twoPane =
+        context.isTablet && MediaQuery.sizeOf(context).width >= 1000;
+
+    final details = <Widget>[
+      if (_refreshing)
+        const Padding(
+          padding: EdgeInsets.only(bottom: AppSpacing.gap),
+          child: LinearProgressIndicator(minHeight: 2),
+        ),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              complaint.displaySubject,
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF212121),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ComplaintStatusRow(complaint: complaint),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Text(
+        complaint.displayCode,
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.mutedText,
+        ),
+      ),
+      const SizedBox(height: 10),
+      ComplaintAssetMetaRow(complaint: complaint),
+      const SizedBox(height: AppSpacing.screen),
+      if (complaint.photoUrls.isNotEmpty) ...[
+        Text(
+          'Complaint Photos',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _PhotoThumbRow(urls: complaint.photoUrls),
+        const SizedBox(height: AppSpacing.screen),
+      ],
+      if (complaint.resolutionPhotoUrls.isNotEmpty) ...[
+        Text(
+          'Officer Resolution Photos',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Photos taken by the officer after fixing the issue',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppColors.mutedText,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _PhotoThumbRow(urls: complaint.resolutionPhotoUrls),
+        const SizedBox(height: AppSpacing.screen),
+      ],
+      Text(
+        'Description',
+        style: GoogleFonts.poppins(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        complaint.description,
+        style: GoogleFonts.poppins(
+          fontSize: 14,
+          height: 1.5,
+          color: const Color(0xFF424242),
+        ),
+      ),
+    ];
+    final progress = <Widget>[
+      if (needsVerification) ...[
+        const SizedBox(height: AppSpacing.screen),
+        _VerificationCard(
+          submitting: _submitting,
+          onConfirm: _confirmResolved,
+          onReopen: _reopen,
+        ),
+      ],
+      const SizedBox(height: AppSpacing.screen),
+      Text(
+        'Timeline',
+        style: GoogleFonts.poppins(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 12),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: [
+              for (var i = 0; i < timeline.length; i++)
+                _TimelineStage(
+                  title: timeline[i].title,
+                  done: timeline[i].done,
+                  isLast: i == timeline.length - 1,
+                ),
+            ],
+          ),
+        ),
+      ),
+    ];
 
     return AppScaffold(
       title: complaint.displayCode,
+      tabletMaxWidth: twoPane ? Breakpoints.wide : Breakpoints.form,
       body: Column(
         children: [
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.screen),
-              children: [
-                if (_refreshing)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: AppSpacing.gap),
-                    child: LinearProgressIndicator(minHeight: 2),
-                  ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        complaint.displaySubject,
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF212121),
+            child: twoPane
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screen,
+                            AppSpacing.screen,
+                            AppSpacing.screen / 2,
+                            AppSpacing.screen,
+                          ),
+                          children: details,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    ComplaintStatusRow(complaint: complaint),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  complaint.displayCode,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.mutedText,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ComplaintAssetMetaRow(complaint: complaint),
-                const SizedBox(height: AppSpacing.screen),
-                if (complaint.photoUrls.isNotEmpty) ...[
-                  Text(
-                    'Complaint Photos',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _PhotoThumbRow(urls: complaint.photoUrls),
-                  const SizedBox(height: AppSpacing.screen),
-                ],
-                if (complaint.resolutionPhotoUrls.isNotEmpty) ...[
-                  Text(
-                    'Officer Resolution Photos',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Photos taken by the officer after fixing the issue',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: AppColors.mutedText,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _PhotoThumbRow(urls: complaint.resolutionPhotoUrls),
-                  const SizedBox(height: AppSpacing.screen),
-                ],
-                Text(
-                  'Description',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  complaint.description,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: const Color(0xFF424242),
-                  ),
-                ),
-                if (needsVerification) ...[
-                  const SizedBox(height: AppSpacing.screen),
-                  _VerificationCard(
-                    submitting: _submitting,
-                    onConfirm: _confirmResolved,
-                    onReopen: _reopen,
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.screen),
-                Text(
-                  'Timeline',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < timeline.length; i++)
-                          _TimelineStage(
-                            title: timeline[i].title,
-                            done: timeline[i].done,
-                            isLast: i == timeline.length - 1,
+                      Expanded(
+                        flex: 4,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screen / 2,
+                            AppSpacing.screen,
+                            AppSpacing.screen,
+                            AppSpacing.screen,
                           ),
-                      ],
-                    ),
+                          // Drop the leading section gap - top of this pane.
+                          children: progress.sublist(1),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(AppSpacing.screen),
+                    children: [...details, ...progress],
                   ),
-                ),
-              ],
-            ),
           ),
           _OfficerFooter(name: complaint.assignedOfficerName),
         ],
@@ -282,6 +322,7 @@ class _PhotoThumbRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = context.isTablet ? 130.0 : 100.0;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -293,8 +334,8 @@ class _PhotoThumbRow extends StatelessWidget {
               onTap: () => showPhotoViewer(context, imageUrl: url),
               child: Image.network(
                 url,
-                width: 100,
-                height: 100,
+                width: size,
+                height: size,
                 fit: BoxFit.cover,
               ),
             ),

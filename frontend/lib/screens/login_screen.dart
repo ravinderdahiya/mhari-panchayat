@@ -16,6 +16,7 @@ import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/launch_url.dart';
+import '../utils/responsive.dart';
 import 'forgot_password_screen.dart';
 import 'registration_screen.dart';
 
@@ -281,6 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (context.isTablet) return _buildTablet(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -295,78 +297,161 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        _t('लॉगिन', 'Login'),
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.notoSansDevanagari(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF212121),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _RoleTabs(
-                        isCitizen: _citizenTab,
-                        onChanged: _selectTab,
-                        citizenLabel: _t('नागरिक', 'Citizen'),
-                        departmentLabel: _t('विभाग', 'Department'),
-                      ),
-                      const SizedBox(height: 22),
-                      if (_citizenTab) ..._buildCitizenForm() else ..._buildStaffForm(),
-                    ],
-                  ),
-                ),
+                child: _buildLoginCard(),
               ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _TermsFooter(
-                  onTermsTap: () => openInAppUrl(context, ApiConfig.termsOfServiceUrl),
-                  onPrivacyTap: () => openInAppUrl(context, ApiConfig.privacyPolicyUrl),
-                  isEnglish: _isEnglish,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '© 2026 HARSAC. All rights reserved.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: AppColors.secondaryText,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Version 1.0.1',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: AppColors.secondaryText,
-                ),
-              ),
-              const SizedBox(height: 16),
+              ..._buildFooter(),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Tablet-only layout. Portrait: full-width hero on top, login card
+  /// (max 560 wide) vertically centred in the remaining space. Landscape:
+  /// branding panel on the left half, login card on the right.
+  Widget _buildTablet(BuildContext context) {
+    final hero = _LoginHero(
+      isEnglish: _isEnglish,
+      onLanguageChanged: _setLanguage,
+      subtitle: _t('ग्राम पंचायत, हरियाणा', 'Gram Panchayat, Haryana'),
+      badgeSize: 128,
+      titleSize: 32,
+    );
+    final cardColumn = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [_buildLoginCard(), ..._buildFooter()],
+          ),
+        ),
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final landscape = constraints.maxWidth > constraints.maxHeight;
+            if (!landscape) {
+              return CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: hero),
+                  SliverFillRemaining(hasScrollBody: false, child: cardColumn),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _LoginHero(
+                    isEnglish: _isEnglish,
+                    onLanguageChanged: _setLanguage,
+                    subtitle: _t(
+                      'ग्राम पंचायत, हरियाणा',
+                      'Gram Panchayat, Haryana',
+                    ),
+                    badgeSize: 160,
+                    titleSize: 36,
+                    sidePanel: true,
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: cardColumn,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            _t('लॉगिन', 'Login'),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.notoSansDevanagari(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF212121),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _RoleTabs(
+            isCitizen: _citizenTab,
+            onChanged: _selectTab,
+            citizenLabel: _t('नागरिक', 'Citizen'),
+            departmentLabel: _t('विभाग', 'Department'),
+          ),
+          const SizedBox(height: 22),
+          if (_citizenTab) ..._buildCitizenForm() else ..._buildStaffForm(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildFooter() {
+    return [
+      const SizedBox(height: 24),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: _TermsFooter(
+          onTermsTap: () => openInAppUrl(context, ApiConfig.termsOfServiceUrl),
+          onPrivacyTap: () => openInAppUrl(context, ApiConfig.privacyPolicyUrl),
+          isEnglish: _isEnglish,
+        ),
+      ),
+      const SizedBox(height: 16),
+      Text(
+        '© 2026 HARSAC. All rights reserved.',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.poppins(
+          fontSize: 11,
+          color: AppColors.secondaryText,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Version 1.0.1',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.poppins(
+          fontSize: 11,
+          color: AppColors.secondaryText,
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
   }
 
   List<Widget> _buildCitizenForm() {
@@ -718,14 +803,106 @@ class _LoginHero extends StatelessWidget {
     required this.isEnglish,
     required this.onLanguageChanged,
     required this.subtitle,
+    this.badgeSize = 96,
+    this.titleSize = 26,
+    this.sidePanel = false,
   });
 
   final bool isEnglish;
   final ValueChanged<bool> onLanguageChanged;
   final String subtitle;
+  final double badgeSize;
+  final double titleSize;
+
+  /// Tablet landscape: fills its (left-half) slot top to bottom with the
+  /// branding vertically centred, instead of a rounded top banner.
+  final bool sidePanel;
+
+  Widget _branding() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _AuthorityFlipBadge(size: badgeSize),
+        const SizedBox(height: 18),
+        Text.rich(
+          TextSpan(
+            style: GoogleFonts.notoSansDevanagari(
+              fontSize: titleSize,
+              fontWeight: FontWeight.w800,
+            ),
+            children: const [
+              TextSpan(
+                text: 'म्हारी ',
+                style: TextStyle(color: AppColors.brandGreen),
+              ),
+              TextSpan(
+                text: 'पंचायत',
+                style: TextStyle(color: AppColors.secondary),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            color: AppColors.secondaryText,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSidePanel() {
+    return ClipRect(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [const Color(0xFFE4EFE0), AppColors.greyBg],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -60,
+              right: -60,
+              child: _Blob(color: AppColors.secondary.withValues(alpha: 0.18), size: 240),
+            ),
+            Positioned(
+              bottom: -90,
+              left: -70,
+              child: _Blob(color: AppColors.primary.withValues(alpha: 0.12), size: 300),
+            ),
+            Positioned(
+              top: 20,
+              right: 24,
+              child: _LanguageToggle(
+                isEnglish: isEnglish,
+                onChanged: onLanguageChanged,
+              ),
+            ),
+            Positioned.fill(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+                  child: _branding(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (sidePanel) return _buildSidePanel();
     return ClipRRect(
       borderRadius: const BorderRadius.only(
         bottomLeft: Radius.circular(32),
@@ -764,12 +941,12 @@ class _LoginHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const _AuthorityFlipBadge(size: 96),
+                _AuthorityFlipBadge(size: badgeSize),
                 const SizedBox(height: 14),
                 Text.rich(
                   TextSpan(
                     style: GoogleFonts.notoSansDevanagari(
-                      fontSize: 26,
+                      fontSize: titleSize,
                       fontWeight: FontWeight.w800,
                     ),
                     children: const [

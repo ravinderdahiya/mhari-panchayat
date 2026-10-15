@@ -105,7 +105,11 @@ export default function LoginPage({ onLoginSuccess, onNavigateRegister, onNaviga
         </form>
 
         <p className="mt-4 text-center text-[11px] leading-5 text-white/85 drop-shadow">
-          By continuing, you agree to our Terms of Service and{' '}
+          By continuing, you agree to our{' '}
+          <a href={api.termsOfServiceUrl} className="font-semibold underline hover:text-white">
+            Terms of Service
+          </a>{' '}
+          and{' '}
           <a href={api.privacyPolicyUrl} className="font-semibold underline hover:text-white">
             Privacy Policy
           </a>

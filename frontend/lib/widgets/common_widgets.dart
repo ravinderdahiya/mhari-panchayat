@@ -5,6 +5,7 @@ import '../navigation/app_navigation.dart';
 import '../screens/login_screen.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 
 class AppScaffold extends StatelessWidget {
   const AppScaffold({
@@ -15,6 +16,7 @@ class AppScaffold extends StatelessWidget {
     this.actions,
     this.showBackButton = true,
     this.onBack,
+    this.tabletMaxWidth = Breakpoints.form,
   });
 
   final String title;
@@ -23,6 +25,9 @@ class AppScaffold extends StatelessWidget {
   final List<Widget>? actions;
   final bool showBackButton;
   final VoidCallback? onBack;
+
+  /// Content width on tablets (header + body line up on it). Ignored on phones.
+  final double tabletMaxWidth;
 
   void _handleBack(BuildContext context) {
     if (onBack != null) {
@@ -49,6 +54,7 @@ class AppScaffold extends StatelessWidget {
             subtitle: subtitle,
             onBack: showBackButton ? () => _handleBack(context) : null,
             actions: actions,
+            tabletMaxWidth: tabletMaxWidth,
           ),
           Expanded(
             child: Transform.translate(
@@ -62,7 +68,7 @@ class AppScaffold extends StatelessWidget {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: body,
+                child: TabletConstrained(maxWidth: tabletMaxWidth, child: body),
               ),
             ),
           ),
@@ -80,6 +86,7 @@ class GradientHeader extends StatelessWidget {
     this.onBack,
     this.actions,
     this.child,
+    this.tabletMaxWidth = Breakpoints.form,
   });
 
   final String title;
@@ -87,6 +94,10 @@ class GradientHeader extends StatelessWidget {
   final VoidCallback? onBack;
   final List<Widget>? actions;
   final Widget? child;
+
+  /// On tablets the header's contents align with the page content column;
+  /// the gradient itself still spans the full width.
+  final double tabletMaxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -105,66 +116,69 @@ class GradientHeader extends StatelessWidget {
             ? AppGradients.tallHeader
             : AppGradients.shortHeader,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (onBack != null)
-                IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.white,
+      child: TabletConstrained(
+        maxWidth: tabletMaxWidth,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (onBack != null)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                    ),
+                    tooltip: 'Back',
+                    onPressed: onBack,
                   ),
-                  tooltip: 'Back',
-                  onPressed: onBack,
-                ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 28,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        subtitle!,
+                        title,
                         style: GoogleFonts.poppins(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 13,
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 28,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle!,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ),
-              if (actions != null)
-                IconTheme(
-                  data: const IconThemeData(color: Colors.white),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: actions!,
                   ),
                 ),
-            ],
-          ),
-          if (child != null) child!,
-        ],
+                if (actions != null)
+                  IconTheme(
+                    data: const IconThemeData(color: Colors.white),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: actions!,
+                    ),
+                  ),
+              ],
+            ),
+            if (child != null) child!,
+          ],
+        ),
       ),
     );
   }

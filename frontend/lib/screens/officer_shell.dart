@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/notification_center.dart';
+import '../widgets/adaptive_nav_scaffold.dart';
 import '../widgets/location_gate.dart';
 import '../widgets/notification_badge.dart';
 import 'complaint_map_screen.dart';
@@ -41,39 +42,37 @@ class _OfficerShellState extends State<OfficerShell> {
       const ProfileScreen(showReportsLink: true),
     ];
 
-    return Scaffold(
+    return AdaptiveNavScaffold(
       body: screens[_index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined, size: 24),
-            selectedIcon: Icon(Icons.home_rounded, size: 24),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined, size: 24),
-            selectedIcon: Icon(Icons.map_rounded, size: 24),
-            label: 'Map',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.task_outlined, size: 24),
-            selectedIcon: Icon(Icons.task_rounded, size: 24),
-            label: 'Tasks',
-          ),
-          NavigationDestination(
-            icon: NotificationBadgeIcon(icon: Icons.notifications_outlined),
-            selectedIcon: NotificationBadgeIcon(icon: Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline, size: 24),
-            selectedIcon: Icon(Icons.person_rounded, size: 24),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      selectedIndex: _index,
+      onDestinationSelected: (value) => setState(() => _index = value),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined, size: 24),
+          selectedIcon: Icon(Icons.home_rounded, size: 24),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.map_outlined, size: 24),
+          selectedIcon: Icon(Icons.map_rounded, size: 24),
+          label: 'Map',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.task_outlined, size: 24),
+          selectedIcon: Icon(Icons.task_rounded, size: 24),
+          label: 'Tasks',
+        ),
+        NavigationDestination(
+          icon: NotificationBadgeIcon(icon: Icons.notifications_outlined),
+          selectedIcon: NotificationBadgeIcon(icon: Icons.notifications_rounded),
+          label: 'Alerts',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline, size: 24),
+          selectedIcon: Icon(Icons.person_rounded, size: 24),
+          label: 'Profile',
+        ),
+      ],
     );
   }
 }

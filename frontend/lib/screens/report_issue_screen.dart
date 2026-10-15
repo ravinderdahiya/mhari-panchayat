@@ -16,6 +16,7 @@ import '../services/fake_location_detector.dart';
 import '../services/location_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/photo_stamp.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/in_app_camera.dart';
 import '../widgets/photo_viewer.dart';
@@ -507,7 +508,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     return AppScaffold(
       title: 'New Complaint',
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 28),
+        padding: context.isTablet
+            ? const EdgeInsets.fromLTRB(16, 24, 16, 40)
+            : const EdgeInsets.fromLTRB(10, 12, 10, 28),
         children: [
           Container(
             padding: const EdgeInsets.all(14),
@@ -683,118 +686,122 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          DropdownButtonFormField<int>(
-            initialValue: _departmentId,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: 'Department *',
-              prefixIcon: const Icon(Icons.account_balance_outlined),
-              suffixIcon: _loadingDepartments
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : null,
+          ..._pairOnTablet(
+            context,
+            DropdownButtonFormField<int>(
+              initialValue: _departmentId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Department *',
+                prefixIcon: const Icon(Icons.account_balance_outlined),
+                suffixIcon: _loadingDepartments
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+              ),
+              items: [
+                for (final department in _departments)
+                  DropdownMenuItem(
+                    value: department.id,
+                    child: Text(department.name, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: _loadingDepartments ? null : _selectDepartment,
             ),
-            items: [
-              for (final department in _departments)
-                DropdownMenuItem(
-                  value: department.id,
-                  child: Text(department.name, overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: _loadingDepartments ? null : _selectDepartment,
+            DropdownButtonFormField<int>(
+              key: ValueKey('asset-$_departmentId-$_assetTypeId'),
+              initialValue: _assetTypeId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Asset *',
+                prefixIcon: const Icon(Icons.apartment_outlined),
+                suffixIcon: _loadingAssets
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+              ),
+              items: [
+                for (final asset in _assetTypes)
+                  if (int.tryParse(asset.id) case final id?)
+                    DropdownMenuItem(value: id, child: Text(asset.name)),
+              ],
+              onChanged: _loadingAssets || _assetTypes.isEmpty
+                  ? null
+                  : _selectAssetType,
+            ),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            key: ValueKey('asset-$_departmentId-$_assetTypeId'),
-            initialValue: _assetTypeId,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: 'Asset *',
-              prefixIcon: const Icon(Icons.apartment_outlined),
-              suffixIcon: _loadingAssets
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : null,
+          ..._pairOnTablet(
+            context,
+            DropdownButtonFormField<int>(
+              initialValue: _categoryId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: _assetTypeId != null && _categories.isEmpty && !_loadingCategories
+                    ? 'Complaint Category (not required for this asset)'
+                    : 'Complaint Category *',
+                prefixIcon: const Icon(Icons.category_outlined),
+                suffixIcon: _loadingCategories
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+              ),
+              items: [
+                for (final category in _categories)
+                  DropdownMenuItem(
+                    value: category.id,
+                    child: Text(category.name),
+                  ),
+              ],
+              onChanged: _loadingCategories || _categories.isEmpty
+                  ? null
+                  : (value) {
+                      final category = _firstWhereOrNull(
+                        _categories,
+                        (item) => item.id == value,
+                      );
+                      setState(() {
+                        _categoryId = value;
+                        if (category?.defaultPriorityId != null) {
+                          _priorityId = category!.defaultPriorityId;
+                        }
+                      });
+                    },
             ),
-            items: [
-              for (final asset in _assetTypes)
-                if (int.tryParse(asset.id) case final id?)
-                  DropdownMenuItem(value: id, child: Text(asset.name)),
-            ],
-            onChanged: _loadingAssets || _assetTypes.isEmpty
-                ? null
-                : _selectAssetType,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: _categoryId,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: _assetTypeId != null && _categories.isEmpty && !_loadingCategories
-                  ? 'Complaint Category (not required for this asset)'
-                  : 'Complaint Category *',
-              prefixIcon: const Icon(Icons.category_outlined),
-              suffixIcon: _loadingCategories
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : null,
+            DropdownButtonFormField<int>(
+              initialValue: _priorityId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Priority *',
+                prefixIcon: Icon(Icons.flag_outlined),
+              ),
+              items: [
+                for (final priority in _priorities)
+                  DropdownMenuItem(
+                    value: priority.id,
+                    child: Text(priority.name),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _priorityId = value),
             ),
-            items: [
-              for (final category in _categories)
-                DropdownMenuItem(
-                  value: category.id,
-                  child: Text(category.name),
-                ),
-            ],
-            onChanged: _loadingCategories || _categories.isEmpty
-                ? null
-                : (value) {
-                    final category = _firstWhereOrNull(
-                      _categories,
-                      (item) => item.id == value,
-                    );
-                    setState(() {
-                      _categoryId = value;
-                      if (category?.defaultPriorityId != null) {
-                        _priorityId = category!.defaultPriorityId;
-                      }
-                    });
-                  },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: _priorityId,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Priority *',
-              prefixIcon: Icon(Icons.flag_outlined),
-            ),
-            items: [
-              for (final priority in _priorities)
-                DropdownMenuItem(
-                  value: priority.id,
-                  child: Text(priority.name),
-                ),
-            ],
-            onChanged: (value) => setState(() => _priorityId = value),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -1007,4 +1014,22 @@ DetectedLocation? _preferMoreComplete(
   return _resolvedHierarchyParts(candidate) > _resolvedHierarchyParts(current)
       ? candidate
       : current;
+}
+
+/// Phones: [first], a 12px gap, then [second] — exactly the original
+/// stacked layout. Tablets: the two short fields side by side.
+List<Widget> _pairOnTablet(BuildContext context, Widget first, Widget second) {
+  if (!context.isTablet) {
+    return [first, const SizedBox(height: 12), second];
+  }
+  return [
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: first),
+        const SizedBox(width: 12),
+        Expanded(child: second),
+      ],
+    ),
+  ];
 }

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 import 'complaint_details_screen.dart';
@@ -18,7 +19,8 @@ class ComplaintSuccessScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: _scrollBody(
+          context,
           padding: const EdgeInsets.all(AppSpacing.screen),
           child: Column(
             children: [
@@ -183,4 +185,32 @@ class ComplaintSuccessScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Phones: exactly the original `SingleChildScrollView(padding, child)`.
+/// Tablets: the confirmation centred at ~560 wide and vertically centred.
+Widget _scrollBody(
+  BuildContext context, {
+  required EdgeInsetsGeometry padding,
+  required Widget child,
+}) {
+  if (!context.isTablet) {
+    return SingleChildScrollView(padding: padding, child: child);
+  }
+  return LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: constraints.maxHeight > 64 ? constraints.maxHeight - 64 : 0.0,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: child,
+          ),
+        ),
+      ),
+    ),
+  );
 }

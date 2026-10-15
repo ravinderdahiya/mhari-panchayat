@@ -15,6 +15,7 @@ import '../widgets/common_widgets.dart';
 import 'asset_details_screen.dart';
 import 'asset_survey_form_screen.dart';
 import 'surveyor_profile_screen.dart';
+import '../utils/responsive.dart';
 
 class AssetSurveyScreen extends StatefulWidget {
   const AssetSurveyScreen({super.key, this.embedded = false});
@@ -248,6 +249,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                 ),
               ],
             ],
+            tabletMaxWidth: Breakpoints.wide,
           ),
           Expanded(
             child: Transform.translate(
@@ -261,104 +263,39 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                 clipBehavior: Clip.antiAlias,
                 child: _loadingDepartments
                     ? const Center(child: CircularProgressIndicator())
-                    : CustomScrollView(
-                        slivers: [
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                            sliver: SliverToBoxAdapter(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _ModeTab(
-                                          label: '+ New Asset',
-                                          selected: _isNewAsset,
-                                          onTap: () => _switchMode(isNew: true),
+                    : _SurveyLayout(
+                        builder: (context, hPad, columns) => CustomScrollView(
+                          slivers: [
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
+                              sliver: SliverToBoxAdapter(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _ModeTab(
+                                            label: '+ New Asset',
+                                            selected: _isNewAsset,
+                                            onTap: () => _switchMode(isNew: true),
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: _ModeTab(
-                                          label: '✎ Existing Asset',
-                                          selected: !_isNewAsset,
-                                          onTap: () =>
-                                              _switchMode(isNew: false),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _ModeTab(
+                                            label: '✎ Existing Asset',
+                                            selected: !_isNewAsset,
+                                            onTap: () =>
+                                                _switchMode(isNew: false),
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  if (_isNewAsset) ...[
-                                    Text(
-                                      'Select Department *',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF212121),
-                                      ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 8),
-                                    if (_departments.isEmpty)
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.orangeTint,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: AppColors.border,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _infoMessage ??
-                                              'No departments assigned. Ask admin to assign your department(s).',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            color: const Color(0xFF5C4A1F),
-                                            height: 1.4,
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      DropdownButtonFormField<int>(
-                                        value: _selectedDepartmentId,
-                                        isExpanded: true,
-                                        hint: Text(
-                                          '-- Choose a department --',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            color: AppColors.mutedText,
-                                          ),
-                                        ),
-                                        decoration: const InputDecoration(
-                                          contentPadding: EdgeInsets.symmetric(
-                                            horizontal: 14,
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        items: [
-                                          for (final dept in _departments)
-                                            DropdownMenuItem(
-                                              value: dept.id,
-                                              child: Text(
-                                                dept.name,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                        onChanged: _onDepartmentChanged,
-                                      ),
-                                    if (_selectedDepartmentId != null) ...[
-                                      const SizedBox(height: 16),
+                                    const SizedBox(height: 16),
+                                    if (_isNewAsset) ...[
                                       Text(
-                                        'Select Asset Type *',
+                                        'Select Department *',
                                         style: GoogleFonts.poppins(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
@@ -366,16 +303,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 8),
-                                      if (_loadingTypes)
-                                        const Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 20,
-                                          ),
-                                          child: Center(
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        )
-                                      else if (_types.isEmpty)
+                                      if (_departments.isEmpty)
                                         Container(
                                           width: double.infinity,
                                           padding: const EdgeInsets.all(16),
@@ -390,7 +318,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                           ),
                                           child: Text(
                                             _infoMessage ??
-                                                'No assets linked to this department yet.',
+                                                'No departments assigned. Ask admin to assign your department(s).',
                                             style: GoogleFonts.poppins(
                                               fontSize: 13,
                                               color: const Color(0xFF5C4A1F),
@@ -398,170 +326,278 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                                             ),
                                           ),
                                         )
-                                      else ...[
-                                        DropdownButtonFormField<String>(
-                                          value: _selectedId,
+                                      else
+                                        DropdownButtonFormField<int>(
+                                          value: _selectedDepartmentId,
                                           isExpanded: true,
                                           hint: Text(
-                                            '-- Choose an asset --',
+                                            '-- Choose a department --',
                                             style: GoogleFonts.poppins(
                                               fontSize: 13,
                                               color: AppColors.mutedText,
                                             ),
                                           ),
                                           decoration: const InputDecoration(
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                  horizontal: 14,
-                                                  vertical: 12,
-                                                ),
+                                            contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 12,
+                                            ),
                                           ),
                                           items: [
-                                            for (final type in _types)
+                                            for (final dept in _departments)
                                               DropdownMenuItem(
-                                                value: type.id,
+                                                value: dept.id,
                                                 child: Text(
-                                                  type.name,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  dept.name,
+                                                  overflow: TextOverflow.ellipsis,
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 13,
                                                   ),
                                                 ),
                                               ),
                                           ],
-                                          onChanged: (id) {
-                                            if (id == null) return;
-                                            AssetType? match;
-                                            for (final t in _types) {
-                                              if (t.id == id) {
-                                                match = t;
-                                                break;
+                                          onChanged: _onDepartmentChanged,
+                                        ),
+                                      if (_selectedDepartmentId != null) ...[
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Select Asset Type *',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF212121),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (_loadingTypes)
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 20,
+                                            ),
+                                            child: Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                          )
+                                        else if (_types.isEmpty)
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.orangeTint,
+                                              borderRadius: BorderRadius.circular(
+                                                12,
+                                              ),
+                                              border: Border.all(
+                                                color: AppColors.border,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              _infoMessage ??
+                                                  'No assets linked to this department yet.',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                color: const Color(0xFF5C4A1F),
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          )
+                                        else ...[
+                                          DropdownButtonFormField<String>(
+                                            value: _selectedId,
+                                            isExpanded: true,
+                                            hint: Text(
+                                              '-- Choose an asset --',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                color: AppColors.mutedText,
+                                              ),
+                                            ),
+                                            decoration: const InputDecoration(
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                    horizontal: 14,
+                                                    vertical: 12,
+                                                  ),
+                                            ),
+                                            items: [
+                                              for (final type in _types)
+                                                DropdownMenuItem(
+                                                  value: type.id,
+                                                  child: Text(
+                                                    type.name,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                            onChanged: (id) {
+                                              if (id == null) return;
+                                              AssetType? match;
+                                              for (final t in _types) {
+                                                if (t.id == id) {
+                                                  match = t;
+                                                  break;
+                                                }
                                               }
-                                            }
-                                            if (match != null) _onSelect(match);
-                                          },
-                                        ),
-                                        const SizedBox(height: 14),
-                                        if (_selectedId == null)
-                                          const _PlaceholderCard(),
+                                              if (match != null) _onSelect(match);
+                                            },
+                                          ),
+                                          const SizedBox(height: 14),
+                                          if (_selectedId == null)
+                                            const _PlaceholderCard(),
+                                        ],
                                       ],
-                                    ],
-                                  ] else ...[
-                                    TextField(
-                                      onChanged: (v) =>
-                                          setState(() => _existingQuery = v),
-                                      style: GoogleFonts.poppins(fontSize: 14),
-                                      decoration: InputDecoration(
-                                        hintText: 'Search by asset name',
-                                        hintStyle: GoogleFonts.poppins(
-                                          color: AppColors.mutedText,
-                                          fontSize: 13,
-                                        ),
-                                        prefixIcon: Icon(
-                                          Icons.search_rounded,
-                                          color: AppColors.mutedText,
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            24,
+                                    ] else ...[
+                                      TextField(
+                                        onChanged: (v) =>
+                                            setState(() => _existingQuery = v),
+                                        style: GoogleFonts.poppins(fontSize: 14),
+                                        decoration: InputDecoration(
+                                          hintText: 'Search by asset name',
+                                          hintStyle: GoogleFonts.poppins(
+                                            color: AppColors.mutedText,
+                                            fontSize: 13,
                                           ),
-                                          borderSide: BorderSide(
-                                            color: AppColors.border,
+                                          prefixIcon: Icon(
+                                            Icons.search_rounded,
+                                            color: AppColors.mutedText,
                                           ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            24,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              24,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppColors.border,
+                                            ),
                                           ),
-                                          borderSide: BorderSide(
-                                            color: AppColors.border,
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              24,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppColors.border,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
+                                      const SizedBox(height: 8),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (_isNewAsset &&
-                              _selectedDepartmentId != null &&
-                              !_loadingTypes &&
-                              _types.isNotEmpty)
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                14,
-                                16,
-                                24,
-                              ),
-                              sliver: SliverGrid(
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 3,
-                                      crossAxisSpacing: 10,
-                                      mainAxisSpacing: 10,
-                                      childAspectRatio: 0.82,
-                                    ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final type = _types[index];
-                                    return _AssetTile(
-                                      assetType: type,
-                                      selected: type.id == _selectedId,
-                                      onTap: () => _onSelect(type),
-                                    );
-                                  },
-                                  childCount: _types.length,
-                                  addAutomaticKeepAlives: false,
                                 ),
                               ),
-                            )
-                          else if (_isNewAsset)
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: 24),
-                            )
-                          else if (_loadingExisting)
-                            const SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          else if (_filteredExisting.isEmpty)
-                            SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: Center(
-                                child: Text(
-                                  'No surveyed assets found',
-                                  style: GoogleFonts.poppins(
-                                    color: AppColors.mutedText,
+                            ),
+                            if (_isNewAsset &&
+                                _selectedDepartmentId != null &&
+                                !_loadingTypes &&
+                                _types.isNotEmpty)
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(
+                                  hPad,
+                                  14,
+                                  hPad,
+                                  24,
+                                ),
+                                sliver: SliverGrid(
+                                  gridDelegate:
+                                      // 3 columns on phones, 4 on tablets.
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: context.isTablet ? 4 : 3,
+                                        crossAxisSpacing: 10,
+                                        mainAxisSpacing: 10,
+                                        childAspectRatio: context.isTablet ? 1.1 : 0.82,
+                                      ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                      final type = _types[index];
+                                      return _AssetTile(
+                                        assetType: type,
+                                        selected: type.id == _selectedId,
+                                        onTap: () => _onSelect(type),
+                                      );
+                                    },
+                                    childCount: _types.length,
+                                    addAutomaticKeepAlives: false,
                                   ),
                                 ),
-                              ),
-                            )
-                          else
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                              sliver: SliverList(
-                                delegate: SliverChildBuilderDelegate((
-                                  context,
-                                  index,
-                                ) {
-                                  final survey = _filteredExisting[index];
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: _ExistingAssetCard(
-                                      survey: survey,
-                                      onTap: () => _onSelectExisting(survey),
-                                      isForwarding: _forwardingId == survey.id,
-                                      onForward: () => _forwardSubmission(survey),
+                              )
+                            else if (_isNewAsset)
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: 24),
+                              )
+                            else if (_loadingExisting)
+                              const SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            else if (_filteredExisting.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Center(
+                                  child: Text(
+                                    'No surveyed assets found',
+                                    style: GoogleFonts.poppins(
+                                      color: AppColors.mutedText,
                                     ),
-                                  );
-                                }, childCount: _filteredExisting.length),
+                                  ),
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 24),
+                                sliver: SliverList(
+                                  delegate: SliverChildBuilderDelegate((
+                                    context,
+                                    index,
+                                  ) {
+                                    Widget card(Survey survey) =>
+                                        _ExistingAssetCard(
+                                          survey: survey,
+                                          onTap: () => _onSelectExisting(survey),
+                                          isForwarding:
+                                              _forwardingId == survey.id,
+                                          onForward: () =>
+                                              _forwardSubmission(survey),
+                                        );
+                                    if (columns > 1) {
+                                      // Tablets: a row of [columns] cards.
+                                      final row = _filteredExisting
+                                          .skip(index * columns)
+                                          .take(columns)
+                                          .toList();
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: IntrinsicHeight(
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              for (var i = 0; i < columns; i++) ...[
+                                                if (i > 0)
+                                                  const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: i < row.length
+                                                      ? card(row[i])
+                                                      : const SizedBox(),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    final survey = _filteredExisting[index];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: card(survey),
+                                    );
+                                  }, childCount: (_filteredExisting.length / columns).ceil()),
+                                ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
               ),
             ),
@@ -917,6 +953,28 @@ class _ExistingAssetCard extends StatelessWidget {
         ),
         isThreeLine: true,
         trailing: const Icon(Icons.chevron_right_rounded),
+      ),
+    );
+  }
+}
+
+/// Phones: calls [builder] with the original 16dp side padding and a single
+/// column. Tablets: centres the content at [Breakpoints.wide] (the side
+/// margins stay part of the scroll view) and lets lists use 2-3 columns.
+class _SurveyLayout extends StatelessWidget {
+  const _SurveyLayout({required this.builder});
+
+  final Widget Function(BuildContext context, double hPad, int columns)
+  builder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!context.isTablet) return builder(context, 16, 1);
+    return LayoutBuilder(
+      builder: (context, constraints) => builder(
+        context,
+        centeredGutter(constraints.maxWidth, Breakpoints.wide, min: 16),
+        tabletColumns(context, constraints.maxWidth),
       ),
     );
   }

@@ -19,6 +19,7 @@ import '../services/complaint_api.dart';
 import '../services/location_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
+import '../utils/responsive.dart';
 import '../widgets/complaint_widgets.dart';
 import '../widgets/flipping_logo.dart';
 import 'asset_details_screen.dart';
@@ -582,22 +583,24 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   top: 10,
                   left: 12,
                   right: 12,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _HomeSearchBar(
-                          controller: _searchController,
-                          focusNode: _searchFocus,
-                          hint: _searchHint,
-                          loading: _searching,
-                          onChanged: _onSearchChanged,
-                          onClear: _clearSearch,
-                          onMic: () => _comingSoon('Voice search'),
+                  child: _TabletOverlayWidth(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _HomeSearchBar(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            hint: _searchHint,
+                            loading: _searching,
+                            onChanged: _onSearchChanged,
+                            onClear: _clearSearch,
+                            onMic: () => _comingSoon('Voice search'),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      _LayersButton(onTap: _showLayers),
-                    ],
+                        const SizedBox(width: 10),
+                        _LayersButton(onTap: _showLayers),
+                      ],
+                    ),
                   ),
                 ),
                 Positioned(
@@ -638,7 +641,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     top: 68,
                     left: 12,
                     right: 12,
-                    child: _SearchResults(hits: _hits, onTap: _openHit),
+                    child: _TabletOverlayWidth(
+                      child: _SearchResults(hits: _hits, onTap: _openHit),
+                    ),
                   ),
               ],
             ),
@@ -686,6 +691,27 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Keeps a floating map overlay (search bar, search results) at a sensible
+/// width on tablets, anchored to the left like a map side panel. Phones get
+/// [child] unchanged.
+class _TabletOverlayWidth extends StatelessWidget {
+  const _TabletOverlayWidth({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!context.isTablet) return child;
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: child,
+      ),
     );
   }
 }

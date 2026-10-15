@@ -11,6 +11,7 @@ import '../services/asset_type_api.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/photo_stamp.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/in_app_camera.dart';
 import '../widgets/photo_viewer.dart';
@@ -425,6 +426,48 @@ class _ReadOnlyLocationFields extends StatelessWidget {
           style: GoogleFonts.poppins(fontSize: 12, color: AppColors.mutedText),
         ),
         const SizedBox(height: 12),
+        if (context.isTablet) ...[
+          // Tablet-only: short read-only fields in pairs.
+          Row(
+            children: [
+              Expanded(
+                child: _ReadOnlyField(
+                  label: 'District',
+                  value: location.district.name,
+                  icon: Icons.map_outlined,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.gap),
+              Expanded(
+                child: _ReadOnlyField(
+                  label: 'Tehsil / Sub-Tehsil',
+                  value: location.tehsil.name,
+                  icon: Icons.location_city_outlined,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.gap),
+          Row(
+            children: [
+              Expanded(
+                child: _ReadOnlyField(
+                  label: 'Village',
+                  value: location.village.name,
+                  icon: Icons.holiday_village_outlined,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.gap),
+              Expanded(
+                child: _ReadOnlyField(
+                  label: 'Panchayat',
+                  value: panchayat.isEmpty ? 'Not available' : panchayat,
+                  icon: Icons.account_balance_outlined,
+                ),
+              ),
+            ],
+          ),
+        ] else ...[
         _ReadOnlyField(
           label: 'District',
           value: location.district.name,
@@ -448,6 +491,7 @@ class _ReadOnlyLocationFields extends StatelessWidget {
           value: panchayat.isEmpty ? 'Not available' : panchayat,
           icon: Icons.account_balance_outlined,
         ),
+        ],
         const SizedBox(height: AppSpacing.gap),
         Row(
           children: [

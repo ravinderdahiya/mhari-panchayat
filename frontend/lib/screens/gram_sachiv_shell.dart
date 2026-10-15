@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/notification_center.dart';
+import '../widgets/adaptive_nav_scaffold.dart';
 import '../widgets/notification_badge.dart';
 import 'notification_screen.dart';
 import 'profile_screen.dart';
@@ -36,29 +37,27 @@ class _GramSachivShellState extends State<GramSachivShell> {
       _ => const ProfileScreen(),
     };
 
-    return Scaffold(
+    return AdaptiveNavScaffold(
       body: screen,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.fact_check_outlined, size: 24),
-            selectedIcon: Icon(Icons.fact_check_rounded, size: 24),
-            label: 'Verify',
-          ),
-          NavigationDestination(
-            icon: NotificationBadgeIcon(icon: Icons.notifications_outlined),
-            selectedIcon: NotificationBadgeIcon(icon: Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline, size: 24),
-            selectedIcon: Icon(Icons.person_rounded, size: 24),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      selectedIndex: _index,
+      onDestinationSelected: (value) => setState(() => _index = value),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.fact_check_outlined, size: 24),
+          selectedIcon: Icon(Icons.fact_check_rounded, size: 24),
+          label: 'Verify',
+        ),
+        NavigationDestination(
+          icon: NotificationBadgeIcon(icon: Icons.notifications_outlined),
+          selectedIcon: NotificationBadgeIcon(icon: Icons.notifications_rounded),
+          label: 'Alerts',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline, size: 24),
+          selectedIcon: Icon(Icons.person_rounded, size: 24),
+          label: 'Profile',
+        ),
+      ],
     );
   }
 }

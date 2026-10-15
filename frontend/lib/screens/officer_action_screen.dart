@@ -10,6 +10,7 @@ import '../services/complaint_api.dart';
 import '../services/officer_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/photo_stamp.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 import '../widgets/photo_viewer.dart';
@@ -237,6 +238,206 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
   Widget build(BuildContext context) {
     final complaint = _complaint;
     final actions = _officerActions[complaint.status] ?? const [];
+    // Tablet landscape: complaint info on the left, the officer's work
+    // (after-fix photos, remarks) on the right.
+    final twoPane =
+        context.isTablet && MediaQuery.sizeOf(context).width >= 1000;
+    final thumbSize = context.isTablet ? 110.0 : 84.0;
+
+    final info = <Widget>[
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              complaint.displaySubject,
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          StatusChip(status: complaint.status),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Text(
+        complaint.locationLabel,
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          color: AppColors.mutedText,
+        ),
+      ),
+      const SizedBox(height: AppSpacing.screen),
+      _CitizenInfoCard(
+        phone: complaint.citizenMobile ?? 'Not available',
+        address: '${complaint.village}, ${complaint.panchayat}',
+      ),
+      if (complaint.assignedOfficerName != null) ...[
+        const SizedBox(height: AppSpacing.gap),
+        _AssignedOfficerRow(name: complaint.assignedOfficerName!),
+      ],
+      const SizedBox(height: AppSpacing.screen),
+      _SectionLabel('Description'),
+      const SizedBox(height: AppSpacing.gap),
+      Text(
+        complaint.description,
+        style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
+      ),
+      if (complaint.photoUrls.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.screen),
+        _SectionLabel('Complaint Photos'),
+        const SizedBox(height: AppSpacing.gap),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final url in complaint.photoUrls)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: () =>
+                      showPhotoViewer(context, imageUrl: url),
+                  child: Image.network(
+                    url,
+                    width: thumbSize,
+                    height: thumbSize,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+      if (complaint.resolutionPhotoUrls.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.screen),
+        _SectionLabel('Resolution Photos'),
+        const SizedBox(height: AppSpacing.gap),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final url in complaint.resolutionPhotoUrls)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: () =>
+                      showPhotoViewer(context, imageUrl: url),
+                  child: Image.network(
+                    url,
+                    width: thumbSize,
+                    height: thumbSize,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    ];
+    final work = <Widget>[
+      if (actions.any((a) => a.needsPhoto)) ...[
+        const SizedBox(height: AppSpacing.screen),
+        _SectionLabel('After-fix Photos'),
+        const SizedBox(height: 4),
+        Text(
+          'Capture photos of the fixed work before marking resolved.',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppColors.mutedText,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.gap),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < _resolutionPhotos.length; i++)
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.memory(
+                      _resolutionPhotos[i],
+                      width: thumbSize,
+                      height: thumbSize,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: InkWell(
+                      onTap: () => setState(
+                        () => _resolutionPhotos.removeAt(i),
+                      ),
+                      child: const CircleAvatar(
+                        radius: 11,
+                        backgroundColor: Colors.black54,
+                        child: Icon(
+                          Icons.close,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (_resolutionPhotos.length < 5)
+              InkWell(
+                onTap: _addResolutionPhoto,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: thumbSize,
+                  height: thumbSize,
+                  decoration: BoxDecoration(
+                    color: AppColors.greenTint,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Icon(
+                    Icons.add_a_photo_rounded,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+      if (actions.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.screen),
+        _SectionLabel('Remarks'),
+        const SizedBox(height: AppSpacing.gap),
+        TextField(
+          controller: _remarksController,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText:
+                'Add resolution remarks or reason for rejection...',
+            alignLabelWithHint: true,
+          ),
+        ),
+      ] else ...[
+        const SizedBox(height: AppSpacing.screen),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.greyBg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            _readOnlyMessage(complaint.status),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: AppColors.mutedText,
+            ),
+          ),
+        ),
+      ],
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -245,6 +446,7 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
           GradientHeader(
             title: '${complaint.displayCode} · Action',
             onBack: () => Navigator.of(context).pop(),
+            tabletMaxWidth: twoPane ? Breakpoints.wide : Breakpoints.form,
             actions: [
               IconButton(
                 onPressed: _reassigning ? null : _reassign,
@@ -263,201 +465,43 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
             ],
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.screen),
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        complaint.displaySubject,
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+            child: twoPane
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screen,
+                            AppSpacing.screen,
+                            AppSpacing.screen / 2,
+                            AppSpacing.screen,
+                          ),
+                          children: info,
                         ),
                       ),
-                    ),
-                    StatusChip(status: complaint.status),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  complaint.locationLabel,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: AppColors.mutedText,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.screen),
-                _CitizenInfoCard(
-                  phone: complaint.citizenMobile ?? 'Not available',
-                  address: '${complaint.village}, ${complaint.panchayat}',
-                ),
-                if (complaint.assignedOfficerName != null) ...[
-                  const SizedBox(height: AppSpacing.gap),
-                  _AssignedOfficerRow(name: complaint.assignedOfficerName!),
-                ],
-                const SizedBox(height: AppSpacing.screen),
-                _SectionLabel('Description'),
-                const SizedBox(height: AppSpacing.gap),
-                Text(
-                  complaint.description,
-                  style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
-                ),
-                if (complaint.photoUrls.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.screen),
-                  _SectionLabel('Complaint Photos'),
-                  const SizedBox(height: AppSpacing.gap),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final url in complaint.photoUrls)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: InkWell(
-                            onTap: () =>
-                                showPhotoViewer(context, imageUrl: url),
-                            child: Image.network(
-                              url,
-                              width: 84,
-                              height: 84,
-                              fit: BoxFit.cover,
-                            ),
+                      Expanded(
+                        flex: 4,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screen / 2,
+                            AppSpacing.screen,
+                            AppSpacing.screen,
+                            AppSpacing.screen,
                           ),
+                          // Drop the leading section gap - top of this pane.
+                          children: work.sublist(1),
                         ),
-                    ],
-                  ),
-                ],
-                if (complaint.resolutionPhotoUrls.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.screen),
-                  _SectionLabel('Resolution Photos'),
-                  const SizedBox(height: AppSpacing.gap),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final url in complaint.resolutionPhotoUrls)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: InkWell(
-                            onTap: () =>
-                                showPhotoViewer(context, imageUrl: url),
-                            child: Image.network(
-                              url,
-                              width: 84,
-                              height: 84,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                if (actions.any((a) => a.needsPhoto)) ...[
-                  const SizedBox(height: AppSpacing.screen),
-                  _SectionLabel('After-fix Photos'),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Capture photos of the fixed work before marking resolved.',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: AppColors.mutedText,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.gap),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (var i = 0; i < _resolutionPhotos.length; i++)
-                        Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.memory(
-                                _resolutionPhotos[i],
-                                width: 84,
-                                height: 84,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              top: 2,
-                              right: 2,
-                              child: InkWell(
-                                onTap: () => setState(
-                                  () => _resolutionPhotos.removeAt(i),
-                                ),
-                                child: const CircleAvatar(
-                                  radius: 11,
-                                  backgroundColor: Colors.black54,
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (_resolutionPhotos.length < 5)
-                        InkWell(
-                          onTap: _addResolutionPhoto,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            width: 84,
-                            height: 84,
-                            decoration: BoxDecoration(
-                              color: AppColors.greenTint,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Icon(
-                              Icons.add_a_photo_rounded,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                if (actions.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.screen),
-                  _SectionLabel('Remarks'),
-                  const SizedBox(height: AppSpacing.gap),
-                  TextField(
-                    controller: _remarksController,
-                    minLines: 3,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'Add resolution remarks or reason for rejection...',
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: AppSpacing.screen),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.greyBg,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _readOnlyMessage(complaint.status),
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: AppColors.mutedText,
                       ),
+                    ],
+                  )
+                : TabletConstrained(
+                    child: ListView(
+                      padding: const EdgeInsets.all(AppSpacing.screen),
+                      children: [...info, ...work],
                     ),
                   ),
-                ],
-              ],
-            ),
           ),
         ],
       ),
@@ -466,38 +510,41 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.screen),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: AppSpacing.gap),
-                      Expanded(
-                        child: actions[i].destructive
-                            ? OutlinedButton.icon(
-                                onPressed: _submitting
-                                    ? null
-                                    : () => _performAction(actions[i]),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.rejectedText,
-                                  side: BorderSide(
-                                    color: AppColors.rejectedText,
+                child: TabletConstrained(
+                  maxWidth: 640,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpacing.gap),
+                        Expanded(
+                          child: actions[i].destructive
+                              ? OutlinedButton.icon(
+                                  onPressed: _submitting
+                                      ? null
+                                      : () => _performAction(actions[i]),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.rejectedText,
+                                    side: BorderSide(
+                                      color: AppColors.rejectedText,
+                                    ),
+                                    minimumSize: const Size.fromHeight(48),
                                   ),
-                                  minimumSize: const Size.fromHeight(48),
+                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  label: Text(actions[i].label),
+                                )
+                              : GradientButton(
+                                  onPressed: _submitting
+                                      ? null
+                                      : () => _performAction(actions[i]),
+                                  label: _submitting
+                                      ? 'Saving...'
+                                      : actions[i].label,
+                                  icon: Icons.check_rounded,
                                 ),
-                                icon: const Icon(Icons.close_rounded, size: 18),
-                                label: Text(actions[i].label),
-                              )
-                            : GradientButton(
-                                onPressed: _submitting
-                                    ? null
-                                    : () => _performAction(actions[i]),
-                                label: _submitting
-                                    ? 'Saving...'
-                                    : actions[i].label,
-                                icon: Icons.check_rounded,
-                              ),
-                      ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

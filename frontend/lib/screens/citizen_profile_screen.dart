@@ -7,6 +7,7 @@ import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
 import 'my_complaints_screen.dart';
@@ -90,87 +91,89 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
               child: Column(
                 children: [
                   _CitizenProfileHeader(profile: _profile),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.screen,
-                      4,
-                      AppSpacing.screen,
-                      24,
-                    ),
-                    child: Column(
-                      children: [
-                        _StatsRow(total: _total, inProgress: _inProgress, resolved: _resolved),
-                        const SizedBox(height: 10),
-                        _CitizenNavCard(
-                          items: [
-                            _NavEntry(
-                              icon: Icons.assignment_rounded,
-                              color: _mockGreen,
-                              title: 'My Complaints',
-                              filled: true,
-                              subtitle: 'View and track your complaints',
-                              onTap: () => push(context, const MyComplaintsScreen()),
-                            ),
-                            _NavEntry(
-                              icon: Icons.notifications_rounded,
-                              color: _mockOrange,
-                              title: 'Notifications',
-                              filled: true,
-                              subtitle: 'Manage alerts and updates',
-                              onTap: () => push(context, const NotificationScreen()),
-                            ),
-                            _NavEntry(
-                              icon: Icons.settings_rounded,
-                              color: const Color(0xFF8B5CF6),
-                              title: 'Settings',
-                              subtitle: 'App preferences',
-                              onTap: () => push(context, const SettingsScreen()),
-                            ),
-                            _NavEntry(
-                              icon: Icons.support_agent_rounded,
-                              color: const Color(0xFF14B8A6),
-                              title: 'Help & Support',
-                              subtitle: 'FAQs, contact us',
-                              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Help & Support will be available soon')),
+                  TabletConstrained(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.screen,
+                        4,
+                        AppSpacing.screen,
+                        24,
+                      ),
+                      child: Column(
+                        children: [
+                          _StatsRow(total: _total, inProgress: _inProgress, resolved: _resolved),
+                          const SizedBox(height: 10),
+                          _CitizenNavCard(
+                            items: [
+                              _NavEntry(
+                                icon: Icons.assignment_rounded,
+                                color: _mockGreen,
+                                title: 'My Complaints',
+                                filled: true,
+                                subtitle: 'View and track your complaints',
+                                onTap: () => push(context, const MyComplaintsScreen()),
                               ),
-                            ),
-                            _NavEntry(
-                              icon: Icons.info_rounded,
-                              color: const Color(0xFF2563EB),
-                              title: 'About Mhari Panchayat',
-                              subtitle: 'App information and version',
-                              onTap: () => showAboutDialog(
-                                context: context,
-                                applicationName: 'Mhari Panchayat',
-                                applicationVersion: '1.0.0',
-                                applicationLegalese:
-                                    'Development and Panchayats Department, Government of Haryana',
+                              _NavEntry(
+                                icon: Icons.notifications_rounded,
+                                color: _mockOrange,
+                                title: 'Notifications',
+                                filled: true,
+                                subtitle: 'Manage alerts and updates',
+                                onTap: () => push(context, const NotificationScreen()),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              await AuthService.logout();
-                              if (!context.mounted) return;
-                              pushReplacement(context, const LoginScreen());
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFD9482B),
-                              side: const BorderSide(color: Color(0xFFE3705A)),
-                              minimumSize: const Size.fromHeight(44),
-                              backgroundColor: const Color(0xFFFDF1EE),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.logout_rounded, size: 18),
-                            label: Text('Logout', style: _titleStyle(14, weight: FontWeight.w600)),
+                              _NavEntry(
+                                icon: Icons.settings_rounded,
+                                color: const Color(0xFF8B5CF6),
+                                title: 'Settings',
+                                subtitle: 'App preferences',
+                                onTap: () => push(context, const SettingsScreen()),
+                              ),
+                              _NavEntry(
+                                icon: Icons.support_agent_rounded,
+                                color: const Color(0xFF14B8A6),
+                                title: 'Help & Support',
+                                subtitle: 'FAQs, contact us',
+                                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Help & Support will be available soon')),
+                                ),
+                              ),
+                              _NavEntry(
+                                icon: Icons.info_rounded,
+                                color: const Color(0xFF2563EB),
+                                title: 'About Mhari Panchayat',
+                                subtitle: 'App information and version',
+                                onTap: () => showAboutDialog(
+                                  context: context,
+                                  applicationName: 'Mhari Panchayat',
+                                  applicationVersion: '1.0.0',
+                                  applicationLegalese:
+                                      'Development and Panchayats Department, Government of Haryana',
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await AuthService.logout();
+                                if (!context.mounted) return;
+                                pushReplacement(context, const LoginScreen());
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFD9482B),
+                                side: const BorderSide(color: Color(0xFFE3705A)),
+                                minimumSize: const Size.fromHeight(44),
+                                backgroundColor: const Color(0xFFFDF1EE),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.logout_rounded, size: 18),
+                              label: Text('Logout', style: _titleStyle(14, weight: FontWeight.w600)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -206,100 +209,103 @@ class _CitizenProfileHeader extends StatelessWidget {
             colors: [Color(0xFFE4EFE0), Color(0xFFB9D3B4), Color(0xFF3F7D55), Color(0xFF1E5A3A)],
           ),
         ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const FlippingLogo(size: 38),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: 'Mahari ', style: _titleStyle(20, color: _mockGreen, weight: FontWeight.w700)),
-                          TextSpan(text: 'Panchayat', style: _titleStyle(20, color: _mockOrange, weight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      'मेरी पंचायत - सशक्त पंचायत, समृद्ध हरियाणा',
-                      style: _subtitleStyle(8.5, color: AppColors.ink),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 26),
-            Row(
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 3)),
-                        ],
-                      ),
-                      child: const CircleAvatar(
-                        radius: 40,
-                        backgroundColor: Color(0xFFE9F0E6),
-                        child: Icon(Icons.person_rounded, color: _mockGreen, size: 46),
-                      ),
-                    ),
-                    Positioned(
-                      right: 2,
-                      bottom: 2,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _mockGreen,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
+        child: TabletConstrained(
+          maxWidth: Breakpoints.form,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const FlippingLogo(size: 38),
+                  const SizedBox(width: 10),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Citizen ${profile?.id ?? ''}',
-                        style: _titleStyle(20, color: Colors.white, weight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(formattedMobile, style: _subtitleStyle(14, color: Colors.white.withValues(alpha: 0.92))),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3F3E6),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      Text.rich(
+                        TextSpan(
                           children: [
-                            const Icon(Icons.check_circle_rounded, color: _mockGreen, size: 14),
-                            const SizedBox(width: 5),
-                            Text('Registered Citizen', style: _titleStyle(11.5, color: _mockGreen)),
+                            TextSpan(text: 'Mahari ', style: _titleStyle(20, color: _mockGreen, weight: FontWeight.w700)),
+                            TextSpan(text: 'Panchayat', style: _titleStyle(20, color: _mockOrange, weight: FontWeight.w700)),
                           ],
+                        ),
+                      ),
+                      Text(
+                        'मेरी पंचायत - सशक्त पंचायत, समृद्ध हरियाणा',
+                        style: _subtitleStyle(8.5, color: AppColors.ink),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              Row(
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 3)),
+                          ],
+                        ),
+                        child: const CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Color(0xFFE9F0E6),
+                          child: Icon(Icons.person_rounded, color: _mockGreen, size: 46),
+                        ),
+                      ),
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: _mockGreen,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Citizen ${profile?.id ?? ''}',
+                          style: _titleStyle(20, color: Colors.white, weight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(formattedMobile, style: _subtitleStyle(14, color: Colors.white.withValues(alpha: 0.92))),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE3F3E6),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle_rounded, color: _mockGreen, size: 14),
+                              const SizedBox(width: 5),
+                              Text('Registered Citizen', style: _titleStyle(11.5, color: _mockGreen)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import '../models/survey.dart';
 import '../services/asset_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/photo_viewer.dart';
 
@@ -109,9 +110,16 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
     final showUpdateButton =
         widget.onUpdateSurvey != null && asset != null && _canUpdateSurvey;
 
+    final updateButton = GradientButton(
+      onPressed: widget.onUpdateSurvey,
+      label: 'Update Survey',
+      icon: Icons.edit_note_rounded,
+    );
+
     return AppScaffold(
       title: asset?.assetName ?? 'Asset Details',
       subtitle: asset?.assetTypeName,
+      tabletMaxWidth: _twoPane(context) ? Breakpoints.wide : Breakpoints.form,
       body: !showUpdateButton
           ? content
           : Column(
@@ -124,30 +132,27 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
                     AppSpacing.screen,
                     AppSpacing.screen,
                   ),
-                  child: GradientButton(
-                    onPressed: widget.onUpdateSurvey,
-                    label: 'Update Survey',
-                    icon: Icons.edit_note_rounded,
-                  ),
+                  child: context.isTablet
+                      ? Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 480),
+                            child: updateButton,
+                          ),
+                        )
+                      : updateButton,
                 ),
               ],
             ),
     );
   }
 
+  /// Tablet landscape: summary on the left, photos/status on the right.
+  bool _twoPane(BuildContext context) =>
+      context.isTablet && MediaQuery.sizeOf(context).width >= 1000;
+
   Widget _buildBody(BuildContext context, AssetDetail asset, Survey? survey) {
-    return ListView(
-      // Extra top padding - AppScaffold's body sits in a rounded card
-      // pulled up 20px to overlap the gradient header (see
-      // common_widgets.dart's AppScaffold), which otherwise clips the
-      // asset name/ID row right at the top of this list.
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.screen,
-        AppSpacing.screen + 20,
-        AppSpacing.screen,
-        AppSpacing.screen,
-      ),
-      children: [
+    final thumbSize = context.isTablet ? 120.0 : 92.0;
+    final summary = <Widget>[
         Row(
           children: [
             Container(
@@ -232,6 +237,8 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
             style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
           ),
         ],
+    ];
+    final media = <Widget>[
         if (asset.photoUrls.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.screen),
           Text(
@@ -256,12 +263,12 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
                     ),
                     child: Image.network(
                       '${ApiConfig.baseUrl}$path',
-                      width: 92,
-                      height: 92,
+                      width: thumbSize,
+                      height: thumbSize,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        width: 92,
-                        height: 92,
+                        width: thumbSize,
+                        height: thumbSize,
                         color: AppColors.greyBg,
                         child: Icon(
                           Icons.broken_image_rounded,
@@ -283,7 +290,53 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
           const SizedBox(height: 8),
           _StatusTimeline(survey: survey),
         ],
-      ],
+    ];
+
+    if (_twoPane(context) && media.isNotEmpty) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 5,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen,
+                AppSpacing.screen + 20,
+                AppSpacing.screen / 2,
+                AppSpacing.screen,
+              ),
+              children: summary,
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen / 2,
+                AppSpacing.screen + 20,
+                AppSpacing.screen,
+                AppSpacing.screen,
+              ),
+              // Drop the leading section gap - it's the top of this pane.
+              children: media.sublist(1),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      // Extra top padding - AppScaffold's body sits in a rounded card
+      // pulled up 20px to overlap the gradient header (see
+      // common_widgets.dart's AppScaffold), which otherwise clips the
+      // asset name/ID row right at the top of this list.
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screen,
+        AppSpacing.screen + 20,
+        AppSpacing.screen,
+        AppSpacing.screen,
+      ),
+      children: [...summary, ...media],
     );
   }
 

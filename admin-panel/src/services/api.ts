@@ -329,6 +329,9 @@ export const getPanchayatOfficials = (code: string) =>
 // backend/public/privacy-policy.html.
 export const privacyPolicyUrl = `${API_BASE_URL}/privacy-policy.html`;
 
+// Same, for backend/public/terms-of-service.html.
+export const termsOfServiceUrl = `${API_BASE_URL}/terms-of-service.html`;
+
 export const gisPanchayatMapServerUrl = `${API_BASE_URL}/api/gis/panchayat`;
 
 // Same reasoning, for HARSAC's hosted Panchayat/district boundary vector tile

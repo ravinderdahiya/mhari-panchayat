@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/feedback_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/photo_viewer.dart';
 
@@ -87,7 +88,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     return AppScaffold(
       title: 'App Feedback',
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 28),
+        padding: context.isTablet
+            ? const EdgeInsets.fromLTRB(16, 28, 16, 40)
+            : const EdgeInsets.fromLTRB(10, 12, 10, 28),
         children: [
           Text(
             'आपका feedback',

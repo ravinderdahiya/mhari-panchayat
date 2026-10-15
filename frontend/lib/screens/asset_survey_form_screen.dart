@@ -14,6 +14,7 @@ import '../services/location_api.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/photo_stamp.dart';
+import '../utils/responsive.dart';
 import '../widgets/photo_viewer.dart';
 import '../widgets/in_app_camera.dart';
 
@@ -508,140 +509,158 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Survey Form',
-                      style: GoogleFonts.poppins(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+            TabletConstrained(
+              maxWidth: Breakpoints.form,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Survey Form',
+                        style: GoogleFonts.poppins(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Expanded(
               child: Form(
                 key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  children: [
-                    _HeaderCard(
-                      assetName: widget.assetTypeName,
-                      dateLabel: _dateLabel,
-                      isUpdate: widget.existingSurvey != null,
-                    ),
-                    if (_outOfAssignedArea || _assignmentMissing) ...[
-                      const SizedBox(height: 12),
-                      _OutOfAreaBanner(
-                        panchayatName: _assignedPanchayatName,
-                        missingAssignment: _assignmentMissing,
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    _LabeledTextField(
-                      label: 'Asset Name *',
-                      controller: _assetNameController,
-                      hint: 'Enter asset name',
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _LabeledTextField(
-                      label: 'District *',
-                      controller: _districtController,
-                      hint: 'Auto-filled from GPS',
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _LabeledTextField(
-                      label: 'Panchayat *',
-                      controller: _gpController,
-                      hint: _assignedPanchayatName ?? 'Auto-filled from GPS',
-                      readOnly: _assignedPanchayatId != null,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _LabeledTextField(
-                      label: 'Village *',
-                      controller: _villageController,
-                      hint: 'Auto-filled from GPS',
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _GpsCoordinateField(
-                      label: 'GPS Latitude *',
-                      value: _lat,
-                      available: _gpsEnabled,
-                    ),
-                    const SizedBox(height: 12),
-                    _GpsCoordinateField(
-                      label: 'GPS Longitude *',
-                      value: _lng,
-                      available: _gpsEnabled,
-                    ),
-                    const SizedBox(height: 12),
-                    _GpsAccuracyRow(
-                      enabled: _gpsEnabled,
-                      busy: _detectingLocation,
-                      accuracy: _accuracy,
-                      onEnable: _enableGps,
-                    ),
-                    const SizedBox(height: 12),
-                    _LabeledDropdown<String>(
-                      label: 'Condition *',
-                      value:
-                          _conditionOptions.any(
-                            (option) => option.value == _condition,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => ListView(
+                    padding: context.isTablet
+                        ? EdgeInsets.fromLTRB(
+                            centeredGutter(constraints.maxWidth, Breakpoints.form, min: 24),
+                            16,
+                            centeredGutter(constraints.maxWidth, Breakpoints.form, min: 24),
+                            24,
                           )
-                          ? _conditionOptions
-                                .firstWhere(
-                                  (option) => option.value == _condition,
-                                )
-                                .label
-                          : null,
-                      items: _conditionOptions
-                          .map((option) => option.label)
-                          .toList(),
-                      onChanged: (v) {
-                        if (v == null) return;
-                        setState(() {
-                          _condition = _conditionOptions
-                              .firstWhere((option) => option.label == v)
-                              .value;
-                        });
-                      },
-                    ),
-                    if (!_loadingConditionOptions && _conditionOptions.isEmpty)
-                      TextButton(
-                        onPressed: () {
-                          setState(() => _loadingConditionOptions = true);
-                          _loadConditionOptions();
-                        },
-                        child: const Text('Retry loading conditions'),
+                        : const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    children: [
+                      _HeaderCard(
+                        assetName: widget.assetTypeName,
+                        dateLabel: _dateLabel,
+                        isUpdate: widget.existingSurvey != null,
                       ),
-                    const SizedBox(height: 12),
-                    _DescriptionField(controller: _descriptionController),
-                    const SizedBox(height: 14),
-                    _PhotosSection(
-                      photos: _photos,
-                      onAdd: _addPhoto,
-                      onRemove: (i) => setState(() => _photos.removeAt(i)),
-                    ),
-                    const SizedBox(height: 14),
-                    _SurveyedByRow(officerName: _officerName),
-                  ],
+                      if (_outOfAssignedArea || _assignmentMissing) ...[
+                        const SizedBox(height: 12),
+                        _OutOfAreaBanner(
+                          panchayatName: _assignedPanchayatName,
+                          missingAssignment: _assignmentMissing,
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      ..._pairOnTablet(
+                        context,
+                        _LabeledTextField(
+                          label: 'Asset Name *',
+                          controller: _assetNameController,
+                          hint: 'Enter asset name',
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        ),
+                        _LabeledTextField(
+                          label: 'District *',
+                          controller: _districtController,
+                          hint: 'Auto-filled from GPS',
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._pairOnTablet(
+                        context,
+                        _LabeledTextField(
+                          label: 'Panchayat *',
+                          controller: _gpController,
+                          hint: _assignedPanchayatName ?? 'Auto-filled from GPS',
+                          readOnly: _assignedPanchayatId != null,
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        ),
+                        _LabeledTextField(
+                          label: 'Village *',
+                          controller: _villageController,
+                          hint: 'Auto-filled from GPS',
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._pairOnTablet(
+                        context,
+                        _GpsCoordinateField(
+                          label: 'GPS Latitude *',
+                          value: _lat,
+                          available: _gpsEnabled,
+                        ),
+                        _GpsCoordinateField(
+                          label: 'GPS Longitude *',
+                          value: _lng,
+                          available: _gpsEnabled,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _GpsAccuracyRow(
+                        enabled: _gpsEnabled,
+                        busy: _detectingLocation,
+                        accuracy: _accuracy,
+                        onEnable: _enableGps,
+                      ),
+                      const SizedBox(height: 12),
+                      _LabeledDropdown<String>(
+                        label: 'Condition *',
+                        value:
+                            _conditionOptions.any(
+                              (option) => option.value == _condition,
+                            )
+                            ? _conditionOptions
+                                  .firstWhere(
+                                    (option) => option.value == _condition,
+                                  )
+                                  .label
+                            : null,
+                        items: _conditionOptions
+                            .map((option) => option.label)
+                            .toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _condition = _conditionOptions
+                                .firstWhere((option) => option.label == v)
+                                .value;
+                          });
+                        },
+                      ),
+                      if (!_loadingConditionOptions && _conditionOptions.isEmpty)
+                        TextButton(
+                          onPressed: () {
+                            setState(() => _loadingConditionOptions = true);
+                            _loadConditionOptions();
+                          },
+                          child: const Text('Retry loading conditions'),
+                        ),
+                      const SizedBox(height: 12),
+                      _DescriptionField(controller: _descriptionController),
+                      const SizedBox(height: 14),
+                      _PhotosSection(
+                        photos: _photos,
+                        onAdd: _addPhoto,
+                        onRemove: (i) => setState(() => _photos.removeAt(i)),
+                      ),
+                      const SizedBox(height: 14),
+                      _SurveyedByRow(officerName: _officerName),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1204,66 +1223,69 @@ class _BottomActions extends StatelessWidget {
           color: AppColors.background,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: busy ? null : onCancel,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.secondaryText,
-                  side: BorderSide(color: AppColors.border),
-                  minimumSize: const Size.fromHeight(46),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+        child: TabletConstrained(
+          maxWidth: Breakpoints.form,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onCancel,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.secondaryText,
+                    side: BorderSide(color: AppColors.border),
+                    minimumSize: const Size.fromHeight(46),
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: busy ? null : onSubmit,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: blocked ? null : AppGradients.cta,
-                      color: blocked ? AppColors.border : null,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      height: 46,
-                      alignment: Alignment.center,
-                      child: busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              '☁ Submit',
-                              style: GoogleFonts.poppins(
-                                color: blocked
-                                    ? AppColors.secondaryText
-                                    : Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: busy ? null : onSubmit,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: blocked ? null : AppGradients.cta,
+                        color: blocked ? AppColors.border : null,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Container(
+                        height: 46,
+                        alignment: Alignment.center,
+                        child: busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                '☁ Submit',
+                                style: GoogleFonts.poppins(
+                                  color: blocked
+                                      ? AppColors.secondaryText
+                                      : Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1307,4 +1329,22 @@ class _DashedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Phones: [first], a 12px gap, then [second] — exactly the original
+/// stacked layout. Tablets: the two short fields side by side.
+List<Widget> _pairOnTablet(BuildContext context, Widget first, Widget second) {
+  if (!context.isTablet) {
+    return [first, const SizedBox(height: 12), second];
+  }
+  return [
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: first),
+        const SizedBox(width: 12),
+        Expanded(child: second),
+      ],
+    ),
+  ];
 }
