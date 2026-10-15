@@ -7,6 +7,7 @@ use App\Models\AssetSurvey;
 use App\Models\AssetSurveyReview;
 use App\Models\AssetType;
 use App\Models\Panchayat;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -348,6 +349,30 @@ class AssetSurveyController extends Controller
         return $query;
     }
 
+    /**
+     * 'rejected' / 'returned' are terminal-looking states every reviewer in the
+     * jurisdiction can see, but the Rejected / Returned lists of a role must only
+     * hold what that role itself rejected or returned - not what Gram Sachiv did
+     * one stage below (or what BDPO did above). The audit trail already records
+     * the acting role, so the list is narrowed by it. Admin-panel overrides
+     * (admin / super admin) stay visible to every role, as before.
+     */
+    private function onlyActionsByOwnStage(\Illuminate\Database\Eloquent\Builder $query, User $user, string $reviewStatus): void
+    {
+        if (! in_array($reviewStatus, ['rejected', 'returned'], true)
+            || ! in_array($user->role, ['gram_sachiv', 'bdpo', 'ddpo', 'xen_pr', 'ceo_zp'], true)) {
+            return;
+        }
+
+        $query->whereExists(function ($exists) use ($user, $reviewStatus) {
+            $exists->select(DB::raw(1))
+                ->from('asset_survey_reviews')
+                ->whereColumn('asset_survey_reviews.survey_id', 'asset_surveys.id')
+                ->where('asset_survey_reviews.action', $reviewStatus)
+                ->whereIn('asset_survey_reviews.actor_role', [$user->role, 'admin', 'super_admin']);
+        });
+    }
+
     /** The search / condition / review-status filters of the Asset Surveys screen. */
     private function applyListFilters(\Illuminate\Database\Eloquent\Builder $query, Request $request): void
     {
@@ -455,6 +480,7 @@ class AssetSurveyController extends Controller
             $reviewStatus = strtolower((string) $request->query('review_status', ''));
             if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
                 $query->where('review_status', $reviewStatus);
+                $this->onlyActionsByOwnStage($query, $request->user(), $reviewStatus);
             }
 
             $surveys = $query->with(self::WITH)

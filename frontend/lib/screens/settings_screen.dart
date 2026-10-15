@@ -3,12 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../config/api_config.dart';
 import '../navigation/app_navigation.dart';
-import '../navigation/navigator_key.dart';
-import '../navigation/role_navigation.dart';
 import '../services/app_preferences.dart';
-import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../theme/theme_controller.dart';
 import '../utils/launch_url.dart';
 import '../widgets/common_widgets.dart';
 import 'change_password_screen.dart';
@@ -45,24 +41,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setEnglish(bool value) async {
     setState(() => _isEnglish = value);
     await AppPreferences.setIsEnglish(value);
-  }
-
-  /// Most screens read colors from a plain `AppColors.*` static getter
-  /// rather than `Theme.of(context)` (a ~22-screen retrofit, out of scope
-  /// here - see app_theme.dart), so a screen already built before this
-  /// toggle won't repaint on its own. Rebuilding the dashboard from scratch
-  /// - skipping the splash screen's 3s minimum display - guarantees every
-  /// visible screen re-reads the current color immediately, at the cost of
-  /// resetting back to the shell's Home tab instead of wherever the user
-  /// was mid-flow.
-  Future<void> _setDark(bool value) async {
-    await ThemeController.instance.setDark(value);
-    final session = await AuthService.getSession();
-    if (session == null || !mounted) return;
-    rootNavigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => dashboardForSession(session)),
-      (route) => false,
-    );
   }
 
   Future<void> _pickLanguage() async {
@@ -159,18 +137,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           value: _pushNotifications,
                           onChanged: (v) =>
                               setState(() => _pushNotifications = v),
-                        ),
-                        const _RowDivider(),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: ThemeController.instance,
-                          builder: (context, isDark, _) {
-                            return _ToggleRow(
-                              icon: Icons.dark_mode_rounded,
-                              title: _t('डार्क मोड', 'Dark mode'),
-                              value: isDark,
-                              onChanged: _setDark,
-                            );
-                          },
                         ),
                       ],
                     ),

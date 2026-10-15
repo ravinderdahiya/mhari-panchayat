@@ -17,17 +17,12 @@ import '../navigation/app_navigation.dart';
 import '../services/asset_api.dart';
 import '../services/complaint_api.dart';
 import '../services/location_api.dart';
-import '../services/route_tracker.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
 import '../widgets/complaint_widgets.dart';
 import '../widgets/flipping_logo.dart';
-import '../widgets/route_recorder.dart';
 import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
-import 'my_complaints_screen.dart';
-import 'notification_screen.dart';
-import 'report_issue_screen.dart';
 
 class ComplaintMapScreen extends StatefulWidget {
   const ComplaintMapScreen({
@@ -51,7 +46,6 @@ class ComplaintMapScreen extends StatefulWidget {
 
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   final _mapController = MapController();
-  final _sheetController = DraggableScrollableController();
 
   // Marker clustering: the camera is read at build time, so the map just asks
   // for a (throttled) rebuild whenever it moves or zooms.
@@ -119,7 +113,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   @override
   void initState() {
     super.initState();
-    RouteTracker.instance.addListener(_followRoute);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyLocation());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -132,7 +125,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     } else {
       _loading = false;
     }
-    _loadAssets();
+    // The complaints map shows complaints only; the asset layer belongs to the
+    // asset-survey maps (CPLO / reviewers, showComplaints: false).
+    if (!widget.showComplaints) _loadAssets();
   }
 
   Future<void> _loadComplaints() async {
@@ -186,28 +181,11 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     }
   }
 
-  /// Keeps the newest recorded point in view while a route is recording.
-  void _followRoute() {
-    final tracker = RouteTracker.instance;
-    if (!mounted || !tracker.isRecording || tracker.points.isEmpty) return;
-    try {
-      final zoom = _mapController.camera.zoom;
-      _mapController.move(
-        tracker.points.last.latLng,
-        zoom < _myLocationZoom ? _myLocationZoom : zoom,
-      );
-    } catch (_) {
-      // Map not built yet (e.g. tab just switched back) - next point retries.
-    }
-  }
-
   @override
   void dispose() {
-    RouteTracker.instance.removeListener(_followRoute);
     _searchDebounce?.cancel();
     _mapSub?.cancel();
     _clusterTimer?.cancel();
-    _sheetController.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     _mapController.dispose();
@@ -425,10 +403,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     };
   }
 
-  /// Quick Access + Recent Activities are citizen-only; staff Map tabs share
-  /// the rest of the dashboard layout (header, search, chips, map controls).
-  bool get _showQuickAccess => widget.showComplaints && !widget.staffQueue;
-
   @override
   Widget build(BuildContext context) => _buildCitizenHome(context);
 
@@ -439,13 +413,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text('$what will be available soon')));
-  }
-
-  Future<void> _openAndRefresh(Widget screen) async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => screen));
-    if (mounted) _loadComplaints();
   }
 
   // ------------------------------------------------------------------ search
@@ -598,91 +565,10 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     );
   }
 
-  /// Distance the map overlays keep from the bottom: just above the collapsed
-  /// handle when the Quick Access sheet exists.
-  double get _overlayBottom => _showQuickAccess ? 12 + _kHandleHeight : 12;
-
-  /// Quick Access + Recent Activities live in a bottom sheet that starts as just
-  /// a small handle (map fully visible); swipe up or tap the handle to open it.
-  Widget _buildQuickSheet(List<Complaint> recent) {
-    // Stable key: the Stack's other children appear/disappear (loading spinner,
-    // search results), and without it the sheet would be re-created while the
-    // old one still holds the controller.
-    return Positioned.fill(
-      key: const ValueKey('quick_access_sheet'),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final height = constraints.maxHeight;
-          final minFraction = _kHandleHeight / height;
-          final maxFraction = (_kPanelHeight / height).clamp(
-            minFraction + 0.1,
-            0.9,
-          );
-
-          return DraggableScrollableSheet(
-            controller: _sheetController,
-            initialChildSize: minFraction,
-            minChildSize: minFraction,
-            maxChildSize: maxFraction,
-            snap: true,
-            snapSizes: [minFraction, maxFraction],
-            builder: (context, scrollController) => Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(22),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.14),
-                    blurRadius: 14,
-                    offset: const Offset(0, -3),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: Column(
-                  children: [
-                    _SheetHandle(
-                      onTap: () => _toggleSheet(minFraction, maxFraction),
-                    ),
-                    _QuickAccessPanel(
-                      recent: recent,
-                      onRaise: () => _openAndRefresh(const ReportIssueScreen()),
-                      onTrack: () =>
-                          _openAndRefresh(const MyComplaintsScreen()),
-                      onAlerts: () =>
-                          _openAndRefresh(const NotificationScreen()),
-                      onPanchayat: () => _comingSoon('Panchayat details'),
-                      onViewComplaint: (c) =>
-                          push(context, ComplaintDetailsScreen(complaint: c)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _toggleSheet(double minFraction, double maxFraction) {
-    if (!_sheetController.isAttached) return;
-    final open = _sheetController.size > (minFraction + maxFraction) / 2;
-    _sheetController.animateTo(
-      open ? minFraction : maxFraction,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
-  }
+  /// Distance the map overlays keep from the bottom edge.
+  double get _overlayBottom => 12;
 
   Widget _buildCitizenHome(BuildContext context) {
-    final recent = ([
-      ..._complaints,
-    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt))).take(1).toList();
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -722,11 +608,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     onTap: _recenter,
                   ),
                 ),
-                Positioned(
-                  right: 12,
-                  bottom: _overlayBottom,
-                  child: const RouteRecorderControl(),
-                ),
                 if (widget.showComplaints)
                   Positioned(
                     left: 12,
@@ -759,7 +640,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     right: 12,
                     child: _SearchResults(hits: _hits, onTap: _openHit),
                   ),
-                if (_showQuickAccess) _buildQuickSheet(recent),
               ],
             ),
           ),
@@ -791,55 +671,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
         GisMapImageLayer(
           controller: _mapController,
           mapServerUrl: ApiConfig.gisPanchayatMapServerUrl,
-        ),
-        ListenableBuilder(
-          listenable: RouteTracker.instance,
-          builder: (context, _) {
-            final points = [
-              for (final p in RouteTracker.instance.points) p.latLng,
-            ];
-            if (points.length < 2) return const SizedBox.shrink();
-            return PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: points,
-                  strokeWidth: 5,
-                  color: const Color(0xFF1565C0),
-                  borderStrokeWidth: 2,
-                  borderColor: Colors.white,
-                ),
-              ],
-            );
-          },
-        ),
-        ListenableBuilder(
-          listenable: RouteTracker.instance,
-          builder: (context, _) {
-            final points = RouteTracker.instance.points;
-            if (points.isEmpty) return const SizedBox.shrink();
-            return MarkerLayer(
-              markers: [
-                Marker(
-                  point: points.first.latLng,
-                  width: 44,
-                  height: 52,
-                  alignment: Alignment.topCenter,
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Color(0xFF2E7D32),
-                    size: 44,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black38,
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
         ),
         MarkerLayer(
           markers: [
@@ -1039,9 +870,6 @@ class _ClusterBubble extends StatelessWidget {
 
 const _kGreen = Color(0xFF1B6B43);
 
-/// Height of the collapsed Quick Access sheet (the handle) and of the open panel.
-const _kHandleHeight = 30.0;
-const _kPanelHeight = 330.0;
 const _kOrange = Color(0xFFF58220);
 
 TextStyle _pop(
@@ -1445,334 +1273,4 @@ class _IssueStatusCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SheetHandle extends StatelessWidget {
-  const _SheetHandle({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        height: _kHandleHeight,
-        width: double.infinity,
-        child: Center(
-          child: Container(
-            width: 42,
-            height: 5,
-            decoration: BoxDecoration(
-              color: const Color(0xFFCFD4CC),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickAccessPanel extends StatelessWidget {
-  const _QuickAccessPanel({
-    required this.recent,
-    required this.onRaise,
-    required this.onTrack,
-    required this.onAlerts,
-    required this.onPanchayat,
-    required this.onViewComplaint,
-  });
-
-  final List<Complaint> recent;
-  final VoidCallback onRaise;
-  final VoidCallback onTrack;
-  final VoidCallback onAlerts;
-  final VoidCallback onPanchayat;
-  final ValueChanged<Complaint> onViewComplaint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.screen,
-        2,
-        AppSpacing.screen,
-        16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionRow(title: 'Quick Access', onViewAll: onTrack),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _AccessTile(
-                  icon: Icons.note_add_rounded,
-                  label: 'Raise\nComplaint',
-                  color: const Color(0xFFE53935),
-                  background: const Color(0xFFFCE9E8),
-                  onTap: onRaise,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AccessTile(
-                  icon: Icons.manage_search_rounded,
-                  label: 'Track\nStatus',
-                  color: _kGreen,
-                  background: const Color(0xFFE6F3EA),
-                  onTap: onTrack,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AccessTile(
-                  icon: Icons.notifications_rounded,
-                  label: 'View\nAlerts',
-                  color: _kOrange,
-                  background: const Color(0xFFFDEEDD),
-                  onTap: onAlerts,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AccessTile(
-                  icon: Icons.groups_rounded,
-                  label: 'Panchayat\nDetails',
-                  color: const Color(0xFF7C4DDB),
-                  background: const Color(0xFFEEE7FA),
-                  onTap: onPanchayat,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _SectionRow(title: 'Recent Activities', onViewAll: onTrack),
-          const SizedBox(height: 6),
-          if (recent.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'No complaints raised yet',
-                style: _pop(
-                  12,
-                  weight: FontWeight.w400,
-                  color: AppColors.mutedText,
-                ),
-              ),
-            )
-          else
-            for (final complaint in recent)
-              _RecentTile(
-                complaint: complaint,
-                onTap: () => onViewComplaint(complaint),
-              ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionRow extends StatelessWidget {
-  const _SectionRow({required this.title, required this.onViewAll});
-
-  final String title;
-  final VoidCallback onViewAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(title, style: _pop(15, weight: FontWeight.w700)),
-        ),
-        InkWell(
-          onTap: onViewAll,
-          child: Row(
-            children: [
-              Text('View All', style: _pop(12, weight: FontWeight.w500)),
-              const Icon(Icons.chevron_right_rounded, size: 18),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AccessTile extends StatelessWidget {
-  const _AccessTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.background,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color background;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 26),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: _pop(
-                  10.5,
-                  weight: FontWeight.w500,
-                ).copyWith(height: 1.2),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecentTile extends StatelessWidget {
-  const _RecentTile({required this.complaint, required this.onTap});
-
-  final Complaint complaint;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = complaint.photoUrls.isNotEmpty
-        ? complaint.photoUrls.first
-        : null;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 46,
-                height: 46,
-                child: photo == null
-                    ? const _ThumbFallback()
-                    : Image.network(
-                        photo,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const _ThumbFallback(),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    complaint.displaySubject,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: _pop(13.5, weight: FontWeight.w700),
-                  ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 13,
-                        color: AppColors.mutedText,
-                      ),
-                      const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          complaint.locationLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: _pop(
-                            11,
-                            weight: FontWeight.w400,
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusBackgroundColor(complaint.status),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    statusLabel(complaint.status),
-                    style: _pop(
-                      10.5,
-                      weight: FontWeight.w600,
-                      color: statusTextColor(complaint.status),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  complaint.dateLabel,
-                  style: _pop(
-                    10.5,
-                    weight: FontWeight.w400,
-                    color: AppColors.mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ThumbFallback extends StatelessWidget {
-  const _ThumbFallback();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    color: const Color(0xFFE9ECE7),
-    child: Icon(
-      Icons.report_problem_rounded,
-      color: AppColors.mutedText,
-      size: 24,
-    ),
-  );
 }

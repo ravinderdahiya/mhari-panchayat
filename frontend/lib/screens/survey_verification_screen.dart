@@ -93,7 +93,7 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
           GradientHeader(
             title: isGramSachiv ? 'Survey Verification' : '$roleLabel Verification',
             subtitle: isGramSachiv
-                ? 'CPLO सर्वे सत्यापित करें · अपनी पंचायत'
+                ? 'Survey Verification by Gram Sachiv'
                 : roleSubtitle,
           ),
           Expanded(
