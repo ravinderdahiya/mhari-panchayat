@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\CitizenController;
 use App\Http\Controllers\Api\ElectedRepresentativeController;
 use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\GisController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MasterDataController;
@@ -122,6 +123,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reports/complaints', [ReportController::class, 'complaints']);
         Route::get('/reports/complaints/export', [ReportController::class, 'complaintsExport'])->middleware('throttle:20,1');
         Route::get('/reports/asset-surveys', [ReportController::class, 'assetSurveys']);
+        Route::get('/reports/asset-surveys/stats/export', [ReportController::class, 'assetStatsExport'])->middleware('throttle:20,1');
         Route::get('/admin/polygons', [AdminSurveyPolygonController::class, 'index']);
         Route::get('/admin/polygons/{uuid}', [AdminSurveyPolygonController::class, 'show'])->whereUuid('uuid');
         Route::get('/roles/permissions', [RolePermissionController::class, 'index']);
@@ -147,7 +149,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // In-app notifications (citizen + staff inbox)
     Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+    Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
+    Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
 
     // App feedback (mobile app staff) - anyone authenticated can submit,
     // only permission:feedback.view holders can read the list.

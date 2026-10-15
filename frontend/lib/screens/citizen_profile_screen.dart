@@ -122,13 +122,6 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                 onTap: () => push(context, const NotificationScreen()),
                               ),
                               _NavEntry(
-                                icon: Icons.translate_rounded,
-                                color: const Color(0xFF3B82F6),
-                                title: 'Language',
-                                subtitle: 'English / हिंदी',
-                                onTap: () => push(context, const SettingsScreen()),
-                              ),
-                              _NavEntry(
                                 icon: Icons.settings_rounded,
                                 color: const Color(0xFF8B5CF6),
                                 title: 'Settings',

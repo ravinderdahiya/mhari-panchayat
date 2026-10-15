@@ -24,6 +24,24 @@ class NotificationController extends Controller
         ]);
     }
 
+    public function unreadCount(Request $request)
+    {
+        return response()->json([
+            'success' => true,
+            'count' => UserNotification::query()->where('user_id', $request->user()->id)->where('is_read', false)->count(),
+        ]);
+    }
+
+    public function markAllRead(Request $request)
+    {
+        $updated = UserNotification::query()
+            ->where('user_id', $request->user()->id)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+
+        return response()->json(['success' => true, 'message' => 'All notifications marked as read', 'updated' => $updated]);
+    }
+
     public function markRead(Request $request, int $id)
     {
         $notification = UserNotification::query()

@@ -432,6 +432,7 @@ export interface AssetSurveyFilters {
   condition?: string;
   reviewStatus?: import('../types').AssetSurveyReviewStatus;
   districtId?: string;
+  assetTypeIds?: string[]; // none = every asset type
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;   // YYYY-MM-DD
   role?: string;     // role of the submitting surveyor
@@ -442,6 +443,7 @@ function assetSurveyFilterParams(options: AssetSurveyFilters, params = new URLSe
   if (options.condition && options.condition !== 'ALL') params.set('condition', options.condition);
   if (options.reviewStatus) params.set('review_status', options.reviewStatus);
   if (options.districtId) params.set('district_id', options.districtId);
+  if (options.assetTypeIds?.length) params.set('asset_type_ids', options.assetTypeIds.join(','));
   if (options.dateFrom) params.set('date_from', options.dateFrom);
   if (options.dateTo) params.set('date_to', options.dateTo);
   if (options.role) params.set('role', options.role);
@@ -475,9 +477,18 @@ export interface AssetSurveyReport {
     submitted: number; in_review: number; returned: number; approved: number; rejected: number; approval_rate: number;
   };
   by_review_status: ReportCount[]; by_condition: ReportCount[]; by_department: ReportCount[]; by_asset_type: ReportCount[]; by_district: ReportCount[];
+  // Every enlisted asset (asset type) with its department and survey counts.
+  asset_stats: { rows: AssetStatRow[]; totals: { total: number; good: number; fair: number; poor: number; damaged: number } };
+  // All active asset types and the departments they are enlisted under (feeds the filter).
+  asset_types: { id: number; name: string; departments: { id: number; name: string }[] }[];
   top_surveyors: { id: number; name: string; role: string; count: number; approved: number; rejected_or_returned: number }[];
   trend: (TrendPoint & { surveys?: number })[];
   range: ReportRange;
+}
+
+export interface AssetStatRow {
+  department_id: number | null; department: string; department_active: boolean; asset_type_id: number | null; asset_type: string;
+  total: number; good: number; fair: number; poor: number; damaged: number;
 }
 
 export interface ComplaintReportFilters { dateFrom?: string; dateTo?: string; districtId?: string; status?: string }
@@ -496,6 +507,31 @@ export const getComplaintReport = async (options: ComplaintReportFilters = {}) =
 
 export const getAssetSurveyReport = async (options: AssetSurveyFilters = {}) =>
   (await request<{ success: boolean; data: AssetSurveyReport }>(`/api/reports/asset-surveys?${assetSurveyFilterParams(options)}`)).data;
+
+// Excel of the per-asset statistics (department, asset type, counts) for the current filters.
+export const downloadAssetStatsExcel = async (options: AssetSurveyFilters = {}) => {
+  const token = getToken();
+  const res = await fetch(`${API_BASE_URL}/api/reports/asset-surveys/stats/export?${assetSurveyFilterParams(options)}`, {
+    headers: {
+      Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Export failed (${res.status})`);
+  }
+  const filename = /filename="?([^";]+)"?/i.exec(res.headers.get('Content-Disposition') ?? '')?.[1]
+    ?? `asset-statistics-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+};
 
 // Same fetch-with-auth-header download trick as downloadAssetSurveysExcel.
 export const downloadComplaintsExcel = async (options: ComplaintReportFilters = {}) => {

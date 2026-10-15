@@ -135,13 +135,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () => push(context, const NotificationScreen()),
           ),
           _NavItemData(
-            icon: Icons.translate_rounded,
-            color: const Color(0xFF3B6FD4),
-            title: 'Language',
-            subtitle: 'English / हिंदी',
-            onTap: () => push(context, const SettingsScreen()),
-          ),
-          _NavItemData(
             icon: Icons.settings_rounded,
             color: const Color(0xFF7C4DDB),
             title: 'Settings',

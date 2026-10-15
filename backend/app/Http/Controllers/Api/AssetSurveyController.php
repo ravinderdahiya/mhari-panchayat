@@ -7,6 +7,7 @@ use App\Models\AssetSurvey;
 use App\Models\AssetSurveyReview;
 use App\Models\AssetType;
 use App\Models\Panchayat;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -348,6 +349,30 @@ class AssetSurveyController extends Controller
         return $query;
     }
 
+    /**
+     * 'rejected' / 'returned' are terminal-looking states every reviewer in the
+     * jurisdiction can see, but the Rejected / Returned lists of a role must only
+     * hold what that role itself rejected or returned - not what Gram Sachiv did
+     * one stage below (or what BDPO did above). The audit trail already records
+     * the acting role, so the list is narrowed by it. Admin-panel overrides
+     * (admin / super admin) stay visible to every role, as before.
+     */
+    private function onlyActionsByOwnStage(\Illuminate\Database\Eloquent\Builder $query, User $user, string $reviewStatus): void
+    {
+        if (! in_array($reviewStatus, ['rejected', 'returned'], true)
+            || ! in_array($user->role, ['gram_sachiv', 'bdpo', 'ddpo', 'xen_pr', 'ceo_zp'], true)) {
+            return;
+        }
+
+        $query->whereExists(function ($exists) use ($user, $reviewStatus) {
+            $exists->select(DB::raw(1))
+                ->from('asset_survey_reviews')
+                ->whereColumn('asset_survey_reviews.survey_id', 'asset_surveys.id')
+                ->where('asset_survey_reviews.action', $reviewStatus)
+                ->whereIn('asset_survey_reviews.actor_role', [$user->role, 'admin', 'super_admin']);
+        });
+    }
+
     /** The search / condition / review-status filters of the Asset Surveys screen. */
     private function applyListFilters(\Illuminate\Database\Eloquent\Builder $query, Request $request): void
     {
@@ -368,6 +393,12 @@ class AssetSurveyController extends Controller
                     ->orWhereHas('department', fn ($department) => $department->where('name', 'ilike', $like))
                     ->orWhereHas('assetType', fn ($assetType) => $assetType->where('name', 'ilike', $like));
             });
+        }
+
+        // Several asset types at once: ?asset_type_ids=3,7,12 (used by the report's Excel export).
+        $typeIds = array_filter(array_map('intval', array_filter(explode(',', (string) $request->query('asset_type_ids', '')), 'ctype_digit')));
+        if ($typeIds) {
+            $query->whereIn('asset_type_id', array_slice(array_values(array_unique($typeIds)), 0, 300));
         }
 
         $condition = strtoupper((string) $request->query('condition', ''));
@@ -449,6 +480,7 @@ class AssetSurveyController extends Controller
             $reviewStatus = strtolower((string) $request->query('review_status', ''));
             if (in_array($reviewStatus, self::REVIEW_STATUSES, true)) {
                 $query->where('review_status', $reviewStatus);
+                $this->onlyActionsByOwnStage($query, $request->user(), $reviewStatus);
             }
 
             $surveys = $query->with(self::WITH)
@@ -615,8 +647,11 @@ class AssetSurveyController extends Controller
         // A correction the surveyor makes on a returned survey resubmits it
         // to the front of the chain rather than leaving it stuck as
         // 'returned' forever.
+        // The old remark is dropped with it (it stays in the review history),
+        // otherwise reviewers keep seeing it on a survey that is no longer returned.
         if ($survey->review_status === 'returned') {
             $updates['review_status'] = 'pending';
+            $updates['rejection_reason'] = null;
         }
 
         $survey->update($updates);
@@ -918,5 +953,12 @@ class AssetSurveyController extends Controller
             'action' => $pastTense,
             'remarks' => $reason,
         ]);
+
+        // Tell the next reviewers / the surveyor. A notification failure must never undo the review.
+        try {
+            app(\App\Services\NotificationService::class)->surveyTransitioned($survey->fresh(), $action, $user, $reason);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

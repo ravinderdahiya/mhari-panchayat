@@ -222,40 +222,6 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
             ('Survey Date', _formatDate(asset.surveyDate)),
           ],
         ),
-        const SizedBox(height: AppSpacing.gap),
-        Row(
-          children: [
-            Expanded(
-              child: StatCard(
-                label: 'Total',
-                value: asset.totalComplaints.toString(),
-                icon: Icons.report_rounded,
-                color: AppColors.primary,
-                backgroundColor: AppColors.orangeTint,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: StatCard(
-                label: 'Resolved',
-                value: asset.resolvedCount.toString(),
-                icon: Icons.check_circle_rounded,
-                color: AppColors.resolvedText,
-                backgroundColor: AppColors.greenTint,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: StatCard(
-                label: 'Pending',
-                value: asset.pendingCount.toString(),
-                icon: Icons.hourglass_empty_rounded,
-                color: AppColors.pendingText,
-                backgroundColor: AppColors.orangeTint,
-              ),
-            ),
-          ],
-        ),
         if (asset.description != null && asset.description!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.screen),
           Text(

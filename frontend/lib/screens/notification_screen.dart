@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/app_notification.dart';
+import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
 import '../services/notification_api.dart';
+import '../services/notification_center.dart';
+import '../services/survey_review_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
 import '../navigation/app_navigation.dart';
 import '../widgets/common_widgets.dart';
+import 'asset_details_screen.dart';
 import 'complaint_details_screen.dart';
+import 'survey_review_detail_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key, this.showBackButton = true});
@@ -42,6 +47,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _notifications = notifications;
         _loading = false;
       });
+      NotificationCenter.instance.setUnread(
+        notifications.where((n) => !n.isRead).length,
+      );
     } on NotificationApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -70,8 +78,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
       } catch (_) {
         // Keep UI optimistic; next refresh will sync.
       }
+      NotificationCenter.instance.setUnread(
+        _notifications.where((n) => !n.isRead).length,
+      );
     }
 
+    if (item.assetSurveyId.isNotEmpty) {
+      await _openSurvey(item);
+      return;
+    }
     if (item.complaintId.isEmpty || !mounted) return;
 
     try {
@@ -91,8 +106,54 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
+  /// Reviewers land on the review screen (with the actions for their stage);
+  /// everyone else (the surveyor being told about a return / rejection / approval)
+  /// sees the asset's details.
+  Future<void> _openSurvey(AppNotification item) async {
+    final session = await AuthService.getSession();
+    final role = (session?.serverRole ?? '').trim().toLowerCase();
+    const reviewers = {'gram_sachiv', 'bdpo', 'ddpo', 'xen_pr', 'ceo_zp'};
+
+    try {
+      if (reviewers.contains(role)) {
+        final survey = await SurveyReviewApi.getById(item.assetSurveyId);
+        if (!mounted) return;
+        push(context, SurveyReviewDetailScreen(survey: survey));
+      } else {
+        if (!mounted) return;
+        push(context, AssetDetailsScreen(assetId: item.assetSurveyId));
+      }
+    } on SurveyReviewApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Survey खोल नहीं पाए।')),
+      );
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    final before = _notifications;
+    setState(() {
+      _notifications = [for (final n in _notifications) n.copyWith(isRead: true)];
+    });
+    NotificationCenter.instance.setUnread(0);
+    try {
+      await NotificationApi.markAllRead();
+    } on NotificationApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _notifications = before);
+      NotificationCenter.instance.setUnread(before.where((n) => !n.isRead).length);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasUnread = _notifications.any((n) => !n.isRead);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -102,7 +163,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
             onBack: widget.showBackButton
                 ? () => Navigator.of(context).maybePop()
                 : null,
-            actions: defaultHeaderActions(context),
+            actions: [
+              if (hasUnread)
+                IconButton(
+                  icon: const Icon(Icons.done_all_rounded),
+                  tooltip: 'Mark all as read',
+                  onPressed: _markAllRead,
+                ),
+              ...defaultHeaderActions(context),
+            ],
           ),
           Expanded(
             child: Transform.translate(
@@ -240,6 +309,30 @@ class _NotifRow extends StatelessWidget {
           bg: AppColors.rejectedBg,
           fg: AppColors.rejectedText,
           icon: Icons.cancel_rounded,
+        );
+      case NotificationKind.surveyReview:
+        return (
+          bg: AppColors.blueTint,
+          fg: AppColors.inProgressText,
+          icon: Icons.fact_check_rounded,
+        );
+      case NotificationKind.surveyReturned:
+        return (
+          bg: AppColors.orangeTint,
+          fg: AppColors.pendingText,
+          icon: Icons.undo_rounded,
+        );
+      case NotificationKind.surveyRejected:
+        return (
+          bg: AppColors.rejectedBg,
+          fg: AppColors.rejectedText,
+          icon: Icons.cancel_rounded,
+        );
+      case NotificationKind.surveyApproved:
+        return (
+          bg: AppColors.greenTint,
+          fg: AppColors.resolvedText,
+          icon: Icons.verified_rounded,
         );
     }
   }
