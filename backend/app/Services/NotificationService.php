@@ -35,16 +35,26 @@ class NotificationService
         string $message,
         ?int $complaintId = null,
         ?int $assetSurveyId = null,
-    ): UserNotification {
-        $notification = UserNotification::create([
-            'user_id' => $userId,
-            'complaint_id' => $complaintId,
-            'asset_survey_id' => $assetSurveyId,
-            'type' => $type,
-            'title' => $title,
-            'message' => $message,
-            'is_read' => false,
-        ]);
+    ): ?UserNotification {
+        // A notification is a side effect of the real action (filing, assigning,
+        // resolving ...) which has already been saved by the time this runs, so a
+        // failure here (e.g. a migration not yet applied on a server) must be
+        // logged, never turned into an "Internal server error" for the user.
+        try {
+            $notification = UserNotification::create([
+                'user_id' => $userId,
+                'complaint_id' => $complaintId,
+                'asset_survey_id' => $assetSurveyId,
+                'type' => $type,
+                'title' => $title,
+                'message' => $message,
+                'is_read' => false,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
 
         // Push is best-effort: the inbox row above is the source of truth.
         try {
