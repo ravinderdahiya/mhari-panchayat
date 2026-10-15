@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/registration_api.dart';
+import '../utils/responsive.dart';
 
 /// Basmati-style set-password screen after email verification deep link.
 class SetPasswordScreen extends StatefulWidget {
@@ -136,7 +137,8 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
         backgroundColor: _header,
         foregroundColor: Colors.white,
       ),
-      body: ListView(
+      body: _formList(
+        context,
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
           Container(
@@ -336,4 +338,37 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
       ),
     );
   }
+}
+
+/// Phones: exactly the original `ListView(padding, children)`. Tablets: the
+/// (short) form at ~560 wide, optically centred in the available height.
+Widget _formList(
+  BuildContext context, {
+  required EdgeInsetsGeometry padding,
+  required List<Widget> children,
+}) {
+  if (!context.isTablet) {
+    return ListView(padding: padding, children: children);
+  }
+  return LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: constraints.maxHeight > 64 ? constraints.maxHeight - 64 : 0.0,
+        ),
+        child: Align(
+          alignment: const Alignment(0, -0.3),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'complaint_map_screen.dart';
 import 'profile_screen.dart';
 import 'survey_verification_screen.dart';
+import '../widgets/adaptive_nav_scaffold.dart';
 
 /// Shared shell for the four upper stages of the asset-survey verification
 /// escalation chain - BDPO, DDPO, XEN-PR, CEO-ZP. Each sees the same
@@ -28,7 +29,7 @@ class _VerifierShellState extends State<VerifierShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AdaptiveNavScaffold(
       body: IndexedStack(
         index: _index,
         children: [
@@ -37,27 +38,25 @@ class _VerifierShellState extends State<VerifierShell> {
           _index == 2 ? const ProfileScreen() : const SizedBox.shrink(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.fact_check_outlined, size: 24),
-            selectedIcon: Icon(Icons.fact_check_rounded, size: 24),
-            label: 'Verify',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined, size: 24),
-            selectedIcon: Icon(Icons.map_rounded, size: 24),
-            label: 'Map',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline, size: 24),
-            selectedIcon: Icon(Icons.person_rounded, size: 24),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      selectedIndex: _index,
+      onDestinationSelected: (value) => setState(() => _index = value),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.fact_check_outlined, size: 24),
+          selectedIcon: Icon(Icons.fact_check_rounded, size: 24),
+          label: 'Verify',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.map_outlined, size: 24),
+          selectedIcon: Icon(Icons.map_rounded, size: 24),
+          label: 'Map',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline, size: 24),
+          selectedIcon: Icon(Icons.person_rounded, size: 24),
+          label: 'Profile',
+        ),
+      ],
     );
   }
 }

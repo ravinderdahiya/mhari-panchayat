@@ -14,16 +14,20 @@ class ApiConfig {
   // static const String localBaseUrl = 'http://192.168.137.1:8083';
 
   /// Phone + PC same Wi‑Fi. Change this IP if your LAN address changes.
-  static const String localBaseUrl = 'http://172.16.1.88:8083';
+  static const String localBaseUrl = 'http://172.16.1.174:8083';
 
 
   static const String liveBaseUrl = 'https://hsac.in/mhari-panchayat';
 
-  /// Debug/profile → local backend. Release → live.
+  /// true → debug/profile builds also hit the live backend.
+  /// Set to false to test against the local Laravel server (localBaseUrl).
+  static const bool useLiveBackend = true;
+
+  /// Release → always live. Debug/profile → live unless useLiveBackend is off.
   /// Pass `--dart-define=API_BASE_URL=...` to override either way.
   static String get baseUrl {
     if (_fromEnvironment.isNotEmpty) return _fromEnvironment;
-    if (kReleaseMode) return liveBaseUrl;
+    if (kReleaseMode || useLiveBackend) return liveBaseUrl;
     return localBaseUrl;
   }
 

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/auth_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 
 /// Staff (Department login) "forgot password" - two steps: identifier ->
@@ -238,7 +239,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: ListView(
+                child: context.isTablet
+                    ? _buildTabletBody()
+                    : ListView(
                   padding: const EdgeInsets.all(AppSpacing.screen),
                   children: [
                     Card(
@@ -256,6 +259,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Tablet-only: the short form card at ~560 wide, optically centred in
+  /// the space below the header instead of hugging the top.
+  Widget _buildTabletBody() {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: constraints.maxHeight > 64 ? constraints.maxHeight - 64 : 0.0,
+          ),
+          child: Align(
+            alignment: const Alignment(0, -0.3),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: _otpSent ? _buildResetStep() : _buildIdentifierStep(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

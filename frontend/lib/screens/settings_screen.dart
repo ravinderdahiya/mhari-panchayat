@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../utils/launch_url.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import 'change_password_screen.dart';
 import 'feedback_screen.dart';
@@ -138,7 +139,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: ListView(
+                child: _settingsList(
+                  context,
                   padding: const EdgeInsets.symmetric(
                     vertical: AppSpacing.screen,
                   ),
@@ -232,6 +234,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+/// Phones: exactly the original `ListView(padding, children)`. Tablets: the
+/// settings groups centred at form width (side margins still scroll).
+Widget _settingsList(
+  BuildContext context, {
+  required EdgeInsets padding,
+  required List<Widget> children,
+}) {
+  if (!context.isTablet) {
+    return ListView(padding: padding, children: children);
+  }
+  return LayoutBuilder(
+    builder: (context, constraints) => ListView(
+      padding: EdgeInsets.symmetric(
+        horizontal: centeredGutter(constraints.maxWidth, Breakpoints.form, min: 16),
+        vertical: 32,
+      ),
+      children: children,
+    ),
+  );
 }
 
 class _LanguageOption extends StatelessWidget {

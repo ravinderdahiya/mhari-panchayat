@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/auth_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 
 /// Self-service password change for any logged-in staff account (CPLO and
@@ -124,7 +125,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: ListView(
+                child: _formList(
+                  context,
                   padding: const EdgeInsets.all(AppSpacing.screen),
                   children: [
                     Card(
@@ -221,4 +223,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ),
     );
   }
+}
+
+/// Phones: exactly the original `ListView(padding, children)`. Tablets: the
+/// (short) form at ~560 wide, optically centred in the available height.
+Widget _formList(
+  BuildContext context, {
+  required EdgeInsetsGeometry padding,
+  required List<Widget> children,
+}) {
+  if (!context.isTablet) {
+    return ListView(padding: padding, children: children);
+  }
+  return LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: constraints.maxHeight > 64 ? constraints.maxHeight - 64 : 0.0,
+        ),
+        child: Align(
+          alignment: const Alignment(0, -0.3),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

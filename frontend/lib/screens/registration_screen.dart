@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/registration_api.dart';
+import '../utils/responsive.dart';
 
 enum RegRole { surveyor, officer }
 
@@ -380,27 +381,41 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           children: [
             _Header(onBack: () => Navigator.of(context).pop()),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_error != null)
-                      _MessageBanner(text: _error!, isError: true),
-                    if (_info != null && _error == null)
-                      _MessageBanner(text: _info!, isError: false),
-                    if (_error != null || _info != null)
-                      const SizedBox(height: 16),
-                    ..._buildFormBody(),
-                  ],
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  padding: context.isTablet
+                      ? EdgeInsets.symmetric(
+                          horizontal: centeredGutter(
+                            constraints.maxWidth,
+                            Breakpoints.form,
+                            min: 32,
+                          ),
+                          vertical: 28,
+                        )
+                      : const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_error != null)
+                        _MessageBanner(text: _error!, isError: true),
+                      if (_info != null && _error == null)
+                        _MessageBanner(text: _info!, isError: false),
+                      if (_error != null || _info != null)
+                        const SizedBox(height: 16),
+                      ..._buildFormBody(),
+                    ],
+                  ),
                 ),
               ),
             ),
             _Footer(
-              child: _PrimaryButton(
-                label: 'Sign up',
-                loading: _busy == 'signup',
-                onPressed: _canSignUp && _busy == null ? _signUp : null,
+              child: TabletConstrained(
+                maxWidth: Breakpoints.form,
+                child: _PrimaryButton(
+                  label: 'Sign up',
+                  loading: _busy == 'signup',
+                  onPressed: _canSignUp && _busy == null ? _signUp : null,
+                ),
               ),
             ),
           ],
@@ -511,123 +526,197 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
       ],
-      if (_phoneVerified) ...[
+      if (_phoneVerified && context.isTablet) ..._buildVerifiedFieldsTablet(),
+      if (_phoneVerified && !context.isTablet) ...[
         const SizedBox(height: 20),
-        _label('Email', required: true),
-        const SizedBox(height: 6),
-        _plainField(
-          _emailController,
-          'email id',
-          Icons.mail_outline_rounded,
-          key: const ValueKey('reg-email'),
-          focusNode: _emailFocus,
-          keyboardType: TextInputType.emailAddress,
-          onNext: () {
-            if (_role == RegRole.officer) {
-              _employeeIdFocus.requestFocus();
-            } else {
-              _emailFocus.unfocus();
-            }
-          },
-        ),
+        ..._emailField(),
         if (_role == RegRole.surveyor) ...[
           const SizedBox(height: 16),
-          _dropdown<int>(
-            label: 'Department',
-            icon: Icons.account_balance_outlined,
-            value: _selectedDepartmentId,
-            items: _departments
-                .map((d) => (value: d.id, label: d.name))
-                .toList(),
-            hint: _loadingDepartments
-                ? 'Loading departments…'
-                : _departments.isEmpty
-                ? 'टैप करके फिर कोशिश करें'
-                : 'Select department',
-            onChanged: (value) =>
-                setState(() => _selectedDepartmentId = value),
-            onRetry: (!_loadingDepartments && _departments.isEmpty)
-                ? _loadDepartments
-                : null,
-          ),
+          _departmentDropdown(),
         ],
         const SizedBox(height: 16),
-        _dropdown<int>(
-          label: 'District',
-          icon: Icons.place_outlined,
-          value: _selectedDistrictId,
-          items: _districts.map((d) => (value: d.id, label: d.name)).toList(),
-          hint: _districts.isEmpty ? 'Loading districts…' : 'Select district',
-          onChanged: _onDistrictChanged,
-        ),
+        _districtDropdown(),
         const SizedBox(height: 16),
-        _dropdown<int>(
-          label: 'Block',
-          icon: Icons.map_outlined,
-          value: _selectedBlockId,
-          items: _blocks.map((b) => (value: b.id, label: b.name)).toList(),
-          hint: _selectedDistrictId == null
-              ? 'Select district first'
-              : (_loadingBlocks ? 'Loading blocks…' : 'Select block'),
-          onChanged: _selectedDistrictId == null ? null : _onBlockChanged,
-        ),
+        _blockDropdown(),
         const SizedBox(height: 16),
-        _dropdown<int>(
-          label: 'Panchayat',
-          icon: Icons.holiday_village_outlined,
-          value: _selectedPanchayatId,
-          items: _panchayats
-              .map((p) => (value: p.id, label: p.name))
-              .toList(),
-          hint: _selectedBlockId == null
-              ? 'Select block first'
-              : (_loadingPanchayats
-                    ? 'Loading panchayats…'
-                    : 'Select panchayat'),
-          onChanged: _selectedBlockId == null
-              ? null
-              : (value) => setState(() => _selectedPanchayatId = value),
-        ),
+        _panchayatDropdown(),
         if (_role == RegRole.officer) ...[
           const SizedBox(height: 16),
-          _label('Employee ID', required: true),
-          const SizedBox(height: 6),
-          _plainField(
-            _employeeIdController,
-            'employee ID',
-            Icons.badge_outlined,
-            key: const ValueKey('reg-employee-id'),
-            focusNode: _employeeIdFocus,
-            textInputAction: TextInputAction.done,
-            onNext: () => _employeeIdFocus.unfocus(),
-          ),
+          ..._employeeIdField(),
         ],
         if (_role == RegRole.surveyor) ...[
           const SizedBox(height: 16),
-          _label('Family ID', required: true),
-          const SizedBox(height: 6),
-          _plainField(
-            _familyIdController,
-            'Parivar Pehchan Patra family ID',
-            Icons.family_restroom_outlined,
-            key: const ValueKey('reg-family-id'),
-            focusNode: _familyIdFocus,
-            textInputAction: TextInputAction.done,
-            onNext: () => _familyIdFocus.unfocus(),
-          ),
+          ..._familyIdField(),
         ],
         const SizedBox(height: 12),
-        Text(
-          'After Sign up, open the verification email on this phone and tap '
-          '“Verify email & open app” to set your password.',
-          style: GoogleFonts.poppins(
-            fontSize: 12.5,
-            color: _RegColors.muted,
-            height: 1.4,
-          ),
-        ),
+        _afterSignUpNote(),
       ],
     ];
+  }
+
+  /// Tablet-only: the post-verification fields with short related pairs
+  /// (department/email, district/block, panchayat/ID) side by side.
+  List<Widget> _buildVerifiedFieldsTablet() {
+    Widget stack(List<Widget> children) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+    Widget pair(Widget a, Widget b) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: a),
+        const SizedBox(width: 16),
+        Expanded(child: b),
+      ],
+    );
+    return [
+      const SizedBox(height: 20),
+      if (_role == RegRole.surveyor)
+        pair(stack(_emailField()), _departmentDropdown())
+      else
+        ..._emailField(),
+      const SizedBox(height: 16),
+      pair(_districtDropdown(), _blockDropdown()),
+      const SizedBox(height: 16),
+      pair(
+        _panchayatDropdown(),
+        stack(
+          _role == RegRole.officer ? _employeeIdField() : _familyIdField(),
+        ),
+      ),
+      const SizedBox(height: 12),
+      _afterSignUpNote(),
+    ];
+  }
+
+  List<Widget> _emailField() {
+    return [
+      _label('Email', required: true),
+      const SizedBox(height: 6),
+      _plainField(
+        _emailController,
+        'email id',
+        Icons.mail_outline_rounded,
+        key: const ValueKey('reg-email'),
+        focusNode: _emailFocus,
+        keyboardType: TextInputType.emailAddress,
+        onNext: () {
+          if (_role == RegRole.officer) {
+            _employeeIdFocus.requestFocus();
+          } else {
+            _emailFocus.unfocus();
+          }
+        },
+      ),
+    ];
+  }
+
+  Widget _departmentDropdown() {
+    return _dropdown<int>(
+      label: 'Department',
+      icon: Icons.account_balance_outlined,
+      value: _selectedDepartmentId,
+      items: _departments
+          .map((d) => (value: d.id, label: d.name))
+          .toList(),
+      hint: _loadingDepartments
+          ? 'Loading departments…'
+          : _departments.isEmpty
+          ? 'टैप करके फिर कोशिश करें'
+          : 'Select department',
+      onChanged: (value) =>
+          setState(() => _selectedDepartmentId = value),
+      onRetry: (!_loadingDepartments && _departments.isEmpty)
+          ? _loadDepartments
+          : null,
+    );
+  }
+
+  Widget _districtDropdown() {
+    return _dropdown<int>(
+      label: 'District',
+      icon: Icons.place_outlined,
+      value: _selectedDistrictId,
+      items: _districts.map((d) => (value: d.id, label: d.name)).toList(),
+      hint: _districts.isEmpty ? 'Loading districts…' : 'Select district',
+      onChanged: _onDistrictChanged,
+    );
+  }
+
+  Widget _blockDropdown() {
+    return _dropdown<int>(
+      label: 'Block',
+      icon: Icons.map_outlined,
+      value: _selectedBlockId,
+      items: _blocks.map((b) => (value: b.id, label: b.name)).toList(),
+      hint: _selectedDistrictId == null
+          ? 'Select district first'
+          : (_loadingBlocks ? 'Loading blocks…' : 'Select block'),
+      onChanged: _selectedDistrictId == null ? null : _onBlockChanged,
+    );
+  }
+
+  Widget _panchayatDropdown() {
+    return _dropdown<int>(
+      label: 'Panchayat',
+      icon: Icons.holiday_village_outlined,
+      value: _selectedPanchayatId,
+      items: _panchayats
+          .map((p) => (value: p.id, label: p.name))
+          .toList(),
+      hint: _selectedBlockId == null
+          ? 'Select block first'
+          : (_loadingPanchayats
+                ? 'Loading panchayats…'
+                : 'Select panchayat'),
+      onChanged: _selectedBlockId == null
+          ? null
+          : (value) => setState(() => _selectedPanchayatId = value),
+    );
+  }
+
+  List<Widget> _employeeIdField() {
+    return [
+      _label('Employee ID', required: true),
+      const SizedBox(height: 6),
+      _plainField(
+        _employeeIdController,
+        'employee ID',
+        Icons.badge_outlined,
+        key: const ValueKey('reg-employee-id'),
+        focusNode: _employeeIdFocus,
+        textInputAction: TextInputAction.done,
+        onNext: () => _employeeIdFocus.unfocus(),
+      ),
+    ];
+  }
+
+  List<Widget> _familyIdField() {
+    return [
+      _label('Family ID', required: true),
+      const SizedBox(height: 6),
+      _plainField(
+        _familyIdController,
+        'Parivar Pehchan Patra family ID',
+        Icons.family_restroom_outlined,
+        key: const ValueKey('reg-family-id'),
+        focusNode: _familyIdFocus,
+        textInputAction: TextInputAction.done,
+        onNext: () => _familyIdFocus.unfocus(),
+      ),
+    ];
+  }
+
+  Widget _afterSignUpNote() {
+    return Text(
+      'After Sign up, open the verification email on this phone and tap '
+      '“Verify email & open app” to set your password.',
+      style: GoogleFonts.poppins(
+        fontSize: 12.5,
+        color: _RegColors.muted,
+        height: 1.4,
+      ),
+    );
   }
 
   Widget _label(String text, {required bool required}) {

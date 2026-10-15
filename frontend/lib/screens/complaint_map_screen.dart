@@ -20,6 +20,7 @@ import '../services/location_api.dart';
 import '../services/route_tracker.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
+import '../utils/responsive.dart';
 import '../widgets/complaint_widgets.dart';
 import '../widgets/flipping_logo.dart';
 import '../widgets/route_recorder.dart';
@@ -619,7 +620,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
             0.9,
           );
 
-          return DraggableScrollableSheet(
+          final sheet = DraggableScrollableSheet(
             controller: _sheetController,
             initialChildSize: minFraction,
             minChildSize: minFraction,
@@ -663,6 +664,14 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
               ),
             ),
           );
+          if (!context.isTablet) return sheet;
+          // Tablet: keep the sheet a readable card width, centred over the
+          // map, instead of stretching across the whole landscape screen.
+          final gutter = centeredGutter(constraints.maxWidth, 640);
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: gutter),
+            child: sheet,
+          );
         },
       ),
     );
@@ -696,22 +705,24 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   top: 10,
                   left: 12,
                   right: 12,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _HomeSearchBar(
-                          controller: _searchController,
-                          focusNode: _searchFocus,
-                          hint: _searchHint,
-                          loading: _searching,
-                          onChanged: _onSearchChanged,
-                          onClear: _clearSearch,
-                          onMic: () => _comingSoon('Voice search'),
+                  child: _TabletOverlayWidth(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _HomeSearchBar(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            hint: _searchHint,
+                            loading: _searching,
+                            onChanged: _onSearchChanged,
+                            onClear: _clearSearch,
+                            onMic: () => _comingSoon('Voice search'),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      _LayersButton(onTap: _showLayers),
-                    ],
+                        const SizedBox(width: 10),
+                        _LayersButton(onTap: _showLayers),
+                      ],
+                    ),
                   ),
                 ),
                 Positioned(
@@ -757,7 +768,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                     top: 68,
                     left: 12,
                     right: 12,
-                    child: _SearchResults(hits: _hits, onTap: _openHit),
+                    child: _TabletOverlayWidth(
+                      child: _SearchResults(hits: _hits, onTap: _openHit),
+                    ),
                   ),
                 if (_showQuickAccess) _buildQuickSheet(recent),
               ],
@@ -855,6 +868,27 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Keeps a floating map overlay (search bar, search results) at a sensible
+/// width on tablets, anchored to the left like a map side panel. Phones get
+/// [child] unchanged.
+class _TabletOverlayWidth extends StatelessWidget {
+  const _TabletOverlayWidth({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!context.isTablet) return child;
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: child,
+      ),
     );
   }
 }

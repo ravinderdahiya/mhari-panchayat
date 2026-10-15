@@ -5,6 +5,7 @@ import '../models/app_notification.dart';
 import '../services/complaint_api.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../navigation/app_navigation.dart';
 import '../widgets/common_widgets.dart';
 import 'complaint_details_screen.dart';
@@ -115,7 +116,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: RefreshIndicator(onRefresh: _load, child: _buildBody()),
+                child: RefreshIndicator(
+                  onRefresh: _load,
+                  // Tablets: the feed reads best as one centred column.
+                  child: context.isTablet
+                      ? LayoutBuilder(
+                          builder: (context, constraints) => _buildBody(
+                            gutter: centeredGutter(
+                              constraints.maxWidth,
+                              Breakpoints.form,
+                            ),
+                          ),
+                        )
+                      : _buildBody(),
+                ),
               ),
             ),
           ),
@@ -124,7 +138,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildBody() {
+  /// [gutter] is the tablet-only side inset that centres the list; 0 on phones.
+  Widget _buildBody({double gutter = 0}) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -173,7 +188,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.only(top: 8),
+      padding: gutter == 0
+          ? const EdgeInsets.only(top: 8)
+          : EdgeInsets.fromLTRB(gutter, 8, gutter, AppSpacing.screen),
       itemCount: _notifications.length,
       separatorBuilder: (_, __) => Divider(
         height: 1,

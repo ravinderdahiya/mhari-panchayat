@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/survey_review_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import 'survey_review_detail_screen.dart';
 
@@ -95,6 +96,7 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
             subtitle: isGramSachiv
                 ? 'CPLO सर्वे सत्यापित करें · अपनी पंचायत'
                 : roleSubtitle,
+            tabletMaxWidth: Breakpoints.wide,
           ),
           Expanded(
             child: Transform.translate(
@@ -106,83 +108,115 @@ class _SurveyVerificationScreenState extends State<SurveyVerificationScreen> {
                   topRight: Radius.circular(24),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final s in VerifierCopy.statusTabs(_serverRole))
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: _StatusChip(
-                                  label: s.$2,
-                                  selected: _status == s.$1,
-                                  color: _statusColor(s.$1),
-                                  onTap: () => _switchStatus(s.$1),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _load,
-                        child: _loading
-                            ? const Center(child: CircularProgressIndicator())
-                            : _error != null
-                            ? _MessageList(
-                                message: _error!,
-                                icon: Icons.error_outline_rounded,
-                              )
-                            : _surveys.isEmpty
-                            ? const _MessageList(
-                                message: 'इस स्थिति में कोई सर्वे नहीं है',
-                                icon: Icons.inbox_outlined,
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  4,
-                                  16,
-                                  24,
-                                ),
-                                itemCount: _surveys.length,
-                                itemBuilder: (context, index) {
-                                  final survey = _surveys[index];
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: _SurveyCard(
-                                      survey: survey,
-                                      onTap: () async {
-                                        final changed = await Navigator.of(
-                                          context,
-                                        ).push<bool>(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                SurveyReviewDetailScreen(
-                                                  survey: survey,
-                                                ),
-                                          ),
-                                        );
-                                        if (changed == true) _load();
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
+                child: context.isTablet
+                    ? LayoutBuilder(
+                        builder: (context, constraints) =>
+                            _buildContent(constraints.maxWidth),
+                      )
+                    : _buildContent(null),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _surveyCard(Survey survey) {
+    return _SurveyCard(
+      survey: survey,
+      onTap: () async {
+        final changed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => SurveyReviewDetailScreen(survey: survey),
+          ),
+        );
+        if (changed == true) _load();
+      },
+    );
+  }
+
+  /// [tabletWidth] is null on phones (original single-column list). On
+  /// tablets content is centred at [Breakpoints.wide] and the survey cards
+  /// flow into 2-3 columns.
+  Widget _buildContent(double? tabletWidth) {
+    final gutter = tabletWidth == null
+        ? 16.0
+        : centeredGutter(tabletWidth, Breakpoints.wide, min: 16);
+    final columns = tabletWidth == null
+        ? 1
+        : tabletColumns(context, tabletWidth);
+
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(gutter, 16, gutter, 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final s in VerifierCopy.statusTabs(_serverRole))
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _StatusChip(
+                      label: s.$2,
+                      selected: _status == s.$1,
+                      color: _statusColor(s.$1),
+                      onTap: () => _switchStatus(s.$1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? _MessageList(
+                    message: _error!,
+                    icon: Icons.error_outline_rounded,
+                  )
+                : _surveys.isEmpty
+                ? const _MessageList(
+                    message: 'इस स्थिति में कोई सर्वे नहीं है',
+                    icon: Icons.inbox_outlined,
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(gutter, 4, gutter, 24),
+                    // Tablets: one item per row of [columns] cards.
+                    itemCount: (_surveys.length / columns).ceil(),
+                    itemBuilder: (context, index) {
+                      if (columns == 1) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _surveyCard(_surveys[index]),
+                        );
+                      }
+                      final start = index * columns;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (var i = start; i < start + columns; i++) ...[
+                              if (i > start) const SizedBox(width: 8),
+                              Expanded(
+                                child: i < _surveys.length
+                                    ? _surveyCard(_surveys[i])
+                                    : const SizedBox(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -5,6 +5,7 @@ import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 import 'complaint_details_screen.dart';
@@ -110,85 +111,12 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppSpacing.screen),
-                    SizedBox(
-                      height: 40,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.screen,
-                        ),
-                        itemCount: _tabs.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final (value, label) = _tabs[index];
-                          return _FilterPill(
-                            label: label,
-                            selected: _filter == value,
-                            onTap: () => setState(() => _filter = value),
-                          );
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: _loading
-                          ? const Center(child: CircularProgressIndicator())
-                          : _error != null && _complaints.isEmpty
-                          ? _ErrorState(message: _error!, onRetry: _load)
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              child: filtered.isEmpty
-                                  ? ListView(
-                                      children: [
-                                        SizedBox(
-                                          height:
-                                              MediaQuery.sizeOf(
-                                                context,
-                                              ).height *
-                                              0.3,
-                                          child: Center(
-                                            child: Text(
-                                              'No complaints in this filter',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 14,
-                                                color: AppColors.mutedText,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  : ListView.separated(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        AppSpacing.screen,
-                                        AppSpacing.gap,
-                                        AppSpacing.screen,
-                                        AppSpacing.screen,
-                                      ),
-                                      itemCount: filtered.length,
-                                      separatorBuilder: (_, __) =>
-                                          const SizedBox(
-                                            height: AppSpacing.gap,
-                                          ),
-                                      itemBuilder: (context, index) {
-                                        final complaint = filtered[index];
-                                        return _MyComplaintCard(
-                                          complaint: complaint,
-                                          onTap: () => push(
-                                            context,
-                                            ComplaintDetailsScreen(
-                                              complaint: complaint,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                            ),
-                    ),
-                  ],
-                ),
+                child: context.isTablet
+                    ? LayoutBuilder(
+                        builder: (context, constraints) =>
+                            _buildContent(filtered, constraints.maxWidth),
+                      )
+                    : _buildContent(filtered, null),
               ),
             ),
           ),
@@ -196,6 +124,118 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
       ),
     );
   }
+
+  /// [tabletWidth] is null on phones (original single-column list). On
+  /// tablets it is the available width: content is centred at
+  /// [Breakpoints.wide] and the cards flow into 2-3 columns.
+  Widget _buildContent(List<Complaint> filtered, double? tabletWidth) {
+    final gutter = tabletWidth == null
+        ? AppSpacing.screen
+        : centeredGutter(
+            tabletWidth,
+            Breakpoints.wide,
+            min: AppSpacing.screen,
+          );
+    final columns = tabletWidth == null
+        ? 1
+        : tabletColumns(context, tabletWidth);
+
+    return Column(
+      children: [
+        const SizedBox(height: AppSpacing.screen),
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: gutter),
+            itemCount: _tabs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final (value, label) = _tabs[index];
+              return _FilterPill(
+                label: label,
+                selected: _filter == value,
+                onTap: () => setState(() => _filter = value),
+              );
+            },
+          ),
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null && _complaints.isEmpty
+              ? _ErrorState(message: _error!, onRetry: _load)
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.sizeOf(context).height * 0.3,
+                              child: Center(
+                                child: Text(
+                                  'No complaints in this filter',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color: AppColors.mutedText,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            gutter,
+                            AppSpacing.gap,
+                            gutter,
+                            AppSpacing.screen,
+                          ),
+                          // Tablets: one item per row of [columns] cards.
+                          itemCount: (filtered.length / columns).ceil(),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: AppSpacing.gap),
+                          itemBuilder: (context, index) {
+                            Widget card(Complaint complaint) =>
+                                _MyComplaintCard(
+                                  complaint: complaint,
+                                  onTap: () => push(
+                                    context,
+                                    ComplaintDetailsScreen(
+                                      complaint: complaint,
+                                    ),
+                                  ),
+                                );
+                            if (columns == 1) return card(filtered[index]);
+                            final start = index * columns;
+                            return _cardRow([
+                              for (final complaint
+                                  in filtered.skip(start).take(columns))
+                                card(complaint),
+                            ], columns);
+                          },
+                        ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Tablet-only: one row of [columns] equal-width, equal-height cells (a short
+/// last row keeps its cells the same width as the rows above).
+Widget _cardRow(List<Widget> cells, int columns) {
+  return IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < columns; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.gap),
+          Expanded(child: i < cells.length ? cells[i] : const SizedBox()),
+        ],
+      ],
+    ),
+  );
 }
 
 class _ErrorState extends StatelessWidget {
@@ -288,6 +328,7 @@ class _MyComplaintsHeader extends StatelessWidget {
     return GradientHeader(
       title: 'My Complaints',
       actions: defaultHeaderActions(context),
+      tabletMaxWidth: Breakpoints.wide,
       child: Padding(
         padding: const EdgeInsets.only(top: 14),
         child: Row(

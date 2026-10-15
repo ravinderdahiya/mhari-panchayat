@@ -8,6 +8,7 @@ import '../models/route_track.dart';
 import '../services/route_api.dart';
 import '../services/route_store.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 
 String _formatDateTime(DateTime t) {
@@ -147,22 +148,24 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.screen),
-                child: FilledButton.icon(
-                  onPressed: _pending.isEmpty || _uploadingIds.isNotEmpty
-                      ? null
-                      : _uploadAll,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.button),
+                child: TabletConstrained(
+                  child: FilledButton.icon(
+                    onPressed: _pending.isEmpty || _uploadingIds.isNotEmpty
+                        ? null
+                        : _uploadAll,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                      ),
                     ),
-                  ),
-                  icon: const Icon(Icons.cloud_upload_rounded),
-                  label: Text(
-                    _pending.isEmpty
-                        ? 'All routes uploaded'
-                        : 'Upload data (${_pending.length})',
+                    icon: const Icon(Icons.cloud_upload_rounded),
+                    label: Text(
+                      _pending.isEmpty
+                          ? 'All routes uploaded'
+                          : 'Upload data (${_pending.length})',
+                    ),
                   ),
                 ),
               ),
@@ -171,73 +174,107 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
           ? const Center(child: CircularProgressIndicator())
           : routes.isEmpty
           ? const Center(child: Text('No saved routes yet.'))
+          : context.isTablet
+          ? LayoutBuilder(
+              builder: (context, constraints) {
+                final gutter = centeredGutter(
+                  constraints.maxWidth,
+                  Breakpoints.wide,
+                  min: AppSpacing.screen,
+                );
+                final columns = tabletColumns(context, constraints.maxWidth);
+                return ListView.separated(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: gutter,
+                    vertical: AppSpacing.screen,
+                  ),
+                  itemCount: (routes.length / columns).ceil(),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, row) {
+                    final start = row * columns;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var i = start; i < start + columns; i++) ...[
+                          if (i > start) const SizedBox(width: 8),
+                          Expanded(
+                            child: i < routes.length
+                                ? _routeCard(routes[i])
+                                : const SizedBox(),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                );
+              },
+            )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.screen),
               itemCount: routes.length,
               separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final route = routes[i];
-                return Card(
-                  margin: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: Icon(
-                      route.isUploaded
-                          ? Icons.cloud_done_rounded
-                          : Icons.route_rounded,
-                      color: route.isUploaded ? const Color(0xFF2E7D32) : null,
-                    ),
-                    title: Text(
-                      route.description.isEmpty
-                          ? _formatDateTime(route.startedAt)
-                          : route.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      '${route.description.isEmpty ? '' : '${_formatDateTime(route.startedAt)}\n'}'
-                      '${formatDistance(route.distanceMeters)} · '
-                      '${formatDuration(route.duration)} · '
-                      '${route.points.length} points'
-                      '${route.isUploaded ? ' · Uploaded' : ''}',
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_uploadingIds.contains(route.id))
-                          const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2.4),
-                            ),
-                          )
-                        else if (!route.isUploaded)
-                          IconButton(
-                            tooltip: 'Upload online',
-                            icon: const Icon(Icons.cloud_upload_outlined),
-                            onPressed: () => _upload(route),
-                          ),
-                        IconButton(
-                          tooltip: 'Delete',
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          onPressed: () => _delete(route),
-                        ),
-                      ],
-                    ),
-                    onTap: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => RouteViewScreen(route: route),
-                        ),
-                      );
-                      // The route may have been uploaded on the next screen.
-                      await _load();
-                    },
-                  ),
-                );
-              },
+              itemBuilder: (context, i) => _routeCard(routes[i]),
             ),
+    );
+  }
+
+  Widget _routeCard(RouteTrack route) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: Icon(
+          route.isUploaded ? Icons.cloud_done_rounded : Icons.route_rounded,
+          color: route.isUploaded ? const Color(0xFF2E7D32) : null,
+        ),
+        title: Text(
+          route.description.isEmpty
+              ? _formatDateTime(route.startedAt)
+              : route.description,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          '${route.description.isEmpty ? '' : '${_formatDateTime(route.startedAt)}\n'}'
+          '${formatDistance(route.distanceMeters)} · '
+          '${formatDuration(route.duration)} · '
+          '${route.points.length} points'
+          '${route.isUploaded ? ' · Uploaded' : ''}',
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_uploadingIds.contains(route.id))
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                ),
+              )
+            else if (!route.isUploaded)
+              IconButton(
+                tooltip: 'Upload online',
+                icon: const Icon(Icons.cloud_upload_outlined),
+                onPressed: () => _upload(route),
+              ),
+            IconButton(
+              tooltip: 'Delete',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: () => _delete(route),
+            ),
+          ],
+        ),
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => RouteViewScreen(route: route),
+            ),
+          );
+          // The route may have been uploaded on the next screen.
+          await _load();
+        },
+      ),
     );
   }
 }
@@ -389,60 +426,63 @@ class _RouteViewScreenState extends State<RouteViewScreen> {
             left: AppSpacing.screen,
             right: AppSpacing.screen,
             bottom: AppSpacing.screen,
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (route.description.isNotEmpty) ...[
+            child: TabletConstrained(
+              maxWidth: 560,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (route.description.isNotEmpty) ...[
+                        Text(
+                          route.description,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       Text(
-                        route.description,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                        '${formatDistance(route.distanceMeters)}  ·  '
+                        '${formatDuration(route.duration)}  ·  '
+                        '${route.points.length} points',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(height: 6),
-                    ],
-                    Text(
-                      '${formatDistance(route.distanceMeters)}  ·  '
-                      '${formatDuration(route.duration)}  ·  '
-                      '${route.points.length} points',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 10),
-                    FilledButton.icon(
-                      onPressed: route.isUploaded || _uploading ? null : _upload,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.button),
+                      const SizedBox(height: 10),
+                      FilledButton.icon(
+                        onPressed: route.isUploaded || _uploading ? null : _upload,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.button),
+                          ),
+                        ),
+                        icon: _uploading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                route.isUploaded
+                                    ? Icons.cloud_done_rounded
+                                    : Icons.cloud_upload_rounded,
+                              ),
+                        label: Text(
+                          route.isUploaded
+                              ? 'Uploaded on '
+                                    '${_formatDateTime(route.uploadedAt!)}'
+                              : 'Upload online',
                         ),
                       ),
-                      icon: _uploading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Icon(
-                              route.isUploaded
-                                  ? Icons.cloud_done_rounded
-                                  : Icons.cloud_upload_rounded,
-                            ),
-                      label: Text(
-                        route.isUploaded
-                            ? 'Uploaded on '
-                                  '${_formatDateTime(route.uploadedAt!)}'
-                            : 'Upload online',
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

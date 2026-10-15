@@ -4,6 +4,7 @@ import '../widgets/location_gate.dart';
 import 'asset_survey_screen.dart';
 import 'complaint_map_screen.dart';
 import 'surveyor_profile_screen.dart';
+import '../widgets/adaptive_nav_scaffold.dart';
 
 /// CPLO handles field asset surveys only, never complaints - Home is the
 /// survey form, Map is the asset-survey map with complaints switched off
@@ -29,29 +30,27 @@ class _CploShellState extends State<CploShell> {
       SurveyorProfileScreen(embedded: true),
     ];
 
-    return Scaffold(
+    return AdaptiveNavScaffold(
       body: IndexedStack(index: _index, children: screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined, size: 24),
-            selectedIcon: Icon(Icons.home_rounded, size: 24),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined, size: 24),
-            selectedIcon: Icon(Icons.map_rounded, size: 24),
-            label: 'Map',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline, size: 24),
-            selectedIcon: Icon(Icons.person_rounded, size: 24),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      selectedIndex: _index,
+      onDestinationSelected: (value) => setState(() => _index = value),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined, size: 24),
+          selectedIcon: Icon(Icons.home_rounded, size: 24),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.map_outlined, size: 24),
+          selectedIcon: Icon(Icons.map_rounded, size: 24),
+          label: 'Map',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline, size: 24),
+          selectedIcon: Icon(Icons.person_rounded, size: 24),
+          label: 'Profile',
+        ),
+      ],
     );
   }
 }

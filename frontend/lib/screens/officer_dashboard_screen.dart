@@ -7,6 +7,7 @@ import '../navigation/app_navigation.dart';
 import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 import 'notification_screen.dart';
@@ -146,96 +147,21 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : RefreshIndicator(
                         onRefresh: _loadComplaints,
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.screen,
-                            AppSpacing.screen + 4,
-                            AppSpacing.screen,
-                            AppSpacing.screen,
-                          ),
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _OfficerStat(
-                                    label: 'Pending',
-                                    value: pending.toString().padLeft(2, '0'),
-                                    icon: Icons.hourglass_empty_rounded,
-                                    color: AppColors.pendingText,
-                                    background: AppColors.orangeTint,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.gap),
-                                Expanded(
-                                  child: _OfficerStat(
-                                    label: 'Active',
-                                    value: active.toString().padLeft(2, '0'),
-                                    icon: Icons.assignment_rounded,
-                                    color: AppColors.inProgressText,
-                                    background: AppColors.blueTint,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.gap),
-                                Expanded(
-                                  child: _OfficerStat(
-                                    label: 'Completed',
-                                    value: completed.toString().padLeft(2, '0'),
-                                    icon: Icons.task_alt_rounded,
-                                    color: AppColors.resolvedText,
-                                    background: AppColors.greenTint,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.screen),
-                            Text(
-                              'Complaint Queue',
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF212121),
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.gap),
-                            if (_complaints.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 24,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'No complaints yet',
-                                    style: GoogleFonts.poppins(
-                                      color: AppColors.mutedText,
+                        child: context.isTablet
+                            ? LayoutBuilder(
+                                builder: (context, constraints) =>
+                                    _buildBody(
+                                      pending: pending,
+                                      active: active,
+                                      completed: completed,
+                                      tabletWidth: constraints.maxWidth,
                                     ),
-                                  ),
-                                ),
                               )
-                            else
-                              ..._complaints.map(
-                                (complaint) => _OfficerTaskCard(
-                                  complaint: complaint,
-                                  distance: _distanceLabel(complaint),
-                                  onAction: () async {
-                                    if (complaint.status ==
-                                        ComplaintStatus.pending) {
-                                      await _takeComplaint(complaint);
-                                      return;
-                                    }
-                                    if (!context.mounted) return;
-                                    await Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => OfficerActionScreen(
-                                          complaint: complaint,
-                                        ),
-                                      ),
-                                    );
-                                    if (context.mounted) _loadComplaints();
-                                  },
-                                ),
+                            : _buildBody(
+                                pending: pending,
+                                active: active,
+                                completed: completed,
                               ),
-                          ],
-                        ),
                       ),
               ),
             ),
@@ -244,6 +170,135 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
       ),
     );
   }
+
+  Widget _taskCard(Complaint complaint) {
+    return _OfficerTaskCard(
+      complaint: complaint,
+      distance: _distanceLabel(complaint),
+      onAction: () async {
+        if (complaint.status == ComplaintStatus.pending) {
+          await _takeComplaint(complaint);
+          return;
+        }
+        if (!context.mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => OfficerActionScreen(complaint: complaint),
+          ),
+        );
+        if (context.mounted) _loadComplaints();
+      },
+    );
+  }
+
+  /// [tabletWidth] is null on phones (original single-column layout). On
+  /// tablets content is centred at [Breakpoints.wide] and the queue cards
+  /// flow into 2-3 columns.
+  Widget _buildBody({
+    required int pending,
+    required int active,
+    required int completed,
+    double? tabletWidth,
+  }) {
+    final gutter = tabletWidth == null
+        ? AppSpacing.screen
+        : centeredGutter(
+            tabletWidth,
+            Breakpoints.wide,
+            min: AppSpacing.screen,
+          );
+    final columns = tabletWidth == null
+        ? 1
+        : tabletColumns(context, tabletWidth);
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        AppSpacing.screen + 4,
+        gutter,
+        AppSpacing.screen,
+      ),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _OfficerStat(
+                label: 'Pending',
+                value: pending.toString().padLeft(2, '0'),
+                icon: Icons.hourglass_empty_rounded,
+                color: AppColors.pendingText,
+                background: AppColors.orangeTint,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.gap),
+            Expanded(
+              child: _OfficerStat(
+                label: 'Active',
+                value: active.toString().padLeft(2, '0'),
+                icon: Icons.assignment_rounded,
+                color: AppColors.inProgressText,
+                background: AppColors.blueTint,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.gap),
+            Expanded(
+              child: _OfficerStat(
+                label: 'Completed',
+                value: completed.toString().padLeft(2, '0'),
+                icon: Icons.task_alt_rounded,
+                color: AppColors.resolvedText,
+                background: AppColors.greenTint,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.screen),
+        Text(
+          'Complaint Queue',
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF212121),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.gap),
+        if (_complaints.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                'No complaints yet',
+                style: GoogleFonts.poppins(color: AppColors.mutedText),
+              ),
+            ),
+          )
+        else if (columns == 1)
+          ..._complaints.map(_taskCard)
+        else
+          for (var i = 0; i < _complaints.length; i += columns)
+            _cardRow([
+              for (final complaint in _complaints.skip(i).take(columns))
+                _taskCard(complaint),
+            ], columns),
+      ],
+    );
+  }
+}
+
+/// Tablet-only: one row of [columns] equal-width, equal-height cells (a short
+/// last row keeps its cells the same width as the rows above).
+Widget _cardRow(List<Widget> cells, int columns) {
+  return IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < columns; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.gap),
+          Expanded(child: i < cells.length ? cells[i] : const SizedBox()),
+        ],
+      ],
+    ),
+  );
 }
 
 class _OfficerHeader extends StatelessWidget {
@@ -270,51 +325,54 @@ class _OfficerHeader extends StatelessWidget {
         28,
       ),
       decoration: const BoxDecoration(gradient: AppGradients.header),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'नमस्ते 👋',
-                  style: GoogleFonts.notoSansDevanagari(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+      child: TabletConstrained(
+        maxWidth: Breakpoints.wide,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'नमस्ते 👋',
+                    style: GoogleFonts.notoSansDevanagari(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  designation,
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFFFFF3E0),
-                    fontSize: 13,
+                  const SizedBox(height: 2),
+                  Text(
+                    designation,
+                    style: GoogleFonts.poppins(
+                      color: const Color(0xFFFFF3E0),
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onNotificationTap,
-            icon: const Icon(Icons.notifications_rounded, color: Colors.white),
-            tooltip: 'Notifications',
-          ),
-          const SizedBox(width: 4),
-          InkWell(
-            onTap: onProfileTap,
-            customBorder: const CircleBorder(),
-            child: CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white.withValues(alpha: 0.22),
-              child: const Icon(
-                Icons.person_rounded,
-                color: Colors.white,
-                size: 22,
+                ],
               ),
             ),
-          ),
-        ],
+            IconButton(
+              onPressed: onNotificationTap,
+              icon: const Icon(Icons.notifications_rounded, color: Colors.white),
+              tooltip: 'Notifications',
+            ),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: onProfileTap,
+              customBorder: const CircleBorder(),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.white.withValues(alpha: 0.22),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

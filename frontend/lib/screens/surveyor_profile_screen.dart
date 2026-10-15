@@ -8,6 +8,7 @@ import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -115,6 +116,65 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
     ];
     final stats = _stats;
 
+    final overview = <Widget>[
+      if (_loading)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: CircularProgressIndicator()),
+        )
+      else ...[
+        if (stats != null) ...[
+          _StatsRow(stats: stats),
+          const SizedBox(height: 18),
+        ],
+        if (details.isNotEmpty) ...[
+          _SectionTitle('Official details'),
+          _InfoCard(rows: details),
+          const SizedBox(height: 18),
+        ],
+      ],
+    ];
+    final account = <Widget>[
+      _SectionTitle('Account'),
+      _NavCard(
+        items: [
+          _NavItemData(
+            icon: Icons.settings_rounded,
+            color: const Color(0xFF7C4DDB),
+            title: 'Settings',
+            subtitle: 'App preferences',
+            onTap: () => push(context, const SettingsScreen()),
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () async {
+            await AuthService.logout();
+            if (!context.mounted) return;
+            pushReplacement(context, const LoginScreen());
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFD9482B),
+            backgroundColor: const Color(0xFFFDF1EE),
+            side: const BorderSide(color: Color(0xFFE3705A)),
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          icon: const Icon(Icons.logout_rounded, size: 20),
+          label: Text('Logout', style: _ts(15, weight: FontWeight.w600)),
+        ),
+      ),
+    ];
+    // Tablet landscape: details/stats and the account menu side by side;
+    // otherwise one centred column. The banner always spans the full width.
+    final twoCol = context.isTablet &&
+        MediaQuery.sizeOf(context).width >= 1000 &&
+        overview.isNotEmpty;
+    final tabletWidth = twoCol ? Breakpoints.wide : Breakpoints.form;
+
     return Scaffold(
       backgroundColor: AppColors.greyBg,
       body: SingleChildScrollView(
@@ -125,61 +185,35 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
               mobile: _formatMobile(p?.mobile),
               roleLabel: FieldStaffCopy.profileSubtitle(_serverRole),
               showClose: !widget.embedded,
+              tabletMaxWidth: tabletWidth,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.screen, 6, AppSpacing.screen, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else ...[
-                    if (stats != null) ...[
-                      _StatsRow(stats: stats),
-                      const SizedBox(height: 18),
-                    ],
-                    if (details.isNotEmpty) ...[
-                      _SectionTitle('Official details'),
-                      _InfoCard(rows: details),
-                      const SizedBox(height: 18),
-                    ],
-                  ],
-                  _SectionTitle('Account'),
-                  _NavCard(
-                    items: [
-                      _NavItemData(
-                        icon: Icons.settings_rounded,
-                        color: const Color(0xFF7C4DDB),
-                        title: 'Settings',
-                        subtitle: 'App preferences',
-                        onTap: () => push(context, const SettingsScreen()),
+            TabletConstrained(
+              maxWidth: tabletWidth,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.screen, 6, AppSpacing.screen, 24),
+                child: twoCol
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: overview,
+                            ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: account,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [...overview, ...account],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await AuthService.logout();
-                        if (!context.mounted) return;
-                        pushReplacement(context, const LoginScreen());
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFD9482B),
-                        backgroundColor: const Color(0xFFFDF1EE),
-                        side: const BorderSide(color: Color(0xFFE3705A)),
-                        minimumSize: const Size.fromHeight(48),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.logout_rounded, size: 20),
-                      label: Text('Logout', style: _ts(15, weight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -207,12 +241,16 @@ class _ProfileHeader extends StatelessWidget {
     required this.mobile,
     required this.roleLabel,
     this.showClose = false,
+    this.tabletMaxWidth = Breakpoints.form,
   });
 
   final String? name;
   final String mobile;
   final String roleLabel;
   final bool showClose;
+
+  /// Banner contents line up with the page column on tablets.
+  final double tabletMaxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -249,102 +287,105 @@ class _ProfileHeader extends StatelessWidget {
             colors: [Color(0xFFE9F1E6), Color(0xFFB9D3B4), Color(0xFF3F7D55), Color(0xFF1E5A3A)],
           ),
         ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const FlippingLogo(),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Mhari Panchayat', style: _ts(20, color: _green, weight: FontWeight.w700)),
-                    Text(
-                      'मेरी पंचायत - सशक्त पंचायत, समृद्ध हरियाणा',
-                      style: _ts(8.5, color: _orange, weight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            Row(
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 3)),
-                        ],
-                      ),
-                      child: const CircleAvatar(
-                        radius: 44,
-                        backgroundColor: Color(0xFFE3F0E8),
-                        child: Icon(Icons.person_rounded, color: _green, size: 52),
-                      ),
-                    ),
-                    Positioned(
-                      right: 2,
-                      bottom: 2,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E2A22),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
+        child: TabletConstrained(
+          maxWidth: tabletMaxWidth,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const FlippingLogo(),
+                  const SizedBox(width: 10),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text('Mhari Panchayat', style: _ts(20, color: _green, weight: FontWeight.w700)),
                       Text(
-                        (name ?? '').isEmpty ? '—' : name!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: _ts(24, color: Colors.white, weight: FontWeight.w700),
+                        'मेरी पंचायत - सशक्त पंचायत, समृद्ध हरियाणा',
+                        style: _ts(8.5, color: _orange, weight: FontWeight.w600),
                       ),
-                      Text(mobile, style: _ts(14, color: Colors.white.withValues(alpha: 0.95))),
-                      const SizedBox(height: 6),
-                      if (roleLabel.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _green,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.verified_rounded, color: Colors.white, size: 14),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  roleLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: _ts(11.5, color: Colors.white, weight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 30),
+              Row(
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 3)),
+                          ],
+                        ),
+                        child: const CircleAvatar(
+                          radius: 44,
+                          backgroundColor: Color(0xFFE3F0E8),
+                          child: Icon(Icons.person_rounded, color: _green, size: 52),
+                        ),
+                      ),
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E2A22),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (name ?? '').isEmpty ? '—' : name!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _ts(24, color: Colors.white, weight: FontWeight.w700),
+                        ),
+                        Text(mobile, style: _ts(14, color: Colors.white.withValues(alpha: 0.95))),
+                        const SizedBox(height: 6),
+                        if (roleLabel.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _green,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_rounded, color: Colors.white, size: 14),
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    roleLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: _ts(11.5, color: Colors.white, weight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/survey_review_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/asset_icon.dart';
+import '../utils/responsive.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/photo_viewer.dart';
 
@@ -177,6 +178,7 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
           ? survey.assetName
           : (survey.assetTypeName ?? 'Survey'),
       subtitle: survey.assetTypeName,
+      tabletMaxWidth: _twoPane(context) ? Breakpoints.wide : Breakpoints.form,
       body: Column(
         children: [
           Expanded(child: _buildBody(context, survey)),
@@ -188,70 +190,73 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                 AppSpacing.screen,
                 AppSpacing.screen,
               ),
-              child: Column(
-                children: [
-                  if (_error != null) ...[
-                    Text(
-                      _error!,
-                      style: GoogleFonts.poppins(
-                        color: AppColors.rejectedText,
-                        fontSize: 12.5,
+              child: TabletConstrained(
+                maxWidth: 640,
+                child: Column(
+                  children: [
+                    if (_error != null) ...[
+                      Text(
+                        _error!,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.rejectedText,
+                          fontSize: 12.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  Row(
-                    children: [
-                      if (canReject)
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _submitting ? null : _reject,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.rejectedText,
-                              side: BorderSide(
-                                color: AppColors.rejectedText,
-                              ),
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            label: const Text('Reject'),
-                          ),
-                        ),
-                      if (canReject && canReturn) const SizedBox(width: 8),
-                      if (canReturn)
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _submitting
-                                ? null
-                                : _returnForCorrection,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.pendingText,
-                              side: BorderSide(
-                                color: AppColors.pendingText,
-                              ),
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                            icon: const Icon(Icons.undo_rounded, size: 18),
-                            label: const Text('Return'),
-                          ),
-                        ),
-                      if ((canReject || canReturn) && action != null)
-                        const SizedBox(width: 12),
-                      if (action != null)
-                        Expanded(
-                          child: GradientButton(
-                            onPressed: _submitting
-                                ? null
-                                : () => _performAction(action.kind),
-                            label: _submitting
-                                ? 'कृपया प्रतीक्षा करें...'
-                                : action.label,
-                            icon: Icons.check_rounded,
-                          ),
-                        ),
+                      const SizedBox(height: 8),
                     ],
-                  ),
-                ],
+                    Row(
+                      children: [
+                        if (canReject)
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _submitting ? null : _reject,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.rejectedText,
+                                side: BorderSide(
+                                  color: AppColors.rejectedText,
+                                ),
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              label: const Text('Reject'),
+                            ),
+                          ),
+                        if (canReject && canReturn) const SizedBox(width: 8),
+                        if (canReturn)
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _submitting
+                                  ? null
+                                  : _returnForCorrection,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.pendingText,
+                                side: BorderSide(
+                                  color: AppColors.pendingText,
+                                ),
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              icon: const Icon(Icons.undo_rounded, size: 18),
+                              label: const Text('Return'),
+                            ),
+                          ),
+                        if ((canReject || canReturn) && action != null)
+                          const SizedBox(width: 12),
+                        if (action != null)
+                          Expanded(
+                            child: GradientButton(
+                              onPressed: _submitting
+                                  ? null
+                                  : () => _performAction(action.kind),
+                              label: _submitting
+                                  ? 'कृपया प्रतीक्षा करें...'
+                                  : action.label,
+                              icon: Icons.check_rounded,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -259,10 +264,13 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
     );
   }
 
+  /// Tablet landscape: survey details on the left, photos on the right.
+  bool _twoPane(BuildContext context) =>
+      context.isTablet && MediaQuery.sizeOf(context).width >= 1000;
+
   Widget _buildBody(BuildContext context, Survey survey) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.screen),
-      children: [
+    final thumbSize = context.isTablet ? 120.0 : 92.0;
+    final summary = <Widget>[
         Row(
           children: [
             Container(
@@ -353,6 +361,8 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
             style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
           ),
         ],
+    ];
+    final media = <Widget>[
         if (survey.photoUrls.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.screen),
           Text(
@@ -371,12 +381,12 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
                     onTap: () => showPhotoViewer(context, imageUrl: url),
                     child: Image.network(
                       url,
-                      width: 92,
-                      height: 92,
+                      width: thumbSize,
+                      height: thumbSize,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        width: 92,
-                        height: 92,
+                        width: thumbSize,
+                        height: thumbSize,
                         color: AppColors.greyBg,
                         child: Icon(
                           Icons.broken_image_rounded,
@@ -389,7 +399,44 @@ class _SurveyReviewDetailScreenState extends State<SurveyReviewDetailScreen> {
             ],
           ),
         ],
-      ],
+    ];
+
+    if (_twoPane(context) && media.isNotEmpty) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 5,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen,
+                AppSpacing.screen,
+                AppSpacing.screen / 2,
+                AppSpacing.screen,
+              ),
+              children: summary,
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen / 2,
+                AppSpacing.screen,
+                AppSpacing.screen,
+                AppSpacing.screen,
+              ),
+              // Drop the leading section gap - it's the top of this pane.
+              children: media.sublist(1),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.screen),
+      children: [...summary, ...media],
     );
   }
 }
