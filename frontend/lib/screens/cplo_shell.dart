@@ -43,11 +43,14 @@ class _CploShellState extends State<CploShell> {
       const LocationGate(
         child: ComplaintMapScreen(staffQueue: true, showComplaints: false),
       ),
-      // Rebuilt on every visit so the list is fresh; the other tabs keep their state.
+      // Alerts and Profile are rebuilt on every visit so they always show fresh data;
+      // Home and Map keep their state.
       _index == 2
           ? const NotificationScreen(showBackButton: false)
           : const SizedBox.shrink(),
-      const SurveyorProfileScreen(embedded: true),
+      _index == 3
+          ? const SurveyorProfileScreen(embedded: true)
+          : const SizedBox.shrink(),
     ];
 
     return AdaptiveNavScaffold(

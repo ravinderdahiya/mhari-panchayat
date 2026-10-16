@@ -87,7 +87,10 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
       backgroundColor: AppColors.greyBg,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 children: [
                   _CitizenProfileHeader(profile: _profile),
@@ -178,6 +181,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                   ),
                 ],
               ),
+            ),
             ),
     );
   }

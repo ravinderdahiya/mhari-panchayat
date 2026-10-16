@@ -37,6 +37,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
   int? _selectedDepartmentId;
   List<AssetType> _types = const [];
   List<Survey> _existingAssets = const [];
+  bool _reloadQueued = false;
   String? _selectedId;
   String _existingQuery = '';
   String? _infoMessage;
@@ -125,7 +126,13 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
   }
 
   Future<void> _loadExistingAssets() async {
-    if (_loadingExisting) return;
+    // A refresh asked for while one is already in flight (e.g. right after a
+    // submit) must not be dropped - that response may predate the submit - so
+    // it is replayed once the current request ends.
+    if (_loadingExisting) {
+      _reloadQueued = true;
+      return;
+    }
     setState(() => _loadingExisting = true);
     try {
       final existing = await SurveyApi.getExistingAssets();
@@ -137,6 +144,10 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadingExisting = false);
+    }
+    if (_reloadQueued && mounted) {
+      _reloadQueued = false;
+      await _loadExistingAssets();
     }
   }
 
@@ -161,22 +172,28 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
 
   void _switchMode({required bool isNew}) {
     setState(() => _isNewAsset = isNew);
-    if (!isNew && _existingAssets.isEmpty) {
-      _loadExistingAssets();
-    }
+    // Always refresh on opening the list (the cached one stays visible meanwhile),
+    // not only when it is empty - it goes stale as soon as a survey is submitted.
+    if (!isNew) _loadExistingAssets();
   }
 
   void _onSelect(AssetType type) {
     setState(() => _selectedId = type.id);
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AssetSurveyFormScreen(
-          departmentId: _selectedDepartmentId!,
-          assetTypeId: type.id,
-          assetTypeName: type.name,
-        ),
-      ),
-    );
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => AssetSurveyFormScreen(
+              departmentId: _selectedDepartmentId!,
+              assetTypeId: type.id,
+              assetTypeName: type.name,
+            ),
+          ),
+        )
+        // The form pops itself after a successful submit: refresh the Existing
+        // Asset list now so the new survey is already there when it is opened.
+        .then((_) {
+          if (mounted) _loadExistingAssets();
+        });
   }
 
   void _onSelectExisting(Survey survey) {
@@ -200,7 +217,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
           ),
         )
         .then((_) {
-          if (!_isNewAsset) _loadExistingAssets();
+          if (mounted) _loadExistingAssets();
         });
   }
 
@@ -527,7 +544,7 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
                               const SliverToBoxAdapter(
                                 child: SizedBox(height: 24),
                               )
-                            else if (_loadingExisting)
+                            else if (_loadingExisting && _existingAssets.isEmpty)
                               const SliverFillRemaining(
                                 hasScrollBody: false,
                                 child: Center(child: CircularProgressIndicator()),

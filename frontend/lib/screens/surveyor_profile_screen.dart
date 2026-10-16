@@ -183,7 +183,10 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.greyBg,
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           children: [
             _ProfileHeader(
@@ -223,6 +226,7 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
