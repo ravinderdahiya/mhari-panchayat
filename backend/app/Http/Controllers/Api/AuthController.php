@@ -236,6 +236,15 @@ class AuthController extends Controller
         }
     }
 
+    /** The fixed demo login for app-store reviewers (OTP_DEMO_MOBILE / OTP_DEMO_CODE). */
+    private function isDemoMobile(string $mobile): bool
+    {
+        $demo = (string) config('services.otp_demo.mobile');
+        $code = (string) config('services.otp_demo.code');
+
+        return $demo !== '' && $code !== '' && hash_equals($demo, $mobile);
+    }
+
     private function issueCitizenOtp(Request $request, bool $resend = false)
     {
         $data = $request->validate([
@@ -252,6 +261,21 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'This mobile number belongs to a staff account. Use Staff Login.',
             ], 422);
+        }
+
+        // Store-review demo number: no SMS is sent, the fixed code is accepted in
+        // verifyOtp(). Answered like a normal send so the app flow is unchanged.
+        if ($this->isDemoMobile($mobile)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'OTP sent to your mobile number',
+                'smsSent' => true,
+                'sms_sent' => true,
+                'expiresIn' => self::CITIZEN_OTP_TTL_MINUTES * 60,
+                'expires_in' => self::CITIZEN_OTP_TTL_MINUTES * 60,
+                'resendAfter' => 0,
+                'resend_after' => 0,
+            ]);
         }
 
         $resendAvailableAt = (int) Cache::get($this->citizenOtpResendKey($mobile), 0);
@@ -326,7 +350,14 @@ class AuthController extends Controller
             Log::warning('Citizen OTP verified via static bypass code', ['mobile' => $mobile]);
         }
 
-        if (! $isLocalTestLogin && ! $isStaticBypass) {
+        // Play Store / App Store reviewers: one fixed number + fixed code, nothing else.
+        $demoCode = (string) config('services.otp_demo.code');
+        $isDemoLogin = $this->isDemoMobile($mobile) && $demoCode !== '' && hash_equals($demoCode, $data['otp']);
+        if ($isDemoLogin) {
+            Log::info('Citizen OTP verified via store-review demo login', ['mobile' => $mobile]);
+        }
+
+        if (! $isLocalTestLogin && ! $isStaticBypass && ! $isDemoLogin) {
             $cachedOtp = Cache::get($this->citizenOtpKey($mobile));
             $attempts = Cache::increment($this->citizenOtpAttemptsKey($mobile));
             if ($attempts > self::CITIZEN_OTP_MAX_ATTEMPTS) {

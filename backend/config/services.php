@@ -49,6 +49,14 @@ return [
         'code' => env('OTP_STATIC_BYPASS_CODE'),
     ],
 
+    // Demo login for Play Store / App Store reviewers, who cannot receive an SMS:
+    // exactly this one mobile number signs in with exactly this OTP. Unset either
+    // value to switch it off. Unlike otp_bypass above it works for no other number.
+    'otp_demo' => [
+        'mobile' => env('OTP_DEMO_MOBILE'),
+        'code' => env('OTP_DEMO_CODE'),
+    ],
+
     // HARSAC's ArcGIS Enterprise portal - hosts the Panchayat boundary MapServer.
     // Token-secured, so the admin panel can't call it directly with a username/password;
     // it asks the backend for a short-lived, referer-locked token instead.
