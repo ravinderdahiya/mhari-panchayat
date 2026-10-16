@@ -197,7 +197,7 @@ class _NewComplaintButton extends StatelessWidget {
       onTap: onTap,
       customBorder: const CircleBorder(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -215,11 +215,15 @@ class _NewComplaintButton extends StatelessWidget {
               child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
             ),
             const SizedBox(height: 2),
-            Text(
-              'Raise Issue',
-              maxLines: 1,
-              softWrap: false,
-              style: GoogleFonts.poppins(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF1B6B43)),
+            // Scale down instead of clipping when the nav slot is narrow.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'Raise Issue',
+                maxLines: 1,
+                softWrap: false,
+                style: GoogleFonts.poppins(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF1B6B43)),
+              ),
             ),
           ],
         ),
