@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckAppVersion;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
 use Illuminate\Auth\AuthenticationException;
@@ -18,7 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['role' => EnsureRole::class, 'permission' => EnsurePermission::class]);
+        $middleware->alias([
+            'role' => EnsureRole::class,
+            'permission' => EnsurePermission::class,
+            'app.version' => CheckAppVersion::class,
+        ]);
         // API-only app: never redirect guests to a named "login" web route
         // (that route does not exist and caused 500s on unauthenticated /api/*).
         $middleware->redirectGuestsTo(fn () => null);

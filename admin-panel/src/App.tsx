@@ -20,6 +20,7 @@ import AssetSurveysPage from './pages/AssetSurveysPage';
 import ProjectMeetingPage from './pages/ProjectMeetingPage';
 import RoadMapPage from './pages/RoadMapPage';
 import ReportsPage from './pages/ReportsPage';
+import AppVersionPage from './pages/AppVersionPage';
 import ProfilePage from './pages/ProfilePage';
 import FeedbackPage from './pages/FeedbackPage';
 import ComingSoon from './components/ComingSoon';
@@ -125,6 +126,7 @@ export default function App() {
       {activeView === 'project-meeting' && <ProjectMeetingPage />}
       {activeView === 'road-map' && <RoadMapPage />}
       {activeView === 'reports' && <ReportsPage />}
+      {activeView === 'app-version' && <AppVersionPage />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>

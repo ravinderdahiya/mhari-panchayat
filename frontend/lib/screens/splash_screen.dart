@@ -3,7 +3,9 @@ import 'package:flutter/scheduler.dart';
 
 import '../navigation/app_navigation.dart';
 import '../navigation/role_navigation.dart';
+import '../services/app_version_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/update_dialog.dart';
 import 'login_screen.dart';
 
 typedef SplashCompleteCallback = void Function(AuthSession? session);
@@ -34,6 +36,8 @@ class _SplashScreenState extends State<SplashScreen> {
     _isBootstrapping = true;
 
     final startedAt = DateTime.now();
+    // Runs alongside the splash delay, so it costs no extra waiting.
+    final versionCheck = AppVersionService.check();
     final session = await AuthService.getSession();
 
     final elapsed = DateTime.now().difference(startedAt);
@@ -41,7 +45,15 @@ class _SplashScreenState extends State<SplashScreen> {
       await Future<void>.delayed(SplashScreen.minDisplayDuration - elapsed);
     }
 
+    final update = await versionCheck;
     if (!mounted || _hasFinished) return;
+
+    if (update.status != UpdateStatus.ok) {
+      // A forced update never returns here: the dialog can't be dismissed.
+      await showUpdateDialog(context, update);
+      if (!mounted || _hasFinished) return;
+    }
+
     _hasFinished = true;
     _finish(session);
   }

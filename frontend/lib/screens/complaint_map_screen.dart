@@ -932,7 +932,7 @@ class _CitizenHomeHeader extends StatelessWidget {
                 TextSpan(
                   children: [
                     TextSpan(
-                      text: 'Mahari ',
+                      text: 'Mhari ',
                       style: _pop(20, weight: FontWeight.w700, color: _kGreen),
                     ),
                     TextSpan(

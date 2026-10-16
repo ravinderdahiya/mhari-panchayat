@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\CitizenController;
 use App\Http\Controllers\Api\ElectedRepresentativeController;
 use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\GisController;
 use App\Http\Controllers\Api\LocationController;
@@ -25,10 +26,13 @@ use App\Http\Controllers\Api\VillageAssetController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
-Route::post('/auth/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
-Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:otp-send');
-Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
+// The app calls this on launch (before sign-in); `app.version` below is the
+// server-side backstop that refuses sign-in from builds below the minimum.
+Route::post('/app/version-check', [AppVersionController::class, 'check'])->middleware('throttle:60,1');
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware(['app.version', 'throttle:login']);
+Route::post('/auth/send-otp', [AuthController::class, 'sendOtp'])->middleware(['app.version', 'throttle:otp-send']);
+Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp'])->middleware(['app.version', 'throttle:otp-send']);
+Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware(['app.version', 'throttle:otp-verify']);
 Route::post('/auth/forgot-password/request', [AuthController::class, 'forgotPasswordRequest'])->middleware('throttle:forgot-password');
 Route::post('/auth/forgot-password/reset', [AuthController::class, 'forgotPasswordReset']);
 // Staff (Department login) "forgot password" - OTP to the mobile on file,
@@ -118,6 +122,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // (not permission:) so an admin can never misconfigure permissions
     // into locking themselves out of the permission editor itself.
     Route::middleware('role:admin')->group(function () {
+        // Release settings the launch-time version check reads (see AppVersionController).
+        Route::get('/app-versions', [AppVersionController::class, 'index']);
+        Route::put('/app-versions/{platform}', [AppVersionController::class, 'update'])->whereIn('platform', ['android', 'ios']);
         // Road Map: every user's survey polygons (admin / super admin only).
         // Reports screen: filterable complaint / asset-survey summaries (admin / super admin).
         Route::get('/reports/complaints', [ReportController::class, 'complaints']);

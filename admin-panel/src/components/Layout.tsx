@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
   Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, Vote,
-  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation, MessageCircleHeart, Route,
+  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation, MessageCircleHeart, Route, Smartphone,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'road-map' | 'profile' | 'feedback';
+  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'road-map' | 'app-version' | 'profile' | 'feedback';
 
 interface LayoutProps {
   currentUser: User;
@@ -101,6 +101,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true, section: 'system' },
   { id: 'audit-log', label: 'Audit Log', icon: ScrollText, adminOnly: true, section: 'system' },
   { id: 'road-map', label: 'Road Map', icon: Route, adminOnly: true, section: 'system' },
+  { id: 'app-version', label: 'App Version', icon: Smartphone, adminOnly: true, section: 'system' },
 ];
 
 const PAGE_SUBTITLES: Record<View, string> = {
@@ -123,6 +124,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   settings: 'System configuration',
   'audit-log': 'System activity history',
   'road-map': 'Survey polygons and walked routes saved from the mobile app',
+  'app-version': 'Release settings that decide when the mobile app asks users to update',
   profile: 'Your account details',
 };
 

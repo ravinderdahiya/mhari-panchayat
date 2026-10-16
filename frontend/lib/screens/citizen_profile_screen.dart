@@ -227,7 +227,7 @@ class _CitizenProfileHeader extends StatelessWidget {
                       Text.rich(
                         TextSpan(
                           children: [
-                            TextSpan(text: 'Mahari ', style: _titleStyle(20, color: _mockGreen, weight: FontWeight.w700)),
+                            TextSpan(text: 'Mhari ', style: _titleStyle(20, color: _mockGreen, weight: FontWeight.w700)),
                             TextSpan(text: 'Panchayat', style: _titleStyle(20, color: _mockOrange, weight: FontWeight.w700)),
                           ],
                         ),

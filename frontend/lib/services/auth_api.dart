@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import 'app_version_service.dart';
 import 'auth_service.dart';
 import 'session_guard.dart';
 
@@ -403,7 +404,11 @@ class AuthApi {
       response = await http
           .post(
             _uri(path),
-            headers: const {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              // Lets the server refuse sign-in from builds below the minimum (HTTP 426).
+              AppVersionService.headerName: await AppVersionService.buildNumber(),
+            },
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 15));

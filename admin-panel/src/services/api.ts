@@ -717,3 +717,24 @@ export const getAssetSurvey = (id: string) =>
 
 export const deleteAssetSurvey = (id: string) =>
   jsonRequest<{ success: boolean }>(`/api/surveys/${id}`, 'DELETE');
+
+// --- MOBILE APP VERSION (force-update settings) ---
+export interface AppVersionSetting {
+  platform: string;
+  latest_version_code: number;
+  min_version_code: number;
+  store_url: string;
+  message: string | null;
+  updated_at: string | null;
+}
+
+export const getAppVersions = () =>
+  request<{ success: boolean; data: AppVersionSetting[] }>('/api/app-versions');
+
+export const updateAppVersion = (platform: string, fields: {
+  latest_version_code: number;
+  min_version_code: number;
+  store_url: string;
+  message: string | null;
+}) =>
+  jsonRequest<{ success: boolean; message: string; data: AppVersionSetting }>(`/api/app-versions/${platform}`, 'PUT', fields);
