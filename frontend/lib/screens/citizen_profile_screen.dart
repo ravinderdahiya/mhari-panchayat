@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
+import '../widgets/about_app_dialog.dart';
 import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
 import 'my_complaints_screen.dart';
@@ -145,13 +146,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                 color: const Color(0xFF2563EB),
                                 title: 'About Mhari Panchayat',
                                 subtitle: 'App information and version',
-                                onTap: () => showAboutDialog(
-                                  context: context,
-                                  applicationName: 'Mhari Panchayat',
-                                  applicationVersion: '1.0.0',
-                                  applicationLegalese:
-                                      'Development and Panchayats Department, Government of Haryana',
-                                ),
+                                onTap: () => showAboutAppDialog(context),
                               ),
                             ],
                           ),

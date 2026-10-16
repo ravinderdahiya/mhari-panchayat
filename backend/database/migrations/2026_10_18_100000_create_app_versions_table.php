@@ -27,7 +27,7 @@ return new class extends Migration
             'platform' => 'android',
             'latest_version_code' => 1,
             'min_version_code' => 1,
-            'store_url' => 'https://play.google.com/store/apps/details?id=hsac.in',
+            'store_url' => 'https://play.google.com/store/apps/details?id=in.hsac.mharipanchayat',
             'message' => null,
             'created_at' => now(),
             'updated_at' => now(),

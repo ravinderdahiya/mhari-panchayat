@@ -7,6 +7,7 @@ import '../services/app_preferences.dart';
 import '../theme/app_theme.dart';
 import '../utils/launch_url.dart';
 import '../utils/responsive.dart';
+import '../widgets/app_version_text.dart';
 import '../widgets/common_widgets.dart';
 import 'change_password_screen.dart';
 import 'feedback_screen.dart';
@@ -182,8 +183,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 28),
                     Center(
-                      child: Text(
-                        'Mhari Panchayat · v1.0.0',
+                      child: AppVersionText(
+                        format: (v) => 'Mhari Panchayat · v$v',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: AppColors.mutedText,

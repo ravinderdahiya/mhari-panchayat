@@ -17,6 +17,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/launch_url.dart';
 import '../utils/responsive.dart';
+import '../widgets/app_version_text.dart';
 import 'forgot_password_screen.dart';
 import 'registration_screen.dart';
 
@@ -442,8 +443,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       const SizedBox(height: 4),
-      Text(
-        'Version 1.0.1',
+      AppVersionText(
+        format: (v) => 'Version $v',
         textAlign: TextAlign.center,
         style: GoogleFonts.poppins(
           fontSize: 11,

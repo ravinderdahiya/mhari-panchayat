@@ -29,6 +29,7 @@ class AppVersionService {
   AppVersionService._();
 
   static String? _buildNumber;
+  static String? _versionName;
   static String? _packageName;
 
   /// Header every sign-in call carries so the server can refuse outdated builds.
@@ -42,10 +43,21 @@ class AppVersionService {
     try {
       final info = await _info();
       _packageName = info.packageName;
+      _versionName = info.version;
       return _buildNumber = info.buildNumber;
     } catch (_) {
       return '0';
     }
+  }
+
+  /// Installed version for display, e.g. "1.0.1 (2)" - read from the build,
+  /// so it always matches pubspec `version:` and the Play Store listing.
+  /// Empty if the platform can't report it.
+  static Future<String> displayVersion() async {
+    final build = await buildNumber();
+    final name = _versionName;
+    if (name == null || name.isEmpty) return '';
+    return '$name ($build)';
   }
 
   /// Never blocks the user on a failed check: offline, server errors and

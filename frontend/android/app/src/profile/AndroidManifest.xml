@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Local dev backend (api_config.dart localBaseUrl) is plain HTTP; release is HTTPS only. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

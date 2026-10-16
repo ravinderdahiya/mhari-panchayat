@@ -1,16 +1,21 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+    <!-- Merged in by plugins but not needed: no video/audio recording, and
+         Android 13+ gallery picks go through the system Photo Picker. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
     <application
         android:label="Mhari Panchayat"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:largeHeap="true"
-        android:usesCleartextTraffic="true">
+        android:largeHeap="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

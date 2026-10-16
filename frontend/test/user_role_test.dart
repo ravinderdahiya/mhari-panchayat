@@ -12,8 +12,11 @@ void main() {
   test('fromServerRole keeps gram sachiv, citizen and officers distinct', () {
     expect(UserRoleStorage.fromServerRole('gram_sachiv'), UserRole.gramSachiv);
     expect(UserRoleStorage.fromServerRole('citizen'), UserRole.citizen);
-    expect(UserRoleStorage.fromServerRole('bdpo'), UserRole.officer);
-    expect(UserRoleStorage.fromServerRole('ddpo'), UserRole.officer);
+    expect(UserRoleStorage.fromServerRole('bdpo'), UserRole.verifier);
+    expect(UserRoleStorage.fromServerRole('ddpo'), UserRole.verifier);
+    expect(UserRoleStorage.fromServerRole('xen_pr'), UserRole.verifier);
+    expect(UserRoleStorage.fromServerRole('ceo_zp'), UserRole.verifier);
+    expect(UserRoleStorage.fromServerRole('je'), UserRole.officer);
   });
 
   test('FieldStaffCopy labels CPLO separately from Surveyor', () {
