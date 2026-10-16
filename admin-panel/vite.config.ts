@@ -10,7 +10,7 @@ import tailwindcss from '@tailwindcss/vite'
 // "opens the admin panel". Shipping them inside the admin build guarantees they
 // exist wherever the admin panel is. The single source of truth stays in
 // backend/public - they are copied at build time, not duplicated in the repo.
-const LEGAL_PAGES = ['terms-of-service.html', 'privacy-policy.html', 'harsac-logo.png']
+const LEGAL_PAGES = ['terms-of-service.html', 'privacy-policy.html', 'delete-account.html', 'harsac-logo.png']
 
 function legalPages(): Plugin {
   return {
