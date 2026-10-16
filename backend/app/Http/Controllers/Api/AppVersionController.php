@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\RespondsWithEnvelope;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\CheckAppVersion;
 use App\Models\AppVersion;
+use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,8 +56,28 @@ class AppVersionController extends Controller
             'min_version_code.lte' => 'The minimum version cannot be higher than the latest version.',
         ]);
 
+        $previousLatest = AppVersion::forPlatform($platform)?->latest_version_code ?? 0;
         $version = AppVersion::updateOrCreate(['platform' => $platform], $data);
         CheckAppVersion::forgetCache($platform);
+
+        // A newer release was published: nudge installed apps. Each phone checks
+        // its own build number and shows the prompt only if it is out of date.
+        // Runs after the response so Save never waits on (or fails because of) FCM.
+        if ($version->latest_version_code > $previousLatest) {
+            dispatch(function () use ($version) {
+                try {
+                    app(FcmService::class)->sendDataToTopic('app_update_'.$version->platform, [
+                        'type' => 'app_update',
+                        'latest_code' => $version->latest_version_code,
+                        'min_code' => $version->min_version_code,
+                        'store_url' => $version->store_url,
+                        'message' => $version->message ?: self::DEFAULT_MESSAGE,
+                    ]);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            })->afterResponse();
+        }
 
         return $this->ok($version, 'App version updated');
     }

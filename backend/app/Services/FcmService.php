@@ -75,6 +75,43 @@ class FcmService
         }
     }
 
+    /**
+     * Data-only push to every device subscribed to a topic. No `notification`
+     * block on purpose: the app decides on the device whether to show anything
+     * (e.g. the update prompt is skipped for users already on the new build).
+     *
+     * @param array<string,scalar|null> $data FCM data values must all be strings.
+     */
+    public function sendDataToTopic(string $topic, array $data): bool
+    {
+        if (! $this->enabled()) {
+            return false;
+        }
+
+        $accessToken = $this->accessToken();
+        if ($accessToken === null) {
+            return false;
+        }
+
+        $project = $this->credentials()['project_id'];
+        $response = Http::withOptions($this->httpOptions())
+            ->withToken($accessToken)
+            ->timeout(8)
+            ->post("https://fcm.googleapis.com/v1/projects/{$project}/messages:send", [
+                'message' => [
+                    'topic' => $topic,
+                    'data' => array_map(fn ($v) => (string) $v, $data),
+                    'android' => ['priority' => 'HIGH'],
+                ],
+            ]);
+
+        if (! $response->successful()) {
+            Log::warning('FCM topic send failed', ['status' => $response->status(), 'body' => $response->body()]);
+        }
+
+        return $response->successful();
+    }
+
     private function accessToken(): ?string
     {
         return Cache::remember('fcm.access_token', now()->addMinutes(50), function () {

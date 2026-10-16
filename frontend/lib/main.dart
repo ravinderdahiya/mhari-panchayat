@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app.dart';
+import 'services/update_notifier.dart';
 import 'theme/theme_controller.dart';
 
 Future<void> main() async {
@@ -21,6 +24,9 @@ Future<void> main() async {
   } catch (_) {
     // Offline / slow network — fall back to platform fonts.
   }
+
+  // Update-available push (best-effort, never blocks startup).
+  unawaited(UpdateNotifier.start());
 
   runApp(const PanchayatApp());
 }
