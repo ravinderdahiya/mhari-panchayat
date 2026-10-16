@@ -570,8 +570,8 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   double get _overlayBottom => 12;
 
   Widget _buildCitizenHome(BuildContext context) {
-    // Tablets: the search bar spans the width and the layers + recenter
-    // buttons sit side by side at its right end.
+    // Tablets: the search bar spans the width with the layers button at its
+    // right end; the recenter button sits bottom-right on every device.
     final tablet = context.isTablet;
     return Scaffold(
       backgroundColor: Colors.white,
@@ -587,6 +587,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   left: 12,
                   right: 12,
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: _HomeSearchBar(
@@ -601,26 +602,18 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                       ),
                       const SizedBox(width: 10),
                       _LayersButton(onTap: _showLayers),
-                      if (tablet) ...[
-                        const SizedBox(width: 10),
-                        _MapSquareButton(
-                          icon: Icons.my_location_rounded,
-                          onTap: _recenter,
-                          size: 54,
-                        ),
-                      ],
                     ],
                   ),
                 ),
-                if (!tablet)
-                  Positioned(
-                    right: 12,
-                    top: 78,
-                    child: _MapSquareButton(
-                      icon: Icons.my_location_rounded,
-                      onTap: _recenter,
-                    ),
+                Positioned(
+                  right: 12,
+                  bottom: _overlayBottom,
+                  child: _MapSquareButton(
+                    icon: Icons.my_location_rounded,
+                    onTap: _recenter,
+                    size: tablet ? 54 : 42,
                   ),
+                ),
                 if (widget.showComplaints)
                   Positioned(
                     left: 12,
@@ -635,7 +628,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   ),
                 if (_loading)
                   const Positioned(
-                    top: 78,
+                    top: 66,
                     left: 0,
                     right: 0,
                     child: Center(
@@ -648,10 +641,10 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   ),
                 if (_hits.isNotEmpty || (_searchedOnce && !_searching))
                   Positioned(
-                    top: 68,
+                    top: 58,
                     left: 12,
                     // Line the results up under the search bar, not the buttons.
-                    right: tablet ? 12 + 54 + 10 + 54 + 10 : 12,
+                    right: tablet ? 12 + 44 + 10 : 12,
                     child: _SearchResults(hits: _hits, onTap: _openHit),
                   ),
               ],
@@ -981,11 +974,11 @@ class _HomeSearchBar extends StatelessWidget {
       shadowColor: Colors.black26,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        height: 54,
-        padding: const EdgeInsets.only(left: 16, right: 6),
+        height: 44,
+        padding: const EdgeInsets.only(left: 14, right: 4),
         child: Row(
           children: [
-            Icon(Icons.search_rounded, color: AppColors.ink, size: 26),
+            Icon(Icons.search_rounded, color: AppColors.ink, size: 22),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -1024,6 +1017,7 @@ class _HomeSearchBar extends StatelessWidget {
               valueListenable: controller,
               builder: (context, value, _) => value.text.isEmpty
                   ? IconButton(
+                      visualDensity: VisualDensity.compact,
                       onPressed: onMic,
                       icon: Icon(
                         Icons.mic_none_rounded,
@@ -1032,6 +1026,7 @@ class _HomeSearchBar extends StatelessWidget {
                       ),
                     )
                   : IconButton(
+                      visualDensity: VisualDensity.compact,
                       onPressed: onClear,
                       icon: Icon(
                         Icons.close_rounded,
@@ -1139,9 +1134,9 @@ class _LayersButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: const SizedBox(
-            width: 54,
-            height: 54,
-            child: Icon(Icons.layers_rounded, color: Colors.white, size: 26),
+            width: 44,
+            height: 44,
+            child: Icon(Icons.layers_rounded, color: Colors.white, size: 22),
           ),
         ),
       ),
@@ -1180,7 +1175,7 @@ class _MapSquareButton extends StatelessWidget {
   }
 }
 
-class _IssueStatusCard extends StatelessWidget {
+class _IssueStatusCard extends StatefulWidget {
   const _IssueStatusCard({
     required this.selected,
     required this.onSelect,
@@ -1196,10 +1191,23 @@ class _IssueStatusCard extends StatelessWidget {
   final int resolved;
 
   @override
+  State<_IssueStatusCard> createState() => _IssueStatusCardState();
+}
+
+class _IssueStatusCardState extends State<_IssueStatusCard> {
+  static const _pendingColor = Color(0xFFE53935);
+  static const _inProgressColor = Color(0xFFF9A825);
+  static const _resolvedColor = Color(0xFF2E9D4F);
+
+  // Starts collapsed so the map stays clear; the collapsed pill still shows
+  // the colour-coded counts so users know what is inside.
+  bool _expanded = false;
+
+  void _toggle() => setState(() => _expanded = !_expanded);
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      width: 160,
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(14),
@@ -1211,51 +1219,109 @@ class _IssueStatusCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Issue Status',
-                  style: _pop(13, weight: FontWeight.w700),
-                ),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        alignment: Alignment.bottomLeft,
+        child: _expanded ? _buildExpanded() : _buildCollapsed(),
+      ),
+    );
+  }
+
+  Widget _buildCollapsed() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _toggle,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Issues', style: _pop(12, weight: FontWeight.w700)),
+            const SizedBox(width: 8),
+            _countDot(_pendingColor, widget.pending),
+            const SizedBox(width: 8),
+            _countDot(_inProgressColor, widget.inProgress),
+            const SizedBox(width: 8),
+            _countDot(_resolvedColor, widget.resolved),
+            const SizedBox(width: 2),
+            const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _countDot(Color color, int count) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text('$count', style: _pop(12, weight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildExpanded() {
+    return SizedBox(
+      width: 160,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _toggle,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Issue Status',
+                      style: _pop(13, weight: FontWeight.w700),
+                    ),
+                  ),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                ],
               ),
-              const Icon(Icons.chevron_right_rounded, size: 20),
-            ],
-          ),
-          const SizedBox(height: 4),
-          _row(
-            const Color(0xFFE53935),
-            'Pending',
-            pending,
-            ComplaintBucket.pending,
-          ),
-          _row(
-            const Color(0xFFF9A825),
-            'In Progress',
-            inProgress,
-            ComplaintBucket.inProgress,
-          ),
-          _row(
-            const Color(0xFF2E9D4F),
-            'Resolved',
-            resolved,
-            ComplaintBucket.resolved,
-          ),
-        ],
+            ),
+            const SizedBox(height: 4),
+            _row(
+              _pendingColor,
+              'Pending',
+              widget.pending,
+              ComplaintBucket.pending,
+            ),
+            _row(
+              _inProgressColor,
+              'In Progress',
+              widget.inProgress,
+              ComplaintBucket.inProgress,
+            ),
+            _row(
+              _resolvedColor,
+              'Resolved',
+              widget.resolved,
+              ComplaintBucket.resolved,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _row(Color color, String label, int count, ComplaintBucket bucket) {
-    final isSelected = selected == bucket;
+    final isSelected = widget.selected == bucket;
 
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: () => onSelect(bucket),
+      onTap: () => widget.onSelect(bucket),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: BoxDecoration(
