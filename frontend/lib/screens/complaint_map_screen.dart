@@ -570,6 +570,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   double get _overlayBottom => 12;
 
   Widget _buildCitizenHome(BuildContext context) {
+    // Tablets: the search bar spans the width and the layers + recenter
+    // buttons sit side by side at its right end.
+    final tablet = context.isTablet;
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -583,34 +586,41 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   top: 10,
                   left: 12,
                   right: 12,
-                  child: _TabletOverlayWidth(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _HomeSearchBar(
-                            controller: _searchController,
-                            focusNode: _searchFocus,
-                            hint: _searchHint,
-                            loading: _searching,
-                            onChanged: _onSearchChanged,
-                            onClear: _clearSearch,
-                            onMic: () => _comingSoon('Voice search'),
-                          ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _HomeSearchBar(
+                          controller: _searchController,
+                          focusNode: _searchFocus,
+                          hint: _searchHint,
+                          loading: _searching,
+                          onChanged: _onSearchChanged,
+                          onClear: _clearSearch,
+                          onMic: () => _comingSoon('Voice search'),
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      _LayersButton(onTap: _showLayers),
+                      if (tablet) ...[
                         const SizedBox(width: 10),
-                        _LayersButton(onTap: _showLayers),
+                        _MapSquareButton(
+                          icon: Icons.my_location_rounded,
+                          onTap: _recenter,
+                          size: 54,
+                        ),
                       ],
+                    ],
+                  ),
+                ),
+                if (!tablet)
+                  Positioned(
+                    right: 12,
+                    top: 78,
+                    child: _MapSquareButton(
+                      icon: Icons.my_location_rounded,
+                      onTap: _recenter,
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 12,
-                  top: 78,
-                  child: _MapSquareButton(
-                    icon: Icons.my_location_rounded,
-                    onTap: _recenter,
-                  ),
-                ),
                 if (widget.showComplaints)
                   Positioned(
                     left: 12,
@@ -640,10 +650,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   Positioned(
                     top: 68,
                     left: 12,
-                    right: 12,
-                    child: _TabletOverlayWidth(
-                      child: _SearchResults(hits: _hits, onTap: _openHit),
-                    ),
+                    // Line the results up under the search bar, not the buttons.
+                    right: tablet ? 12 + 54 + 10 + 54 + 10 : 12,
+                    child: _SearchResults(hits: _hits, onTap: _openHit),
                   ),
               ],
             ),
@@ -691,27 +700,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ],
         ),
       ],
-    );
-  }
-}
-
-/// Keeps a floating map overlay (search bar, search results) at a sensible
-/// width on tablets, anchored to the left like a map side panel. Phones get
-/// [child] unchanged.
-class _TabletOverlayWidth extends StatelessWidget {
-  const _TabletOverlayWidth({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!context.isTablet) return child;
-    return Align(
-      alignment: Alignment.topLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: child,
-      ),
     );
   }
 }
@@ -1162,10 +1150,15 @@ class _LayersButton extends StatelessWidget {
 }
 
 class _MapSquareButton extends StatelessWidget {
-  const _MapSquareButton({required this.icon, required this.onTap});
+  const _MapSquareButton({
+    required this.icon,
+    required this.onTap,
+    this.size = 42,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -1178,9 +1171,9 @@ class _MapSquareButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(icon, size: 22, color: AppColors.ink),
+          width: size,
+          height: size,
+          child: Icon(icon, size: size >= 54 ? 26 : 22, color: AppColors.ink),
         ),
       ),
     );
