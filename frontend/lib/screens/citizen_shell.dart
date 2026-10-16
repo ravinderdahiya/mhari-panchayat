@@ -3,8 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/notification_center.dart';
 import '../theme/app_theme.dart';
-import '../utils/responsive.dart';
-import '../widgets/adaptive_nav_scaffold.dart';
 import '../widgets/location_gate.dart';
 import '../widgets/notification_badge.dart';
 import 'citizen_profile_screen.dart';
@@ -54,37 +52,6 @@ class _CitizenShellState extends State<CitizenShell> {
       const NotificationScreen(showBackButton: false),
       const CitizenProfileScreen(),
     ];
-
-    if (context.isTablet) {
-      return TabletRailScaffold(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        leading: _NewComplaintButton(onTap: _openNewComplaint),
-        destinations: const [
-          NavigationRailDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: Text('Home'),
-          ),
-          NavigationRailDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment_rounded),
-            label: Text('Complaints'),
-          ),
-          NavigationRailDestination(
-            icon: NotificationBadgeIcon(icon: Icons.notifications_outlined),
-            selectedIcon: NotificationBadgeIcon(icon: Icons.notifications_rounded),
-            label: Text('Alerts'),
-          ),
-          NavigationRailDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: Text('Profile'),
-          ),
-        ],
-        body: screens[_index],
-      );
-    }
 
     return Scaffold(
       body: screens[_index],
