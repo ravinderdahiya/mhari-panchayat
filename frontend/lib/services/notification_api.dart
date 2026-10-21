@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 import '../models/app_notification.dart';
+import 'app_version_service.dart';
 import 'auth_service.dart';
 import 'session_guard.dart';
 
@@ -99,7 +100,7 @@ class NotificationApi {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
           },
-          body: jsonEncode({'token': token, 'platform': 'android'}),
+          body: jsonEncode({'token': token, 'platform': AppVersionService.platform}),
         )
         .timeout(const Duration(seconds: 15));
     if (response.statusCode < 200 || response.statusCode >= 300) {

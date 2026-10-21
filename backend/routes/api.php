@@ -71,6 +71,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/search', [LocationController::class, 'search']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::post('/auth/profile/photo', [AuthController::class, 'updateProfilePhoto'])->middleware('throttle:20,1');
+    Route::delete('/auth/profile/photo', [AuthController::class, 'removeProfilePhoto']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
     Route::get('/users/assignable', [UserController::class, 'assignable']);
     Route::get('/panchayats/{code}/officials', [UserController::class, 'panchayatOfficials']);

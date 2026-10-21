@@ -26,8 +26,11 @@ class CheckAppVersion
             return $next($request);
         }
 
-        $settings = Cache::remember(self::key('android'), self::TTL, function () {
-            $version = AppVersion::forPlatform('android');
+        // 'ios' / 'android'; builds that predate the header are Android.
+        $platform = $request->header('X-App-Platform') === 'ios' ? 'ios' : 'android';
+
+        $settings = Cache::remember(self::key($platform), self::TTL, function () use ($platform) {
+            $version = AppVersion::forPlatform($platform);
 
             return $version
                 ? [

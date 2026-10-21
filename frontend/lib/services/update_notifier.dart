@@ -34,7 +34,7 @@ void updateNotificationTapBackground(NotificationResponse response) {
 class UpdateNotifier {
   UpdateNotifier._();
 
-  static const topic = 'app_update_android';
+  static String get topic => 'app_update_${AppVersionService.platform}';
   static const _notificationId = 1001;
 
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -67,6 +67,12 @@ class UpdateNotifier {
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // Permission is requested once by FirebaseMessaging.requestPermission().
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
       ),
       onDidReceiveNotificationResponse: (response) =>
           unawaited(AppVersionService.openStore(response.payload)),
@@ -90,6 +96,7 @@ class UpdateNotifier {
       title: 'म्हारी पंचायत – अपडेट उपलब्ध',
       body: (data['message'] as String?) ?? 'नया वर्ज़न उपलब्ध है, कृपया ऐप अपडेट करें।',
       notificationDetails: const NotificationDetails(
+        iOS: DarwinNotificationDetails(),
         android: AndroidNotificationDetails(
           'app_update',
           'App Updates',

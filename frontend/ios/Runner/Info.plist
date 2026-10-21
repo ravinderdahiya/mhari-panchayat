@@ -66,6 +66,15 @@
 	<string>शिकायत में आपका सटीक स्थान (village/panchayat) दर्ज करने के लिए लोकेशन की आवश्यकता है।</string>
 	<key>NSCameraUsageDescription</key>
 	<string>शिकायत के साथ फोटो जोड़ने के लिए कैमरा एक्सेस की आवश्यकता है।</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>फीडबैक के साथ स्क्रीनशॉट या फोटो जोड़ने के लिए फोटो लाइब्रेरी एक्सेस की आवश्यकता है।</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<!-- The app only uses HTTPS: no export-compliance questionnaire on each upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>खींची गई फोटो सेव करने के लिए फोटो लाइब्रेरी एक्सेस की आवश्यकता है।</string>
 	<key>UILaunchStoryboardName</key>

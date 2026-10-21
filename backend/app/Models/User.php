@@ -26,7 +26,7 @@ use Throwable;
     'set_password_token', 'set_password_token_expires_at',
     'rejection_reason', 'reviewed_by_id', 'reviewed_at',
 ])]
-#[Hidden(['password', 'login_password_enc', 'email_verification_token', 'set_password_token'])]
+#[Hidden(['password', 'login_password_enc', 'email_verification_token', 'set_password_token', 'profile_photo_path'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -181,6 +181,7 @@ class User extends Authenticatable
         $data = $this->toArray();
         unset($data['login_password'], $data['login_password_enc']);
         $data['is_super_admin'] = $this->isSuperAdmin();
+        $data['profile_photo_url'] = $this->profile_photo_path ? asset('storage/'.$this->profile_photo_path) : null;
         $data['permissions'] = $this->permissionKeys();
 
         return $data;

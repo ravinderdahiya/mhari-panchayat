@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -501,6 +502,45 @@ class AuthController extends Controller
         $user->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
 
         return response()->json(['success' => true, 'user' => $user->toAuthArray()]);
+    }
+
+    // Profile picture: one per user, replaced (and the old file deleted) on each upload.
+    public function updateProfilePhoto(Request $request)
+    {
+        $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
+        ], [
+            'photo.max' => 'The photo must be 5 MB or smaller.',
+            'photo.image' => 'Please choose a JPG, PNG or WebP image.',
+            'photo.mimes' => 'Please choose a JPG, PNG or WebP image.',
+        ]);
+
+        $user = $request->user();
+        $old = $user->profile_photo_path;
+        $user->profile_photo_path = $request->file('photo')->store('profile-photos', 'public');
+        $user->save();
+
+        if ($old) {
+            Storage::disk('public')->delete($old);
+        }
+
+        $user->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
+
+        return response()->json(['success' => true, 'message' => 'Profile photo updated', 'user' => $user->toAuthArray()]);
+    }
+
+    public function removeProfilePhoto(Request $request)
+    {
+        $user = $request->user();
+        if ($user->profile_photo_path) {
+            Storage::disk('public')->delete($user->profile_photo_path);
+            $user->profile_photo_path = null;
+            $user->save();
+        }
+
+        $user->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
+
+        return response()->json(['success' => true, 'message' => 'Profile photo removed', 'user' => $user->toAuthArray()]);
     }
 
     public function changePassword(Request $request)

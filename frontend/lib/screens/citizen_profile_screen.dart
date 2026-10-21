@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/about_app_dialog.dart';
 import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
@@ -238,39 +239,7 @@ class _CitizenProfileHeader extends StatelessWidget {
               const SizedBox(height: 26),
               Row(
                 children: [
-                  Stack(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 3)),
-                          ],
-                        ),
-                        child: const CircleAvatar(
-                          radius: 40,
-                          backgroundColor: Color(0xFFE9F0E6),
-                          child: Icon(Icons.person_rounded, color: _mockGreen, size: 46),
-                        ),
-                      ),
-                      Positioned(
-                        right: 2,
-                        bottom: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: _mockGreen,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
-                        ),
-                      ),
-                    ],
-                  ),
+                  ProfileAvatar(photoUrl: profile?.photoUrl, accent: _mockGreen),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(

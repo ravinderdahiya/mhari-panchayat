@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +35,10 @@ class AppVersionService {
 
   /// Header every sign-in call carries so the server can refuse outdated builds.
   static const headerName = 'X-App-Version-Code';
+  static const platformHeaderName = 'X-App-Platform';
+
+  /// 'ios' or 'android' - the release channel this build belongs to.
+  static String get platform => defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
   static Future<PackageInfo> _info() => PackageInfo.fromPlatform();
 
@@ -73,7 +78,7 @@ class AppVersionService {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: jsonEncode({'version_code': int.tryParse(code) ?? 0, 'platform': 'android'}),
+            body: jsonEncode({'version_code': int.tryParse(code) ?? 0, 'platform': platform}),
           )
           .timeout(const Duration(seconds: 6));
       if (response.statusCode != 200) return AppVersionCheck.ok;
@@ -98,6 +103,14 @@ class AppVersionService {
   /// Opens the Play Store listing in the Play Store app, falling back to the
   /// web URL the backend sent.
   static Future<void> openStore(String? fallbackUrl) async {
+    // iOS has no market:// scheme: the App Store link from the backend is used as is.
+    if (platform == 'ios') {
+      if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
+        await launchUrl(Uri.parse(fallbackUrl), mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+
     await buildNumber(); // makes sure the package name is loaded
     final package = _packageName;
     if (package != null) {

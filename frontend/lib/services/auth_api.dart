@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../config/api_config.dart';
 import 'app_version_service.dart';
@@ -102,6 +104,7 @@ class UserProfile {
     this.employeeId,
     this.memberId,
     this.familyId,
+    this.photoUrl,
   });
 
   final String id;
@@ -122,6 +125,9 @@ class UserProfile {
   final String? employeeId;
   final String? memberId;
   final String? familyId;
+
+  /// Profile picture, already pointed at the API host in use; null if none is set.
+  final String? photoUrl;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     String? asString(dynamic value) {
@@ -157,6 +163,9 @@ class UserProfile {
       employeeId: asString(json['employee_id']),
       memberId: asString(json['member_id']),
       familyId: asString(json['family_id']),
+      photoUrl: asString(json['profile_photo_url']) == null
+          ? null
+          : ApiConfig.mediaUrl(asString(json['profile_photo_url'])!),
     );
   }
 }
@@ -319,6 +328,92 @@ class AuthApi {
     return UserProfile.fromJson(user);
   }
 
+  /// Sets the signed-in user's profile picture. Returns the refreshed profile
+  /// (its [UserProfile.photoUrl] is the new picture).
+  static Future<UserProfile> uploadProfilePhoto({
+    required Uint8List bytes,
+    required String fileName,
+  }) {
+    final lower = fileName.toLowerCase();
+    final subtype = lower.endsWith('.png')
+        ? 'png'
+        : lower.endsWith('.webp')
+        ? 'webp'
+        : 'jpeg';
+
+    return _profilePhotoCall((token) async {
+      final request = http.MultipartRequest('POST', _uri('/profile/photo'))
+        ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Accept'] = 'application/json'
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'photo',
+            bytes,
+            filename: fileName,
+            contentType: MediaType('image', subtype),
+          ),
+        );
+      return http.Response.fromStream(
+        await request.send().timeout(const Duration(seconds: 60)),
+      );
+    }, 'फोटो अपलोड नहीं हो पाई। पुनः प्रयास करें।');
+  }
+
+  /// Removes the profile picture (falls back to the default avatar).
+  static Future<UserProfile> removeProfilePhoto() {
+    return _profilePhotoCall(
+      (token) => http
+          .delete(
+            _uri('/profile/photo'),
+            headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 20)),
+      'फोटो हटाई नहीं जा सकी। पुनः प्रयास करें।',
+    );
+  }
+
+  static Future<UserProfile> _profilePhotoCall(
+    Future<http.Response> Function(String token) send,
+    String failureMessage,
+  ) async {
+    final session = await AuthService.getSession();
+    if (session == null || !session.isValid) {
+      throw AuthApiException('कृपया पहले लॉगिन करें');
+    }
+
+    late final http.Response response;
+    try {
+      response = await send(session.token);
+    } catch (_) {
+      throw AuthApiException(
+        'Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।',
+      );
+    }
+
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      body = const {};
+    }
+
+    if (response.statusCode == 401) {
+      await SessionGuard.handleUnauthorized();
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final errors = body['errors'] as Map<String, dynamic>?;
+      final firstError = errors?.values
+          .whereType<List<dynamic>>()
+          .expand((messages) => messages)
+          .firstOrNull;
+      throw AuthApiException(
+        (firstError as String?) ?? body['message'] as String? ?? failureMessage,
+      );
+    }
+
+    return UserProfile.fromJson(body['user'] as Map<String, dynamic>? ?? const {});
+  }
+
   /// Backend role for field-app labels. Uses the value stored at login,
   /// and fills it from `/me` when an older session only has the UI shell.
   static Future<String?> resolvedFieldRole() async {
@@ -408,6 +503,7 @@ class AuthApi {
               'Content-Type': 'application/json',
               // Lets the server refuse sign-in from builds below the minimum (HTTP 426).
               AppVersionService.headerName: await AppVersionService.buildNumber(),
+              AppVersionService.platformHeaderName: AppVersionService.platform,
             },
             body: jsonEncode(payload),
           )

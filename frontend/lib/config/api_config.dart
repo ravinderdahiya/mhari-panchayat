@@ -34,6 +34,25 @@ class ApiConfig {
   /// Alias retained for registration API call sites.
   static String get mhariPanchayatBaseUrl => baseUrl;
 
+  /// Re-points a stored media URL (profile photo, ...) at the API host in use.
+  /// The backend builds absolute URLs from its own APP_URL, which can differ from
+  /// the address the app reaches it on (emulator, LAN, a sub-path deployment).
+  static String mediaUrl(String value) {
+    final base = Uri.parse(baseUrl);
+    final basePath = base.path.isEmpty || base.path == '/' ? '' : base.path;
+
+    final parsed = Uri.tryParse(value);
+    var path = parsed != null && parsed.hasScheme
+        ? (parsed.hasQuery ? '${parsed.path}?${parsed.query}' : parsed.path)
+        : (value.startsWith('/') ? value : '/$value');
+
+    if (basePath.isNotEmpty && path.startsWith(basePath)) {
+      path = path.substring(basePath.length);
+    }
+
+    return '${base.scheme}://${base.authority}$basePath$path';
+  }
+
   /// Served as a static file from the Laravel backend's public/ dir -
   /// see backend/public/privacy-policy.html.
   static String get privacyPolicyUrl => '$baseUrl/privacy-policy.html';

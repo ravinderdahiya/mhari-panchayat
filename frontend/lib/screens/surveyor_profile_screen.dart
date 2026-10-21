@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/flipping_logo.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -193,6 +194,7 @@ class _SurveyorProfileScreenState extends State<SurveyorProfileScreen> {
               name: _name ?? FieldStaffCopy.profileFallbackName(_serverRole),
               mobile: _formatMobile(p?.mobile),
               roleLabel: FieldStaffCopy.profileSubtitle(_serverRole),
+              photoUrl: p?.photoUrl,
               showClose: !widget.embedded,
               tabletMaxWidth: tabletWidth,
             ),
@@ -250,6 +252,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.name,
     required this.mobile,
     required this.roleLabel,
+    this.photoUrl,
     this.showClose = false,
     this.tabletMaxWidth = Breakpoints.form,
   });
@@ -257,6 +260,7 @@ class _ProfileHeader extends StatelessWidget {
   final String? name;
   final String mobile;
   final String roleLabel;
+  final String? photoUrl;
   final bool showClose;
 
   /// Banner contents line up with the page column on tablets.
@@ -320,37 +324,12 @@ class _ProfileHeader extends StatelessWidget {
               const SizedBox(height: 30),
               Row(
                 children: [
-                  Stack(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 3)),
-                          ],
-                        ),
-                        child: const CircleAvatar(
-                          radius: 44,
-                          backgroundColor: Color(0xFFE3F0E8),
-                          child: Icon(Icons.person_rounded, color: _green, size: 52),
-                        ),
-                      ),
-                      Positioned(
-                        right: 2,
-                        bottom: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E2A22),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
-                        ),
-                      ),
-                    ],
+                  ProfileAvatar(
+                    photoUrl: photoUrl,
+                    accent: _green,
+                    badgeColor: const Color(0xFF1E2A22),
+                    background: const Color(0xFFE3F0E8),
+                    radius: 44,
                   ),
                   const SizedBox(width: 16),
                   Expanded(

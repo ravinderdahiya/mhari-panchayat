@@ -102,6 +102,11 @@ class FcmService
                     'topic' => $topic,
                     'data' => array_map(fn ($v) => (string) $v, $data),
                     'android' => ['priority' => 'HIGH'],
+                    // iOS only wakes the app for a data message when it is a background push.
+                    'apns' => [
+                        'headers' => ['apns-push-type' => 'background', 'apns-priority' => '5'],
+                        'payload' => ['aps' => ['content-available' => 1]],
+                    ],
                 ],
             ]);
 

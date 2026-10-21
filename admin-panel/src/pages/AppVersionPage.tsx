@@ -4,12 +4,19 @@ import { Smartphone } from 'lucide-react';
 import * as api from '../services/api';
 import type { AppVersionSetting } from '../services/api';
 
-const PLATFORM = 'android';
+type Platform = 'android' | 'ios';
+
+const PLATFORMS: { id: Platform; label: string; storeHint: string }[] = [
+  { id: 'android', label: 'Android (Play Store)', storeHint: 'https://play.google.com/store/apps/details?id=in.hsac.mharipanchayat' },
+  { id: 'ios', label: 'iOS (App Store)', storeHint: 'https://apps.apple.com/app/id<your-app-id>' },
+];
 
 const inputClass =
   'w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-sidebar focus:ring-1 focus:ring-sidebar';
 
 export default function AppVersionPage() {
+  const [rows, setRows] = useState<AppVersionSetting[]>([]);
+  const [platform, setPlatform] = useState<Platform>('android');
   const [setting, setSetting] = useState<AppVersionSetting | null>(null);
   const [latest, setLatest] = useState('');
   const [min, setMin] = useState('');
@@ -28,11 +35,29 @@ export default function AppVersionPage() {
     setMessage(s.message ?? '');
   };
 
+  // A platform with no saved row yet (e.g. iOS before its first release) starts
+  // from permissive defaults, so nothing is forced until an admin saves it.
+  const showPlatform = (next: Platform, source: AppVersionSetting[]) => {
+    setPlatform(next);
+    setError('');
+    setSaved('');
+    const row = source.find((v) => v.platform === next);
+    if (row) {
+      apply(row);
+    } else {
+      setSetting(null);
+      setLatest('1');
+      setMin('1');
+      setStoreUrl('');
+      setMessage('');
+    }
+  };
+
   useEffect(() => {
     api.getAppVersions()
       .then((res) => {
-        const row = res.data.find((v) => v.platform === PLATFORM);
-        if (row) apply(row);
+        setRows(res.data);
+        showPlatform('android', res.data);
       })
       .catch((reason: Error) => setError(reason.message))
       .finally(() => setLoading(false));
@@ -50,13 +75,14 @@ export default function AppVersionPage() {
     setError('');
     setSaved('');
     try {
-      const res = await api.updateAppVersion(PLATFORM, {
+      const res = await api.updateAppVersion(platform, {
         latest_version_code: latestNum,
         min_version_code: minNum,
         store_url: storeUrl.trim(),
         message: message.trim() === '' ? null : message.trim(),
       });
       apply(res.data);
+      setRows((current) => [...current.filter((v) => v.platform !== platform), res.data]);
       setSaved('Saved. The app picks this up the next time it is opened.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not save');
@@ -83,7 +109,24 @@ export default function AppVersionPage() {
       <form onSubmit={submit} className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
         <div className="flex items-center gap-2 text-slate-700">
           <Smartphone size={18} />
-          <h2 className="text-sm font-bold">Android app (Play Store)</h2>
+          <h2 className="text-sm font-bold">App release settings</h2>
+        </div>
+
+        <div className="flex gap-2" role="tablist">
+          {PLATFORMS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={platform === p.id}
+              onClick={() => showPlatform(p.id, rows)}
+              className={`text-xs font-semibold rounded-full border px-3 py-1.5 cursor-pointer ${
+                platform === p.id ? 'bg-sidebar text-white border-sidebar' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
 
         {loading ? (
@@ -108,8 +151,8 @@ export default function AppVersionPage() {
             </div>
 
             <label className="block text-xs font-semibold text-slate-600 space-y-1">
-              Play Store URL
-              <input className={inputClass} value={storeUrl} onChange={(e) => setStoreUrl(e.target.value)} />
+              {platform === 'ios' ? 'App Store URL' : 'Play Store URL'}
+              <input className={inputClass} placeholder={PLATFORMS.find((p) => p.id === platform)?.storeHint} value={storeUrl} onChange={(e) => setStoreUrl(e.target.value)} />
             </label>
 
             <label className="block text-xs font-semibold text-slate-600 space-y-1">

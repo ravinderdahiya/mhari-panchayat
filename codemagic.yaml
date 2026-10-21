@@ -1,0 +1,68 @@
+# iOS build on a cloud Mac (Codemagic) - the IPA cannot be built on Windows.
+#
+# One-time setup in Codemagic (codemagic.io):
+#   1. Add this GitHub repo as an application and choose "codemagic.yaml".
+#   2. Teams -> Integrations -> App Store Connect: add an API key (App Store Connect ->
+#      Users and Access -> Integrations -> Keys, role "App Manager") and name the
+#      integration exactly as in `integrations.app_store_connect` below.
+#   3. Variable group "ios_release" with:
+#        IOS_GOOGLE_SERVICE_INFO_PLIST  = base64 of GoogleService-Info.plist (the iOS app
+#                                         registered in Firebase for in.hsac.mharipanchayat):
+#                                         base64 -w0 GoogleService-Info.plist
+#        API_BASE_URL (optional)        = defaults to the live server below
+#   4. In Apple Developer: App ID in.hsac.mharipanchayat with "Push Notifications"
+#      enabled; in Firebase -> Project settings -> Cloud Messaging upload the APNs key.
+#
+# Every upload needs a higher build number than the last one (the +N in pubspec `version:`).
+
+workflows:
+  ios-release:
+    name: iOS release (TestFlight / App Store)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Mhari Panchayat App Store Connect
+    environment:
+      groups:
+        - ios_release
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: in.hsac.mharipanchayat
+    scripts:
+      - name: Flutter packages
+        script: |
+          cd frontend
+          flutter pub get
+      - name: Firebase config (iOS)
+        script: |
+          # Push needs this file; without it the app still runs, just without push.
+          if [ -n "$IOS_GOOGLE_SERVICE_INFO_PLIST" ]; then
+            echo "$IOS_GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > frontend/ios/Runner/GoogleService-Info.plist
+          else
+            echo "WARNING: IOS_GOOGLE_SERVICE_INFO_PLIST not set - building without Firebase/push"
+          fi
+      - name: CocoaPods
+        script: |
+          cd frontend/ios
+          pod install
+      - name: Apply signing profiles
+        script: |
+          cd frontend
+          xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          cd frontend
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=API_BASE_URL="${API_BASE_URL:-https://hsac.in/mhari-panchayat}"
+    artifacts:
+      - frontend/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
