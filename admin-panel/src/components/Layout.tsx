@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Database, FileBarChart, MessageSquareWarning,
   Users, UserRound, UserCheck, ShieldCheck, Settings, ScrollText,   Landmark, LogOut, Vote,
-  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation, MessageCircleHeart, Route, Smartphone,
+  ChevronRight, ClipboardCheck, HardHat, Layers3, ListChecks, Presentation, MessageCircleHeart, Route, Smartphone, Globe,
 } from 'lucide-react';
 import type { User } from '../types';
 
 export type View =
   | 'dashboard' | 'master' | 'reports' | 'complaints' | 'my-surveys' | 'village-assets'
-  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'road-map' | 'app-version' | 'profile' | 'feedback';
+  | 'surveyors' | 'cplo-management' | 'asset-surveys' | 'asset-types' | 'users' | 'elected-representatives' | 'citizens' | 'roles' | 'project-meeting' | 'settings' | 'audit-log' | 'road-map' | 'app-version' | 'home-content' | 'profile' | 'feedback';
 
 interface LayoutProps {
   currentUser: User;
@@ -102,6 +102,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'audit-log', label: 'Audit Log', icon: ScrollText, adminOnly: true, section: 'system' },
   { id: 'road-map', label: 'Road Map', icon: Route, adminOnly: true, section: 'system' },
   { id: 'app-version', label: 'App Version', icon: Smartphone, adminOnly: true, section: 'system' },
+  { id: 'home-content', label: 'Home Page', icon: Globe, adminOnly: true, section: 'system' },
 ];
 
 const PAGE_SUBTITLES: Record<View, string> = {
@@ -125,6 +126,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   'audit-log': 'System activity history',
   'road-map': 'Survey polygons and walked routes saved from the mobile app',
   'app-version': 'Release settings that decide when the mobile app asks users to update',
+  'home-content': 'Announcement banner and contact details shown on the public home page',
   profile: 'Your account details',
 };
 

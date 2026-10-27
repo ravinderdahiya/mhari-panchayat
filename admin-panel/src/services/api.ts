@@ -738,3 +738,73 @@ export const updateAppVersion = (platform: string, fields: {
   message: string | null;
 }) =>
   jsonRequest<{ success: boolean; message: string; data: AppVersionSetting }>(`/api/app-versions/${platform}`, 'PUT', fields);
+
+// --- PUBLIC HOME PAGE (no login) ---
+export interface PublicHome {
+  stats: {
+    panchayats: number;
+    complaints_total: number;
+    complaints_resolved: number;
+    avg_resolution_days: number | null;
+    assets_geotagged: number;
+  };
+  asset_types: { total: number; featured: { name: string; name_hi: string | null }[] };
+  contact: { helpline: string; email: string; office_hours: string };
+  announcement: {
+    tag: string; tag_hi: string; title: string; title_hi: string; body: string; body_hi: string;
+    cta_label: string; cta_label_hi: string; cta_url: string;
+  } | null;
+  app: { android_url: string | null; ios_url: string | null };
+  generated_at: string;
+}
+
+export interface TrackedComplaint {
+  complaint_id: string;
+  status: string;
+  rejected: boolean;
+  category: string | null;
+  location: string[];
+  filed_at: string | null;
+  updated_at: string | null;
+  sla_due_at: string | null;
+  days_left: number | null;
+  stage: number;
+  steps: { key: string; reached: boolean; at: string | null }[];
+  timeline: { title: string; status: string; at: string | null }[];
+}
+
+export interface PublicPanchayatHit {
+  id: number; name: string; block_id: number | null; block: string | null; district_id: number | null; district: string | null;
+}
+
+export interface PublicAssetPoint {
+  id: number; name: string; type: string | null; type_hi: string | null; village: string | null; lat: number; lng: number;
+}
+
+export const getPublicHome = () => request<{ success: boolean; data: PublicHome }>('/api/public/home');
+
+export const trackComplaint = (complaint_id: string, mobile: string) =>
+  jsonRequest<{ success: boolean; data: TrackedComplaint }>('/api/public/track-complaint', 'POST', { complaint_id, mobile });
+
+export const searchPublicPanchayats = (q: string) =>
+  request<{ success: boolean; data: PublicPanchayatHit[] }>(`/api/public/search?q=${encodeURIComponent(q)}`);
+
+export const getPublicAssets = (filters: { district_id?: number; block_id?: number; panchayat_id?: number }) => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, String(value)); });
+  return request<{ success: boolean; data: { total: number; points: PublicAssetPoint[] } }>(`/api/public/assets?${params}`);
+};
+
+export const getPublicBlocks = (district_id: number) =>
+  request<{ success: boolean; blocks: { id: number; name: string }[] }>(`/api/registrations/blocks?district_id=${district_id}`);
+
+export const getPublicPanchayats = (block_id: number) =>
+  request<{ success: boolean; panchayats: { id: number; name: string }[] }>(`/api/registrations/panchayats?block_id=${block_id}`);
+
+// --- SITE SETTINGS (admin: content of the public home page) ---
+export type SiteSettings = Record<string, string>;
+
+export const getSiteSettings = () => request<{ success: boolean; data: SiteSettings }>('/api/site-settings');
+
+export const updateSiteSettings = (fields: SiteSettings) =>
+  jsonRequest<{ success: boolean; message: string; data: SiteSettings }>('/api/site-settings', 'PUT', fields);

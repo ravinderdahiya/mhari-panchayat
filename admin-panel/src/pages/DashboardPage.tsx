@@ -97,8 +97,18 @@ interface DashboardPageProps {
   onNavigateToComplaint: (id: number) => void;
 }
 
+// Shown when the complaint-report API refuses this user (a role without
+// complaints.view_reports): the dashboard still opens with its map, with zeroed
+// counters, instead of staying on "Loading…" forever.
+const EMPTY_REPORTS: ComplaintReports = {
+  total: 0, pending: 0, inProgress: 0, completed: 0, rejected: 0, today: 0, thisMonth: 0,
+  avgResolutionHours: null, byStatus: {}, byCategory: {}, trend: [], closedByPerson: [],
+};
+
 export default function DashboardPage({ onNavigateToComplaints, onNavigateToComplaint }: DashboardPageProps) {
   const [reports, setReports] = useState<ComplaintReports | null>(null);
+  // True when the API refused the complaint report (role without complaints.view_reports).
+  const [reportsDenied, setReportsDenied] = useState(false);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [surveys, setSurveys] = useState<AssetSurvey[]>([]);
   const [error, setError] = useState('');
@@ -172,7 +182,16 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   useEffect(() => {
     api.getComplaintReports()
       .then(({ reports }) => setReports(reports))
-      .catch((err) => setError((err as Error).message));
+      .catch((err) => {
+        const message = (err as Error).message;
+        if (/permission/i.test(message)) {
+          // Not an error for this role - it simply has no complaint statistics.
+          setReportsDenied(true);
+        } else {
+          setError(message);
+        }
+        setReports(EMPTY_REPORTS);
+      });
     api.getComplaints()
       .then(({ complaints }) => setComplaints(complaints))
       .catch(() => {});
@@ -181,7 +200,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
       .catch(() => {});
   }, []);
 
-  const heroStats = reports ? [
+  const heroStats = reports && !reportsDenied ? [
     { label: 'Total Complaints', value: reports.total, icon: ListChecks, filter: 'All' as const },
     { label: 'Pending', value: reports.pending, icon: Hourglass, filter: 'Pending' as const },
     { label: 'In Progress', value: reports.inProgress, icon: Wrench, filter: 'In_Progress' as const },

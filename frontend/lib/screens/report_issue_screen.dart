@@ -357,7 +357,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
               _gpsDistrict =
                   place.subAdministrativeArea ?? place.administrativeArea;
               _gpsTehsil = place.locality ?? place.subAdministrativeArea;
-              _gpsVillage = place.subLocality ?? place.name ?? place.locality;
+              _gpsVillage = place.subLocality ??
+                  (_looksLikePlusCode(place.name) ? null : place.name) ??
+                  place.locality;
               _gpsBlock = place.locality ?? place.subAdministrativeArea;
               _error = null;
             });
@@ -415,15 +417,21 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       } catch (_) {
         // Server reverse geocoding remains as a secondary source.
       }
-      if (!_hasCompleteHierarchy(detected)) {
-        final reversed = await LocationApi.reverse(
-          latitude: position.latitude,
-          longitude: position.longitude,
-        );
-        if (_resolvedHierarchyParts(reversed) >
-            _resolvedHierarchyParts(detected)) {
-          detected = reversed;
-        }
+      // The server places the GPS point inside the real panchayat boundary
+      // polygon, which gives the right district / block / village even where
+      // the phone's geocoder is wrong (it can label a Jind village as Hisar).
+      // So it is asked every time, and wins whenever it matched a boundary;
+      // the name-based guesses above are only the fallback.
+      final reversed = await LocationApi.reverse(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      if (reversed != null &&
+          (reversed.boundaryMatched ||
+              (!_hasCompleteHierarchy(detected) &&
+                  _resolvedHierarchyParts(reversed) >
+                      _resolvedHierarchyParts(detected)))) {
+        detected = reversed;
       }
 
       if (!_hasCompleteHierarchy(detected) && nativePlace != null) {
@@ -437,10 +445,12 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       if (!mounted) return;
       setState(() {
         _gpsState ??= 'Haryana';
-        _gpsDistrict ??= detected?.district;
-        _gpsTehsil ??= detected?.tehsil;
-        _gpsVillage ??= detected?.village;
-        _gpsBlock ??= detected?.panchayat;
+        // Master-data values win over the phone geocoder's raw strings (which
+        // can be a former district, a plus code, ...); those only fill gaps.
+        _gpsDistrict = detected?.district ?? _gpsDistrict;
+        _gpsTehsil = detected?.tehsil ?? _gpsTehsil;
+        _gpsVillage = detected?.village ?? _gpsVillage;
+        _gpsBlock = detected?.block ?? _gpsBlock ?? detected?.panchayat;
         _error = null;
       });
 
@@ -1032,4 +1042,11 @@ List<Widget> _pairOnTablet(BuildContext context, Widget first, Widget second) {
       ],
     ),
   ];
+}
+
+/// Open Location Code ("plus code") such as `59RJ+WR9`, which Android's geocoder
+/// returns as the place name when it has no street address - not a village name.
+bool _looksLikePlusCode(String? value) {
+  if (value == null) return false;
+  return RegExp(r'^[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,4}$').hasMatch(value.trim().toUpperCase());
 }
