@@ -332,10 +332,10 @@ class LocationController extends Controller
     {
         $latitude = round($latitude, 6);
         $longitude = round($longitude, 6);
-        // v3: now backed by the real panchayat boundary polygons, not just
+        // v4: adds block + a village/tehsil consistent with the boundary panchayat (v3: backed by the real panchayat boundary polygons, not just
         // Nominatim name-guessing - old cached entries predate that and
         // could still carry a wrong panchayat, so they're not reused.
-        $cacheKey = "reverse-location:v3:{$latitude}:{$longitude}";
+        $cacheKey = "reverse-location:v4:{$latitude}:{$longitude}";
 
         return Cache::remember($cacheKey, now()->addDays(30), function () use ($latitude, $longitude) {
             $nominatim = $this->lookupViaNominatim($latitude, $longitude);
@@ -356,14 +356,38 @@ class LocationController extends Controller
             // fuzzy village-name guess for panchayat/district - overrides
             // just those fields; village/tehsil (which this layer doesn't
             // carry) stay whatever the name-based lookup above found.
+            $result += ['blockId' => null, 'block' => null, 'boundaryMatched' => false];
+
             if ($gis) {
                 $panchayat = Panchayat::where('code', $gis['code'])->with('block.district')->first();
                 if ($panchayat) {
                     $result['panchayatId'] = $panchayat->id;
                     $result['panchayat'] = $panchayat->name;
+                    $result['blockId'] = $panchayat->block?->id;
+                    $result['block'] = $panchayat->block?->name;
+                    $result['boundaryMatched'] = true;
                     if ($panchayat->block?->district_id) {
                         $result['districtId'] = $panchayat->block->district_id;
                         $result['district'] = $panchayat->block->district?->name;
+                    }
+
+                    // Nominatim's village / tehsil guess comes from a name match and can
+                    // belong to another district entirely (e.g. a Hisar village for a
+                    // point in Jind). Keep it only if it really sits in this panchayat;
+                    // otherwise use the panchayat's own village, preferring the one that
+                    // shares the panchayat's name, and take the tehsil from that village.
+                    $guess = $result['villageId'] ? Village::find($result['villageId']) : null;
+                    if (! $guess || $guess->panchayat_id !== $panchayat->id) {
+                        $own = Village::with('tehsil')
+                            ->where('panchayat_id', $panchayat->id)
+                            ->where('is_active', true)
+                            ->orderByRaw('(LOWER(name) = ?) DESC', [mb_strtolower($panchayat->name)])
+                            ->orderBy('name')
+                            ->first();
+                        $result['villageId'] = $own?->id;
+                        $result['village'] = $own?->name;
+                        $result['tehsilId'] = $own?->tehsil?->id;
+                        $result['tehsil'] = $own?->tehsil?->name;
                     }
                 }
             }

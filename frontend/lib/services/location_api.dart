@@ -15,6 +15,9 @@ class DetectedLocation {
     this.village,
     this.panchayatId,
     this.panchayat,
+    this.blockId,
+    this.block,
+    this.boundaryMatched = false,
   });
 
   final int? districtId;
@@ -25,6 +28,12 @@ class DetectedLocation {
   final String? village;
   final int? panchayatId;
   final String? panchayat;
+  final int? blockId;
+  final String? block;
+
+  /// True when the server placed the point inside a real panchayat boundary
+  /// polygon - the authoritative answer, unlike a name-based geocoder guess.
+  final bool boundaryMatched;
 }
 
 /// One hit of the map's place search (district / block / panchayat / village).
@@ -193,6 +202,9 @@ class LocationApi {
       panchayat: value('panchayat'),
       village: value('village'),
       panchayatId: id('panchayatId'),
+      blockId: id('blockId'),
+      block: value('block'),
+      boundaryMatched: location['boundaryMatched'] == true,
     );
   }
 }

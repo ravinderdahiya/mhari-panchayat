@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import * as api from './services/api';
 import type { ComplaintStatus, User } from './types';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import HomePage from './pages/HomePage';
 import DashboardPage from './pages/DashboardPage';
 import MasterDataPage from './pages/MasterDataPage';
 import ComplaintsPage from './pages/ComplaintsPage';
@@ -21,13 +22,14 @@ import ProjectMeetingPage from './pages/ProjectMeetingPage';
 import RoadMapPage from './pages/RoadMapPage';
 import ReportsPage from './pages/ReportsPage';
 import AppVersionPage from './pages/AppVersionPage';
+import HomeContentPage from './pages/HomeContentPage';
 import ProfilePage from './pages/ProfilePage';
 import FeedbackPage from './pages/FeedbackPage';
 import ComingSoon from './components/ComingSoon';
 import Layout from './components/Layout';
 import type { View } from './components/Layout';
 
-type PreAuthView = 'login' | 'register' | 'forgot';
+type PreAuthView = 'home' | 'login' | 'register' | 'forgot';
 
 const PLACEHOLDER_TITLES: Partial<Record<View, string>> = {
   settings: 'Settings',
@@ -40,7 +42,8 @@ export default function App() {
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [masterEntityKey, setMasterEntityKey] = useState('states');
   const [assetSurveyChildId, setAssetSurveyChildId] = useState('pending-review');
-  const [preAuthView, setPreAuthView] = useState<PreAuthView>('login');
+  // Visitors land on the public home page; staff bookmarks can use /#login to skip it.
+  const [preAuthView, setPreAuthView] = useState<PreAuthView>(() => (window.location.hash === '#login' ? 'login' : 'home'));
   const [complaintsFilter, setComplaintsFilter] = useState<ComplaintStatus | 'All' | null>(null);
   const [complaintsInitialId, setComplaintsInitialId] = useState<number | null>(null);
 
@@ -90,18 +93,36 @@ export default function App() {
   }
 
   if (!currentUser) {
+    if (preAuthView === 'home') {
+      return <HomePage onLogin={() => setPreAuthView('login')} />;
+    }
+
+    // The sign-in screens get a way back to the public home page.
+    const withBackToHome = (screen: ReactElement) => (
+      <>
+        <button
+          type="button"
+          onClick={() => setPreAuthView('home')}
+          className="fixed left-4 top-4 z-50 rounded-lg border border-line bg-white/90 px-3 py-1.5 text-xs font-semibold text-sidebar shadow-sm hover:bg-white cursor-pointer"
+        >
+          ← Home
+        </button>
+        {screen}
+      </>
+    );
+
     if (preAuthView === 'register') {
-      return <RegisterPage onRegisterSuccess={setCurrentUser} onNavigateLogin={() => setPreAuthView('login')} />;
+      return withBackToHome(<RegisterPage onRegisterSuccess={setCurrentUser} onNavigateLogin={() => setPreAuthView('login')} />);
     }
     if (preAuthView === 'forgot') {
-      return <ForgotPasswordPage onDone={() => setPreAuthView('login')} onNavigateLogin={() => setPreAuthView('login')} />;
+      return withBackToHome(<ForgotPasswordPage onDone={() => setPreAuthView('login')} onNavigateLogin={() => setPreAuthView('login')} />);
     }
-    return (
+    return withBackToHome(
       <LoginPage
         onLoginSuccess={setCurrentUser}
         onNavigateRegister={() => setPreAuthView('register')}
         onNavigateForgotPassword={() => setPreAuthView('forgot')}
-      />
+      />,
     );
   }
 
@@ -127,6 +148,7 @@ export default function App() {
       {activeView === 'road-map' && <RoadMapPage />}
       {activeView === 'reports' && <ReportsPage />}
       {activeView === 'app-version' && <AppVersionPage />}
+      {activeView === 'home-content' && <HomeContentPage />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>

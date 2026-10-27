@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\CitizenController;
 use App\Http\Controllers\Api\ElectedRepresentativeController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\AppVersionController;
+use App\Http\Controllers\Api\PublicHomeController;
+use App\Http\Controllers\Api\SiteSettingController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\GisController;
 use App\Http\Controllers\Api\LocationController;
@@ -26,6 +28,12 @@ use App\Http\Controllers\Api\VillageAssetController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
+// Public home page data (no login): aggregates, complaint tracker, approved asset points.
+Route::get('/public/home', [PublicHomeController::class, 'home'])->middleware('throttle:60,1');
+Route::post('/public/track-complaint', [PublicHomeController::class, 'track'])->middleware('throttle:15,1');
+Route::get('/public/assets', [PublicHomeController::class, 'assets'])->middleware('throttle:60,1');
+Route::get('/public/search', [PublicHomeController::class, 'search'])->middleware('throttle:60,1');
+
 // The app calls this on launch (before sign-in); `app.version` below is the
 // server-side backstop that refuses sign-in from builds below the minimum.
 Route::post('/app/version-check', [AppVersionController::class, 'check'])->middleware('throttle:60,1');
@@ -125,6 +133,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // into locking themselves out of the permission editor itself.
     Route::middleware('role:admin')->group(function () {
         // Release settings the launch-time version check reads (see AppVersionController).
+        // Editable content of the public home page (announcement banner, helpline, ...).
+        Route::get('/site-settings', [SiteSettingController::class, 'index']);
+        Route::put('/site-settings', [SiteSettingController::class, 'update']);
         Route::get('/app-versions', [AppVersionController::class, 'index']);
         Route::put('/app-versions/{platform}', [AppVersionController::class, 'update'])->whereIn('platform', ['android', 'ios']);
         // Road Map: every user's survey polygons (admin / super admin only).
