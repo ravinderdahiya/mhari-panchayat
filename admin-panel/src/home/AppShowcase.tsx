@@ -83,9 +83,9 @@ export default function AppShowcase({ t, serif, androidUrl, iosUrl }: Props) {
           </div>
         </div>
 
-        <div ref={ref} className="mt-12 grid lg:grid-cols-2 items-center gap-12 lg:gap-6">
+        <div ref={ref} className="mt-12 flex flex-col items-center gap-14 lg:flex-row lg:justify-center lg:gap-28">
           {/* Phone showing the real app */}
-          <div className="relative mx-auto">
+          <div className="relative shrink-0">
             <div aria-hidden className="absolute left-1/2 top-1/2 -z-0 h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-soft/50 blur-3xl" />
             <div className="relative w-[14.5rem] sm:w-[16rem] rounded-[2.7rem] bg-[#16181b] p-[0.55rem] shadow-[0_40px_70px_-30px_rgba(22,51,44,0.65)] ring-1 ring-black/20">
               <span aria-hidden className="absolute -left-[3px] top-24 h-9 w-[3px] rounded-l bg-[#16181b]" />
@@ -99,7 +99,7 @@ export default function AppShowcase({ t, serif, androidUrl, iosUrl }: Props) {
           </div>
 
           {/* Feature chain on a dotted arc */}
-          <div className="mx-auto" style={{ width: WIDTH, maxWidth: '100%' }}>
+          <div className="shrink-0" style={{ width: WIDTH, maxWidth: "100%" }}>
             <div className="relative" style={{ height: FEATURES.length * ROW }}>
               <svg aria-hidden className="absolute inset-0 h-full w-full" viewBox={`0 0 ${WIDTH} ${FEATURES.length * ROW}`} fill="none">
                 <path d={path} stroke="#C68A16" strokeOpacity="0.75" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 7" />
