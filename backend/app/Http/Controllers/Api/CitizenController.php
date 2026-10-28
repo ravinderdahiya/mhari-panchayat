@@ -58,6 +58,7 @@ class CitizenController extends Controller
                 'registeredAt' => $profile->registered_at,
                 'lastLoginAt' => $profile->last_login_at,
                 'isActive' => (bool) $profile->user?->is_active,
+                'location' => $this->locationOf($profile),
                 'complaintsCount' => (int) ($profile->user?->complaints_count ?? 0),
                 'complaints' => ($profile->user?->complaints ?? collect())->map(fn (Complaint $complaint) => [
                     'id' => $complaint->id,
@@ -98,6 +99,69 @@ class CitizenController extends Controller
                     ->count(),
             ],
         ]);
+    }
+
+    /**
+     * Called by the citizen app after sign-in. The server resolves the place from the
+     * coordinates itself (panchayat boundary first), so the app's text is never trusted.
+     */
+    public function updateMyLocation(Request $request, LocationController $locations): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+        $profile = CitizenProfile::where('user_id', $request->user()->id)->first();
+        if (! $profile) {
+            return response()->json(['success' => true, 'saved' => false]);
+        }
+
+        $lat = round((float) $data['latitude'], 6);
+        $lng = round((float) $data['longitude'], 6);
+        $place = $locations->lookup($lat, $lng) ?? [];
+        $parts = [$place['village'] ?? null, $place['panchayat'] ?? null, $place['tehsil'] ?? null, $place['block'] ?? null, $place['district'] ?? null, 'Haryana'];
+
+        $profile->update([
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'state' => 'Haryana',
+            'district' => $place['district'] ?? null,
+            'tehsil' => $place['tehsil'] ?? null,
+            'block' => $place['block'] ?? null,
+            'panchayat' => $place['panchayat'] ?? null,
+            'village' => $place['village'] ?? null,
+            'address' => implode(', ', array_values(array_unique(array_filter($parts)))),
+            'location_updated_at' => now(),
+        ]);
+
+        return response()->json(['success' => true, 'saved' => true]);
+    }
+
+    /** Saved device location, or the place of the latest complaint for citizens who have not shared one. */
+    private function locationOf(CitizenProfile $profile): ?array
+    {
+        if ($profile->latitude !== null && $profile->longitude !== null) {
+            return [
+                'lat' => $profile->latitude, 'long' => $profile->longitude,
+                'state' => $profile->state, 'district' => $profile->district, 'tehsil' => $profile->tehsil,
+                'block' => $profile->block, 'panchayat' => $profile->panchayat, 'village' => $profile->village,
+                'address' => $profile->address, 'source' => 'device', 'updatedAt' => $profile->location_updated_at,
+            ];
+        }
+
+        $complaint = ($profile->user?->complaints ?? collect())->first(fn ($c) => $c->lat !== null && $c->long !== null);
+        if (! $complaint) {
+            return null;
+        }
+        $parts = [$complaint->village, $complaint->panchayat, $complaint->location_tehsil, $complaint->location_block, $complaint->location_district, $complaint->location_state];
+
+        return [
+            'lat' => $complaint->lat, 'long' => $complaint->long,
+            'state' => $complaint->location_state, 'district' => $complaint->location_district, 'tehsil' => $complaint->location_tehsil,
+            'block' => $complaint->location_block, 'panchayat' => $complaint->panchayat, 'village' => $complaint->village,
+            'address' => implode(', ', array_values(array_unique(array_filter($parts)))) ?: null,
+            'source' => 'complaint', 'updatedAt' => $complaint->created_at,
+        ];
     }
 
     public function destroy(CitizenProfile $citizen): JsonResponse

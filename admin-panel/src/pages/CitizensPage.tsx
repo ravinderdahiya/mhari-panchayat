@@ -152,13 +152,14 @@ export default function CitizensPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[1150px]">
+            <table className="w-full text-xs min-w-[1400px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase text-[10px]">
                   <th className="text-left p-3 w-16">S.No.</th>
                   <th className="text-left p-3">Citizen</th>
                   <th className="text-left p-3">Mobile</th>
                   <th className="text-left p-3">Email</th>
+                  <th className="text-left p-3">Location</th>
                   <th className="text-left p-3">Source</th>
                   <th className="text-left p-3">Complaints</th>
                   <th className="text-left p-3">Status</th>
@@ -178,6 +179,14 @@ export default function CitizensPage() {
                       <span className="inline-flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" />{citizen.mobile}</span>
                     </td>
                     <td className="p-3 text-slate-500">{citizen.email || '—'}</td>
+                    <td className="p-3 text-slate-600">
+                      {citizen.location ? (
+                        <>
+                          <p className="font-medium text-slate-700">{[citizen.location.village, citizen.location.tehsil, citizen.location.district].filter(Boolean).join(', ') || '—'}</p>
+                          <p className="font-mono text-[10px] text-slate-400">{citizen.location.lat.toFixed(5)}, {citizen.location.long.toFixed(5)}</p>
+                        </>
+                      ) : '—'}
+                    </td>
                     <td className="p-3 text-slate-500 capitalize">{citizen.registrationSource.replace(/_/g, ' ')}</td>
                     <td className="p-3 font-semibold text-sidebar">{citizen.complaintsCount}</td>
                     <td className="p-3"><StatusBadge active={citizen.isActive} /></td>
@@ -327,6 +336,21 @@ function CitizenDetails({ citizen, onClose }: { citizen: CitizenProfile; onClose
             <Info label="Status" value={citizen.isActive ? 'Active' : 'Inactive'} />
             <Info label="Registration source" value={citizen.registrationSource.replace(/_/g, ' ')} />
             <Info label="Complaints filed" value={String(citizen.complaintsCount)} />
+            <Info label="District" value={citizen.location?.district || '—'} />
+            <Info label="Tehsil" value={citizen.location?.tehsil || '—'} />
+            <Info label="Block" value={citizen.location?.block || '—'} />
+            <Info label="Village / Panchayat" value={[citizen.location?.village, citizen.location?.panchayat].filter((v, i, a) => v && a.indexOf(v) === i).join(' / ') || '—'} />
+            <div className="sm:col-span-2"><Info label="Full address" value={citizen.location?.address || '—'} /></div>
+            <div className="sm:col-span-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Coordinates (lat, long)</p>
+              {citizen.location ? (
+                <p className="mt-1 text-sm font-medium text-slate-800">
+                  <span className="font-mono">{citizen.location.lat.toFixed(6)}, {citizen.location.long.toFixed(6)}</span>
+                  {' '}<a href={`https://www.google.com/maps?q=${citizen.location.lat},${citizen.location.long}`} target="_blank" rel="noreferrer" className="ml-2 text-xs font-semibold text-sidebar hover:underline">Open in map</a>
+                  <span className="ml-2 text-[11px] font-normal text-slate-400">{citizen.location.source === 'device' ? "from the citizen's phone" : 'from latest complaint'}{citizen.location.updatedAt ? ` · ${formatDate(citizen.location.updatedAt, true)}` : ''}</span>
+                </p>
+              ) : <p className="mt-1 text-sm text-slate-500">Not shared yet — appears after the citizen opens the updated app and allows location.</p>}
+            </div>
             <Info label="Registered on" value={formatDate(citizen.registeredAt, true)} />
             <Info label="Last login" value={formatDate(citizen.lastLoginAt, true)} />
           </div>

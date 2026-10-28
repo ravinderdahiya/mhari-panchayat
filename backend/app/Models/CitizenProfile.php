@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'user_id', 'full_name', 'mobile', 'email', 'registration_source',
     'registered_at', 'last_login_at',
+    'latitude', 'longitude', 'state', 'district', 'tehsil', 'block', 'panchayat', 'village', 'address', 'location_updated_at',
 ])]
 class CitizenProfile extends Model
 {
@@ -17,6 +18,9 @@ class CitizenProfile extends Model
         return [
             'registered_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'location_updated_at' => 'datetime',
+            'latitude' => 'float',
+            'longitude' => 'float',
         ];
     }
 

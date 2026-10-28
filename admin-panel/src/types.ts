@@ -239,6 +239,21 @@ export interface CitizenProfile {
   isActive: boolean;
   complaintsCount: number;
   complaints: CitizenComplaintSummary[];
+  location: CitizenLocation | null;
+}
+
+export interface CitizenLocation {
+  lat: number;
+  long: number;
+  state: string | null;
+  district: string | null;
+  tehsil: string | null;
+  block: string | null;
+  panchayat: string | null;
+  village: string | null;
+  address: string | null;
+  source: 'device' | 'complaint';
+  updatedAt: string | null;
 }
 
 export type ElectedRepresentativeTier = 'zp' | 'ps' | 'panch';

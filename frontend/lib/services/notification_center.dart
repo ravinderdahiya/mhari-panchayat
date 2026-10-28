@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'citizen_location_sync.dart';
 import 'notification_api.dart';
 import 'push_service.dart';
 
@@ -25,6 +26,7 @@ class NotificationCenter {
     unawaited(refresh());
     // Every signed-in shell starts this, so it doubles as the push registration point.
     unawaited(PushService.instance.ensureStarted());
+    unawaited(CitizenLocationSync.run());
     _timer ??= Timer.periodic(_interval, (_) => refresh());
   }
 
