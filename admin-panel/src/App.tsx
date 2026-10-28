@@ -19,20 +19,19 @@ import VillageAssetsPage from './pages/VillageAssetsPage';
 import AssetTypesPage from './pages/AssetTypesPage';
 import AssetSurveysPage from './pages/AssetSurveysPage';
 import ProjectMeetingPage from './pages/ProjectMeetingPage';
-import RoadMapPage from './pages/RoadMapPage';
 import ReportsPage from './pages/ReportsPage';
 import AppVersionPage from './pages/AppVersionPage';
 import HomeContentPage from './pages/HomeContentPage';
 import ProfilePage from './pages/ProfilePage';
 import FeedbackPage from './pages/FeedbackPage';
 import ComingSoon from './components/ComingSoon';
+import SettingsPage from './pages/SettingsPage';
 import Layout from './components/Layout';
 import type { View } from './components/Layout';
 
 type PreAuthView = 'home' | 'login' | 'register' | 'forgot';
 
 const PLACEHOLDER_TITLES: Partial<Record<View, string>> = {
-  settings: 'Settings',
   'audit-log': 'Audit Log',
 };
 
@@ -145,10 +144,10 @@ export default function App() {
       {activeView === 'citizens' && <CitizensPage />}
       {activeView === 'feedback' && <FeedbackPage />}
       {activeView === 'project-meeting' && <ProjectMeetingPage />}
-      {activeView === 'road-map' && <RoadMapPage />}
       {activeView === 'reports' && <ReportsPage />}
       {activeView === 'app-version' && <AppVersionPage />}
       {activeView === 'home-content' && <HomeContentPage />}
+      {activeView === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
       {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
     </Layout>
