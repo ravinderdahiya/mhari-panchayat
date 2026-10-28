@@ -732,7 +732,23 @@ export interface PublicAssetPoint {
 
 export const getPublicHome = () => request<{ success: boolean; data: PublicHome }>('/api/public/home');
 
-export const trackComplaint = (complaint_id: string, mobile: string) =>
+export interface PublicFunds {
+  demo: boolean;
+  panchayat: string;
+  block: string | null;
+  fy: string;
+  received_lakh: number;
+  spent_lakh: number;
+  balance_lakh: number;
+  sources: { name: string; purpose: string; allocated_lakh: number; spent_lakh: number }[];
+  recent: { title: string; amount: number; source: string; status: 'completed' | 'in_progress' | 'approved'; date: string }[];
+  as_of: string;
+}
+
+export const getPublicFunds = (panchayat_id: number, fy: string) =>
+  request<{ success: boolean; data: PublicFunds }>(`/api/public/funds?panchayat_id=${panchayat_id}&fy=${encodeURIComponent(fy)}`);
+
+export const trackComplaint =(complaint_id: string, mobile: string) =>
   jsonRequest<{ success: boolean; data: TrackedComplaint }>('/api/public/track-complaint', 'POST', { complaint_id, mobile });
 
 export const searchPublicPanchayats = (q: string) =>

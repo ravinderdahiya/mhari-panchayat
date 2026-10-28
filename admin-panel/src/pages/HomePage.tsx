@@ -8,6 +8,7 @@ import * as api from '../services/api';
 import type { PublicHome, PublicPanchayatHit } from '../services/api';
 import TrackCard from '../home/TrackCard';
 import AppShowcase from '../home/AppShowcase';
+import FundsSection from '../home/FundsSection';
 import type { MapFilters } from '../home/HomeMap';
 import { translator, type Lang } from '../home/strings';
 import { useCountUp, useInView, usePersistentState } from '../home/hooks';
@@ -513,6 +514,8 @@ export default function HomePage({ onLogin }: Props) {
             </div>
           </div>
         </section>
+
+        <FundsSection lang={lang} serif={serif} onLogin={onLogin} />
 
         {/* FAQ */}
         <section id="faq" className="scroll-mt-28 mx-auto max-w-4xl px-4 sm:px-6 py-14">
