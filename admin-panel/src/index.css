@@ -38,3 +38,7 @@ body {
 .animate-spin-slow {
   animation: spin-slow 9s linear infinite;
 }
+
+/* GIGW: high-contrast mode for the public home page (toggle next to A- A A+). */
+html.home-contrast { filter: contrast(1.35); }
+html.home-contrast .text-muted { color: #1b1b1b; }

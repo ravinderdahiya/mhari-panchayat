@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import {
   ArrowRight, ArrowUp, BarChart3, Check, ClipboardCheck, Clock, FileText, FileSearch, Building2,
   HardHat, Hammer, Landmark, LogIn, Mail, MapPin, Megaphone, Menu, Phone, Search,
-  UserRound, Users, X,
+  UserRound, Users, X, ChevronDown, Contrast, Construction, Waves, Droplets, Zap, Lightbulb, Trash2, ShieldAlert, Ellipsis,
 } from 'lucide-react';
 import * as api from '../services/api';
 import type { PublicHome, PublicPanchayatHit } from '../services/api';
@@ -53,6 +53,13 @@ export default function HomePage({ onLogin }: Props) {
     root.style.fontSize = SCALE_PX[scale];
     return () => { root.style.fontSize = previous; };
   }, [scale]);
+
+  const [contrast, setContrast] = usePersistentState<'off' | 'on'>('home_contrast', 'off', ['off', 'on'] as const);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('home-contrast', contrast === 'on');
+    return () => root.classList.remove('home-contrast');
+  }, [contrast]);
 
   useEffect(() => { document.documentElement.lang = lang === 'hi' ? 'hi' : 'en'; }, [lang]);
 
@@ -162,6 +169,11 @@ export default function HomePage({ onLogin }: Props) {
   ];
 
   const ann = home?.announcement;
+  const [cat, setCat] = useState<string | null>(null);
+  const categories: [string, typeof Zap][] = [
+    ['catGali', Construction], ['catNaali', Waves], ['catPaani', Droplets], ['catBijli', Zap],
+    ['catLight', Lightbulb], ['catSafai', Trash2], ['catAtikraman', ShieldAlert], ['catOther', Ellipsis],
+  ];
   const pick = (en: string, hi: string) => (lang === 'hi' && hi ? hi : en);
 
   return (
@@ -180,6 +192,8 @@ export default function HomePage({ onLogin }: Props) {
             <span className="hidden sm:inline truncate">{t('dept')}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button type="button" onClick={() => setContrast(contrast === 'on' ? 'off' : 'on')} aria-pressed={contrast === 'on'} title={t('contrast')} aria-label={t('contrast')}
+              className={`rounded border border-line px-2 py-0.5 cursor-pointer ${contrast === 'on' ? 'bg-sidebar text-white' : 'bg-white text-ink hover:bg-cream'}`}><Contrast size={13} /></button>
             <div className="flex items-center rounded border border-line overflow-hidden" role="group" aria-label="Text size">
               {SCALES.map((s, i) => (
                 <button key={s} type="button" onClick={() => setScale(s)} aria-pressed={scale === s}
@@ -282,6 +296,20 @@ export default function HomePage({ onLogin }: Props) {
         </nav>
       </header>
 
+      {ann && (
+        <div className="bg-accent-soft/60 border-b border-accent/20 text-xs sm:text-sm" role="status">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 py-1.5 flex items-center gap-3 min-w-0">
+            <span className="shrink-0 rounded bg-accent-dark px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">{t('tickerLabel')}</span>
+            <span className="truncate text-ink">{pick(ann.title, ann.title_hi)}</span>
+            {ann.cta_url && (
+              <a href={ann.cta_url} target={ann.cta_url.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="ml-auto shrink-0 font-semibold text-sidebar hover:underline">
+                {pick(ann.cta_label, ann.cta_label_hi) || '→'}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <main id="main">
         {/* Hero + tracker */}
         <section id="home" className="relative overflow-hidden scroll-mt-28">
@@ -315,6 +343,25 @@ export default function HomePage({ onLogin }: Props) {
           </div>
         </section>
 
+        {/* Quick complaint categories */}
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 -mt-2 mb-8">
+          <p className="text-sm font-semibold text-sidebar" style={serif}>{t('catTitle')}</p>
+          <div className="mt-3 grid grid-cols-4 lg:grid-cols-8 gap-2">
+            {categories.map(([key, Icon]) => (
+              <button key={key} type="button" onClick={() => setCat(key)} aria-pressed={cat === key}
+                className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-semibold cursor-pointer transition ${cat === key ? 'border-sidebar bg-sidebar text-white' : 'border-line bg-white text-ink hover:border-sidebar'}`}>
+                <Icon size={20} /> {t(key)}
+              </button>
+            ))}
+          </div>
+          {cat && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-accent-soft/60 px-4 py-3 text-sm text-ink">
+              <span>{t('catHint', { c: t(cat) })}</span>
+              <button type="button" onClick={() => go('download')} className="ml-auto inline-flex items-center gap-1.5 font-semibold text-sidebar hover:underline cursor-pointer">{t('ctaFile')} <ArrowRight size={14} /></button>
+            </div>
+          )}
+        </section>
+
         {/* Who it is for */}
         <section className="mx-auto max-w-7xl px-4 sm:px-6 -mt-2">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -335,8 +382,8 @@ export default function HomePage({ onLogin }: Props) {
         <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-8">
           <div ref={statsRef} className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-line rounded-xl border border-line bg-white overflow-hidden">
             <Stat label={t('statPanchayats')} value={stats?.panchayats ?? null} start={statsSeen} noData={t('statNoData')} loading={!home && !loadError} />
-            <Stat label={t('statResolved')} value={stats?.complaints_resolved ?? null} start={statsSeen} noData={t('statNoData')} loading={!home && !loadError} />
-            <Stat label={t('statDays')} value={stats ? stats.avg_resolution_days : null} decimals={1} start={statsSeen} noData={t('statNoData')} loading={!home && !loadError} />
+            <Stat label={t('statResolved')} value={stats?.complaints_resolved || null} start={statsSeen} noData={t('statTrial')} loading={!home && !loadError} />
+            <Stat label={t('statDays')} value={stats?.complaints_resolved ? stats.avg_resolution_days : null} decimals={1} start={statsSeen} noData={t('statTrial')} loading={!home && !loadError} />
             <Stat label={t('statAssets')} value={stats?.assets_geotagged ?? null} start={statsSeen} noData={t('statNoData')} loading={!home && !loadError} />
           </div>
           {loadError && !home && (
@@ -389,7 +436,7 @@ export default function HomePage({ onLogin }: Props) {
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {services.map(({ icon: Icon, key, action, soon }) => (
               <button key={key} type="button" onClick={action} disabled={!action}
-                className={`relative text-left rounded-xl border border-line bg-white p-5 transition ${action ? 'hover:border-sidebar hover:shadow-md cursor-pointer' : 'opacity-80 cursor-default'}`}>
+                className={`relative text-left rounded-xl border border-line bg-white p-5 transition ${action ? 'hover:border-sidebar hover:shadow-md cursor-pointer' : 'opacity-70 grayscale cursor-default'}`}>
                 {soon && <span className="absolute right-3 top-3 text-[10px] font-semibold text-accent-dark bg-accent-soft/60 rounded-full px-2 py-0.5">{t('soon')}</span>}
                 <Icon size={20} className="text-sidebar" />
                 <p className="mt-3 text-sm font-semibold text-ink">{t(key)}</p>
@@ -407,16 +454,20 @@ export default function HomePage({ onLogin }: Props) {
               <h2 className="mt-3 text-3xl sm:text-4xl font-semibold text-sidebar leading-tight" style={serif}>{t('mapTitle')}</h2>
               <p className="mt-3 text-sm sm:text-base text-muted">{t('mapSub')}</p>
               {home && home.asset_types.featured.length > 0 && (
-                <ul className="mt-5 flex flex-wrap gap-2">
-                  {home.asset_types.featured.map((a) => (
-                    <li key={a.name} className="rounded-full border border-line bg-cream px-3 py-1 text-xs text-ink">{lang === 'hi' && a.name_hi ? a.name_hi : a.name}</li>
-                  ))}
-                  {home.asset_types.total > home.asset_types.featured.length && (
-                    <li className="rounded-full bg-accent-soft/60 px-3 py-1 text-xs font-semibold text-accent-dark">
-                      {t('more', { n: home.asset_types.total - home.asset_types.featured.length })}
-                    </li>
-                  )}
-                </ul>
+                <div className="mt-6">
+                  <p className="text-[11px] font-semibold tracking-wide text-muted">{t('legendTitle')}</p>
+                  <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-cream/40">
+                    {home.asset_types.featured.map((a) => (
+                      <li key={a.name} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                        <span className="inline-flex items-center gap-2 text-ink"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-accent" />{lang === 'hi' && a.name_hi ? a.name_hi : a.name}</span>
+                        <span className="font-semibold tabular-nums text-sidebar">{a.count.toLocaleString('en-IN')}</span>
+                      </li>
+                    ))}
+                    {home.asset_types.total > home.asset_types.featured.length && (
+                      <li className="px-4 py-2 text-xs font-semibold text-accent-dark">{t('more', { n: home.asset_types.total - home.asset_types.featured.length })}</li>
+                    )}
+                  </ul>
+                </div>
               )}
               <button type="button" onClick={onLogin} className="mt-6 inline-flex items-center gap-2 rounded-lg bg-sidebar px-5 py-3 text-sm font-semibold text-white hover:bg-sidebar-hover cursor-pointer">
                 {t('mapOpen')} <ArrowRight size={16} />
@@ -463,6 +514,22 @@ export default function HomePage({ onLogin }: Props) {
           </div>
         </section>
 
+        {/* FAQ */}
+        <section id="faq" className="scroll-mt-28 mx-auto max-w-4xl px-4 sm:px-6 py-14">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-accent-dark">{t('faqTag')}</p>
+          <h2 className="mt-3 text-3xl sm:text-4xl font-semibold text-sidebar leading-tight" style={serif}>{t('faqTitle')}</h2>
+          <div className="mt-6 space-y-2">
+            {['faq1', 'faq2', 'faq3', 'faq4'].map((k) => (
+              <details key={k} className="group rounded-xl border border-line bg-white px-5 py-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+                  {t(k + 'q')} <ChevronDown size={16} className="shrink-0 text-muted transition group-open:rotate-180" />
+                </summary>
+                <p className="mt-2 text-sm text-muted leading-relaxed">{t(k + 'a')}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         {/* Dynamic announcement (set by an admin) */}
         {ann && (
           <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-14">
@@ -506,9 +573,9 @@ export default function HomePage({ onLogin }: Props) {
             <ul className="mt-3 space-y-2">
               {home?.contact.helpline && <li className="flex items-center gap-2"><Phone size={14} /> <a href={`tel:${home.contact.helpline.replace(/\s/g, '')}`} className="hover:underline">{home.contact.helpline}</a></li>}
               {home?.contact.email && <li className="flex items-center gap-2"><Mail size={14} /> <a href={`mailto:${home.contact.email}`} className="hover:underline break-all">{home.contact.email}</a></li>}
-              {home?.contact.office_hours && <li className="flex items-center gap-2"><Clock size={14} /> {home.contact.office_hours}</li>}
-              {home && !home.contact.helpline && !home.contact.email && !home.contact.office_hours && <li className="text-white/50">—</li>}
-            </ul>
+              <li className="flex items-start gap-2"><MapPin size={14} className="mt-0.5 shrink-0" /> {t('fAddress')}</li>
+              <li className="flex items-center gap-2"><Clock size={14} /> {home?.contact.office_hours || t('fHoursDefault')}</li>
+                          </ul>
           </div>
           <div>
             <p className="text-[11px] font-semibold tracking-wide text-white/60">{t('fPolicies')}</p>

@@ -697,7 +697,7 @@ export interface PublicHome {
     avg_resolution_days: number | null;
     assets_geotagged: number;
   };
-  asset_types: { total: number; featured: { name: string; name_hi: string | null }[] };
+  asset_types: { total: number; featured: { name: string; name_hi: string | null; count: number }[] };
   contact: { helpline: string; email: string; office_hours: string };
   announcement: {
     tag: string; tag_hi: string; title: string; title_hi: string; body: string; body_hi: string;

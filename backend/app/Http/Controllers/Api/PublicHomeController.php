@@ -38,7 +38,9 @@ class PublicHomeController extends Controller
                 ->selectRaw('AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400) AS d')
                 ->value('d');
 
-            $types = AssetType::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['name', 'name_hi']);
+            $types = AssetType::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'name_hi']);
+            $counts = AssetSurvey::where('review_status', 'approved')->whereNotNull('latitude')
+                ->selectRaw('asset_type_id, COUNT(*) AS c')->groupBy('asset_type_id')->pluck('c', 'asset_type_id');
             $settings = SiteSetting::values();
 
             return [
@@ -52,7 +54,9 @@ class PublicHomeController extends Controller
                 ],
                 'asset_types' => [
                     'total' => $types->count(),
-                    'featured' => $types->take(8)->map(fn ($t) => ['name' => $t->name, 'name_hi' => $t->name_hi])->values(),
+                    // Types with approved assets first, so the legend leads with what is on the map.
+                    'featured' => $types->map(fn ($t) => ['name' => $t->name, 'name_hi' => $t->name_hi, 'count' => (int) ($counts[$t->id] ?? 0)])
+                        ->sortByDesc('count')->take(8)->values(),
                 ],
                 'contact' => [
                     'helpline' => $settings['helpline'],
