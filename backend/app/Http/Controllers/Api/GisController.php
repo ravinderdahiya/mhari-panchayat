@@ -69,7 +69,7 @@ class GisController extends Controller
                 'geometryType' => 'esriGeometryPoint',
                 'inSR' => 4326,
                 'spatialRel' => 'esriSpatialRelIntersects',
-                'outFields' => 'local_body_code,localbodyname',
+                'outFields' => 'localbodyc,localbodyn',
                 'returnGeometry' => 'false',
                 'token' => $token,
             ]);
@@ -85,11 +85,11 @@ class GisController extends Controller
         }
 
         $attributes = $response->json('features.0.attributes');
-        if (! $attributes || empty($attributes['local_body_code'])) {
+        if (! $attributes || empty($attributes['localbodyc'])) {
             return ['status' => 'none'];
         }
 
-        return ['status' => 'matched', 'code' => (string) $attributes['local_body_code'], 'name' => $attributes['localbodyname'] ?? null];
+        return ['status' => 'matched', 'code' => (string) $attributes['localbodyc'], 'name' => $attributes['localbodyn'] ?? null];
     }
 
     /**
@@ -121,7 +121,7 @@ class GisController extends Controller
                 'geometryType' => 'esriGeometryPoint',
                 'inSR' => 4326,
                 'spatialRel' => 'esriSpatialRelIntersects',
-                'outFields' => 'local_body_code,localbodyname',
+                'outFields' => 'localbodyc,localbodyn',
                 'returnGeometry' => 'false',
                 'token' => $token,
             ]);
@@ -132,13 +132,13 @@ class GisController extends Controller
         }
 
         $attributes = $response->json('features.0.attributes');
-        if (! $attributes || empty($attributes['local_body_code'])) {
+        if (! $attributes || empty($attributes['localbodyc'])) {
             return null;
         }
 
         return [
-            'code' => (string) $attributes['local_body_code'],
-            'name' => $attributes['localbodyname'] ?? null,
+            'code' => (string) $attributes['localbodyc'],
+            'name' => $attributes['localbodyn'] ?? null,
         ];
     }
 
@@ -163,10 +163,12 @@ class GisController extends Controller
             return null;
         }
 
-        $where = 'local_body_code IN ('.implode(',', array_map(
-            fn ($code) => "'".addslashes($code)."'",
-            $codes
-        )).')';
+        // localbodyc is an integer field on this layer, so the codes go in unquoted.
+        $numeric = array_values(array_filter($codes, fn ($code) => ctype_digit((string) $code)));
+        if ($numeric === []) {
+            return null;
+        }
+        $where = 'localbodyc IN ('.implode(',', $numeric).')';
 
         try {
             $http = Http::timeout(20);
