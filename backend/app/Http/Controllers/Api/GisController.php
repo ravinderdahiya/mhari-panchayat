@@ -227,8 +227,34 @@ class GisController extends Controller
         ];
     }
 
+    /**
+     * The proxy is open to anyone and adds the server's GIS token, so the requested path must stay inside the
+     * one service: plain path characters only, and no "." / ".." segments (which the HTTP client would collapse
+     * into a different, token-authorised service on the same GIS server).
+     */
+    public static function isSafeProxyPath(string $path): bool
+    {
+        if ($path === '') {
+            return true;
+        }
+        if (! preg_match('#^[A-Za-z0-9_\-./]+$#', $path) || str_contains($path, '//')) {
+            return false;
+        }
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '.' || $segment === '..') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function proxy(Request $request, string $baseUrl, string $serviceKey, string $path): Response
     {
+        if (! self::isSafeProxyPath($path)) {
+            return response('Invalid path', 400);
+        }
+
         $token = $this->resolveToken($serviceKey);
         if (! $token) {
             return response('GIS service is not configured or unreachable', 503);

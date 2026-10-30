@@ -378,7 +378,9 @@ class ComplaintController extends Controller
             'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'photos' => ['nullable', 'array', 'max:5'],
             'photos.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
-            'voice_note' => ['nullable', 'file', 'max:15360'],
+            // Stored on the public disk under a type-derived extension, so only real audio may get in
+            // (an unrestricted upload could land as a .php file inside a web-served folder).
+            'voice_note' => ['nullable', 'file', 'max:15360', 'mimes:mp3,m4a,aac,wav,ogg,oga,opus,amr,3gp,webm,mp4,caf'],
         ], [
             'category_id.exists' => 'Invalid categoryId',
             'priority_id.exists' => 'Invalid priorityId',
