@@ -388,8 +388,8 @@ class ComplaintController extends Controller
         ]);
 
         // Citizens may only file inside their own panchayat; enforced here as well as in the app.
-        $geofence = app(AppServicesCitizenGeofence::class);
-        if (AppModelsCitizenProfile::where('user_id', $request->user()->id)->exists()) {
+        $geofence = app(\App\Services\CitizenGeofence::class);
+        if (\App\Models\CitizenProfile::where('user_id', $request->user()->id)->exists()) {
             if (! isset($data['lat'], $data['long'])) {
                 return response()->json(['success' => false, 'message' => 'GPS location is required to file a complaint'], 422);
             }
