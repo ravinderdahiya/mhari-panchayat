@@ -25,6 +25,19 @@ class CitizenGeofence
      */
     public function check(User $user, float $lat, float $lng): array
     {
+        // A guard must never take complaint filing down with it (e.g. a migration not yet run).
+        try {
+            return $this->evaluate($user, $lat, $lng);
+        } catch (Throwable $e) {
+            report($e);
+
+            return ['allowed' => true, 'home' => null, 'current' => null, 'message' => null];
+        }
+    }
+
+    /** @return array{allowed: bool, home: ?string, current: ?string, message: ?string} */
+    private function evaluate(User $user, float $lat, float $lng): array
+    {
         $profile = CitizenProfile::where('user_id', $user->id)->first();
         $homeId = $profile ? $this->homePanchayatId($profile) : null;
         if (! $profile || ! $homeId) {
@@ -66,6 +79,10 @@ class CitizenGeofence
         if (! $panchayatId) {
             return;
         }
-        CitizenProfile::where('user_id', $user->id)->whereNull('home_panchayat_id')->update(['home_panchayat_id' => $panchayatId]);
+        try {
+            CitizenProfile::where('user_id', $user->id)->whereNull('home_panchayat_id')->update(['home_panchayat_id' => $panchayatId]);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 }
