@@ -16,6 +16,12 @@ use Illuminate\Support\Facades\Http;
 
 class LocationController extends Controller
 {
+    // Nominatim is a free shared service (1 request/second policy) and is called on every GPS lookup:
+    // give up fast, and skip it for a minute after a failure.
+    public const NOMINATIM_TIMEOUT = 4;
+
+    private const NOMINATIM_BREAKER_KEY = 'nominatim.unavailable';
+
     private function normalizeName(?string $value): string
     {
         $value = mb_strtolower(trim((string) $value));
@@ -273,13 +279,18 @@ class LocationController extends Controller
      */
     private function lookupViaNominatim(float $latitude, float $longitude): ?array
     {
+        if (Cache::has(self::NOMINATIM_BREAKER_KEY)) {
+            return null;
+        }
+
         try {
             $response = Http::acceptJson()
                 ->withHeaders([
                     'Accept-Language' => 'en',
                     'User-Agent' => 'MhariPanchayat/1.0 (local-government survey app)',
                 ])
-                ->timeout(10)
+                ->connectTimeout(2)
+                ->timeout(self::NOMINATIM_TIMEOUT)
                 ->get('https://nominatim.openstreetmap.org/reverse', [
                     'format' => 'jsonv2',
                     'lat' => $latitude,
@@ -289,6 +300,8 @@ class LocationController extends Controller
                 ]);
             $response->throw();
         } catch (\Throwable) {
+            Cache::put(self::NOMINATIM_BREAKER_KEY, true, now()->addMinute());
+
             return null;
         }
         $address = $response->json('address', []);

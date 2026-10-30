@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CitizenProfile;
 use App\Models\Complaint;
+use App\Services\CitizenGeofence;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

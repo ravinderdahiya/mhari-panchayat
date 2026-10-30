@@ -19,6 +19,14 @@ class AssetSurveyApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** A real 1x1 PNG, so the tests do not depend on the GD extension to draw a fake image. */
+    private function photo(string $name): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent($name, base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+        ));
+    }
+
     public function test_surveyor_can_save_asset_survey_and_admin_can_see_identity_and_asset(): void
     {
         Storage::fake('public');
@@ -45,7 +53,7 @@ class AssetSurveyApiTest extends TestCase
             'condition' => 'GOOD',
             'description' => 'Field survey test',
             'surveyDate' => now()->toISOString(),
-            'photos' => [UploadedFile::fake()->image('survey.jpg', 800, 600)],
+            'photos' => [$this->photo('survey.png')],
         ]);
 
         $response->assertCreated()
@@ -99,7 +107,7 @@ class AssetSurveyApiTest extends TestCase
             'condition' => 'GOOD',
             'description' => 'CPLO field survey',
             'surveyDate' => now()->toISOString(),
-            'photos' => [UploadedFile::fake()->image('cplo.jpg', 800, 600)],
+            'photos' => [$this->photo('cplo.png')],
         ])->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('survey.surveyor.role', 'cplo');
@@ -135,7 +143,7 @@ class AssetSurveyApiTest extends TestCase
             'condition' => 'GOOD',
             'description' => 'Should be blocked',
             'surveyDate' => now()->toISOString(),
-            'photos' => [UploadedFile::fake()->image('outside.jpg', 800, 600)],
+            'photos' => [$this->photo('outside.png')],
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['panchayat']);
 
@@ -170,7 +178,7 @@ class AssetSurveyApiTest extends TestCase
             'condition' => 'GOOD',
             'description' => 'Should be blocked',
             'surveyDate' => now()->toISOString(),
-            'photos' => [UploadedFile::fake()->image('none.jpg', 800, 600)],
+            'photos' => [$this->photo('none.png')],
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['panchayat']);
     }

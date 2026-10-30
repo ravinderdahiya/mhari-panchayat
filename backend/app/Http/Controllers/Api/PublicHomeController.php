@@ -12,6 +12,7 @@ use App\Models\SiteSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Data behind the public (logged-out) home page: platform-wide numbers, a
@@ -35,7 +36,9 @@ class PublicHomeController extends Controller
             $resolved = Complaint::whereIn('status', ['Resolved', 'Closed']);
             $avgDays = (clone $resolved)
                 ->whereNotNull('resolved_at')
-                ->selectRaw('AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400) AS d')
+                ->selectRaw(DB::connection()->getDriverName() === 'sqlite'
+                    ? 'AVG(julianday(resolved_at) - julianday(created_at)) AS d'
+                    : 'AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400) AS d')
                 ->value('d');
 
             $types = AssetType::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'name_hi']);
@@ -158,8 +161,8 @@ class PublicHomeController extends Controller
         $hits = Panchayat::query()
             ->with('block:id,name,district_id', 'block.district:id,name')
             ->where('is_active', true)
-            ->where('name', 'ilike', $like)
-            ->orderByRaw('(name ILIKE ?) DESC', [str_replace(['%', '_'], ['\%', '\_'], $q).'%'])
+            ->whereRaw('LOWER(name) LIKE ?', [mb_strtolower($like)])
+            ->orderByRaw('(LOWER(name) LIKE ?) DESC', [mb_strtolower(str_replace(['%', '_'], ['\%', '\_'], $q)).'%'])
             ->orderBy('name')
             ->limit(8)
             ->get(['id', 'name', 'block_id'])

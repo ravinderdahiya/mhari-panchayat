@@ -748,7 +748,17 @@ export interface PublicFunds {
 export const getPublicFunds = (panchayat_id: number, fy: string) =>
   request<{ success: boolean; data: PublicFunds }>(`/api/public/funds?panchayat_id=${panchayat_id}&fy=${encodeURIComponent(fy)}`);
 
-export const trackComplaint =(complaint_id: string, mobile: string) =>
+export interface DistrictPerformanceRow {
+  rank: number;
+  district: string;
+  compliance: number;
+  judged: number;
+}
+
+export const getDistrictPerformance = () =>
+  request<{ success: boolean; data: { districts: DistrictPerformanceRow[]; min_sample: number } }>('/api/public/district-performance');
+
+export const trackComplaint = (complaint_id: string, mobile: string) =>
   jsonRequest<{ success: boolean; data: TrackedComplaint }>('/api/public/track-complaint', 'POST', { complaint_id, mobile });
 
 export const searchPublicPanchayats = (q: string) =>

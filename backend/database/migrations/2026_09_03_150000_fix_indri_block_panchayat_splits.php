@@ -38,6 +38,12 @@ return new class extends Migration
             // imported (as it is in production). Fail loudly and clearly here
             // instead of letting a null $blockId hit the panchayats.block_id
             // NOT NULL constraint below with a cryptic SQL error.
+            // A brand-new database (fresh install, test run) has no geography at all,
+            // so there is nothing to patch.
+            if (! $blockId && ! DB::table('blocks')->exists()) {
+                return;
+            }
+
             if (! $blockId) {
                 throw new \RuntimeException(
                     'Indri block (code '.self::INDRI_BLOCK_CODE.') not found. '.

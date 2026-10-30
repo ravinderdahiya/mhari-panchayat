@@ -32,6 +32,7 @@ Route::get('/public/home', [PublicHomeController::class, 'home'])->middleware('t
 Route::post('/public/track-complaint', [PublicHomeController::class, 'track'])->middleware('throttle:15,1');
 Route::get('/public/assets', [PublicHomeController::class, 'assets'])->middleware('throttle:60,1');
 Route::get('/public/funds', [\App\Http\Controllers\Api\PublicFundsController::class, 'show'])->middleware('throttle:60,1');
+Route::get('/public/district-performance', \App\Http\Controllers\Api\PublicDistrictPerformanceController::class)->middleware('throttle:60,1');
 Route::get('/public/search',[PublicHomeController::class, 'search'])->middleware('throttle:60,1');
 
 // The app calls this on launch (before sign-in); `app.version` below is the

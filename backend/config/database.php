@@ -97,6 +97,12 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Opening a PostgreSQL connection costs ~40 ms - about half of a typical API request.
+            // Set DB_PERSISTENT=true on php-fpm so each worker keeps its connection between requests
+            // (keep pm.max_children below Postgres max_connections), or put pgbouncer in front instead.
+            'options' => filter_var(env('DB_PERSISTENT', false), FILTER_VALIDATE_BOOLEAN)
+                ? [PDO::ATTR_PERSISTENT => true]
+                : [],
         ],
 
         'sqlsrv' => [

@@ -27,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // API-only app: never redirect guests to a named "login" web route
         // (that route does not exist and caused 500s on unauthenticated /api/*).
         $middleware->redirectGuestsTo(fn () => null);
+        // Behind nginx / a load balancer / Cloudflare set TRUSTED_PROXIES (e.g. *), otherwise every
+        // visitor looks like the proxy's IP and shares one rate-limit bucket.
+        $middleware->trustProxies(at: \App\Support\TrustedProxies::fromEnv(env('TRUSTED_PROXIES')));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

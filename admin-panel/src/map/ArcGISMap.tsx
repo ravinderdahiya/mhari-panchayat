@@ -18,7 +18,7 @@ interface ArcGISMapProps {
 // so the immediate remount can cancel it, instead of destroying a view that's
 // about to be recreated for the exact same container.
 let mountGenerationCounter = 0;
-let pendingTeardownTimer: ReturnType<typeof window.setTimeout> | null = null;
+let pendingTeardownTimer: number | null = null;
 let lastView: MapView | null = null;
 
 function claimMountSession() {

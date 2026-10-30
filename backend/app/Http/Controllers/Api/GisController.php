@@ -13,6 +13,18 @@ class GisController extends Controller
 {
     private const DEFAULT_TOKEN_TTL_MINUTES = 60;
 
+    // A point query runs on every "Capture GPS" tap, so it must never hold a PHP worker for long:
+    // give up fast, and once the service has failed skip it for a minute instead of waiting again.
+    public const QUERY_TIMEOUT = 3;
+
+    public const CONNECT_TIMEOUT = 2;
+
+    public const TOKEN_TIMEOUT = 5;
+
+    public const BREAKER_KEY = 'gis.unavailable';
+
+    public const BREAKER_SECONDS = 60;
+
     // Test/candidate replacement for the Panchayat boundary layer, on a separate
     // ArcGIS Enterprise portal (hsac.org.in) from the one below - see the
     // 'hsac_eodb' service config for its own account and token endpoint.
@@ -53,13 +65,19 @@ class GisController extends Controller
      */
     public function pointStatus(float $latitude, float $longitude): array
     {
-        $token = $this->resolveToken('harsac_gis');
+        if (Cache::has(self::BREAKER_KEY)) {
+            return ['status' => 'unavailable'];
+        }
+
+        $token = $this->resolveToken('harsac_gis', self::TOKEN_TIMEOUT);
         if (! $token) {
+            $this->pauseService();
+
             return ['status' => 'unavailable'];
         }
 
         try {
-            $http = Http::timeout(15);
+            $http = Http::connectTimeout(self::CONNECT_TIMEOUT)->timeout(self::QUERY_TIMEOUT);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
@@ -75,12 +93,15 @@ class GisController extends Controller
             ]);
         } catch (\Throwable $exception) {
             Log::warning('GIS point-in-panchayat query failed', ['reason' => $exception->getMessage()]);
+            $this->pauseService();
 
             return ['status' => 'unavailable'];
         }
 
         // An error body (bad token, service down) has no 'features' array at all.
         if (! $response->successful() || $response->json('error') || ! is_array($response->json('features'))) {
+            $this->pauseService();
+
             return ['status' => 'unavailable'];
         }
 
@@ -105,13 +126,19 @@ class GisController extends Controller
      */
     public function pointInPanchayat(float $latitude, float $longitude): ?array
     {
-        $token = $this->resolveToken('harsac_gis');
+        if (Cache::has(self::BREAKER_KEY)) {
+            return null;
+        }
+
+        $token = $this->resolveToken('harsac_gis', self::TOKEN_TIMEOUT);
         if (! $token) {
+            $this->pauseService();
+
             return null;
         }
 
         try {
-            $http = Http::timeout(15);
+            $http = Http::connectTimeout(self::CONNECT_TIMEOUT)->timeout(self::QUERY_TIMEOUT);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
@@ -127,6 +154,7 @@ class GisController extends Controller
             ]);
         } catch (\Throwable $exception) {
             Log::warning('GIS point-in-panchayat query failed', ['reason' => $exception->getMessage()]);
+            $this->pauseService();
 
             return null;
         }
@@ -228,7 +256,13 @@ class GisController extends Controller
             ->header('Content-Type', $upstream->header('Content-Type') ?: 'application/json');
     }
 
-    private function resolveToken(string $serviceKey): ?string
+    /** Skip the GIS service for a minute after it failed, so one outage is not paid for by every request. */
+    private function pauseService(): void
+    {
+        Cache::put(self::BREAKER_KEY, true, now()->addSeconds(self::BREAKER_SECONDS));
+    }
+
+    private function resolveToken(string $serviceKey, int $timeout = 30): ?string
     {
         $username = config("services.{$serviceKey}.username");
         $password = config("services.{$serviceKey}.password");
@@ -245,7 +279,7 @@ class GisController extends Controller
         $ttlMinutes = config("services.{$serviceKey}.token_ttl_minutes", self::DEFAULT_TOKEN_TTL_MINUTES);
 
         try {
-            $http = Http::asForm()->timeout(30);
+            $http = Http::asForm()->connectTimeout(self::CONNECT_TIMEOUT)->timeout($timeout);
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }

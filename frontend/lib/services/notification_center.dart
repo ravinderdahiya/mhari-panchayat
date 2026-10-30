@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -15,7 +16,14 @@ class NotificationCenter {
 
   static final instance = NotificationCenter._();
 
-  static const _interval = Duration(seconds: 60);
+  // Every signed-in phone polls the unread count. A fixed minute made 10,000 users ~170 requests/second on
+  // their own, so it is 2-3 minutes with a random gap (push notifications already cover urgent news).
+  static const _baseSeconds = 150;
+  static const _jitterSeconds = 30;
+
+  /// The wait before the next poll: 150 s +/- 30 s, so phones never poll in lockstep.
+  static Duration pollDelay([Random? random]) =>
+      Duration(seconds: _baseSeconds - _jitterSeconds + (random ?? Random()).nextInt(2 * _jitterSeconds + 1));
 
   final unread = ValueNotifier<int>(0);
   Timer? _timer;
@@ -27,7 +35,14 @@ class NotificationCenter {
     // Every signed-in shell starts this, so it doubles as the push registration point.
     unawaited(PushService.instance.ensureStarted());
     unawaited(CitizenLocationSync.run());
-    _timer ??= Timer.periodic(_interval, (_) => refresh());
+    if (_timer == null) _scheduleNextPoll();
+  }
+
+  void _scheduleNextPoll() {
+    _timer = Timer(pollDelay(), () async {
+      await refresh();
+      if (_timer != null) _scheduleNextPoll();
+    });
   }
 
   void stop() {

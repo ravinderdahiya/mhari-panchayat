@@ -9,6 +9,7 @@ import type { PublicHome, PublicPanchayatHit } from '../services/api';
 import TrackCard from '../home/TrackCard';
 import AppShowcase from '../home/AppShowcase';
 import FundsSection from '../home/FundsSection';
+import DistrictPerformance from '../home/DistrictPerformance';
 import type { MapFilters } from '../home/HomeMap';
 import { translator, type Lang } from '../home/strings';
 import { useCountUp, useInView, usePersistentState } from '../home/hooks';
@@ -514,6 +515,8 @@ export default function HomePage({ onLogin }: Props) {
             </div>
           </div>
         </section>
+
+        <DistrictPerformance t={t} serif={serif} />
 
         <FundsSection lang={lang} serif={serif} onLogin={onLogin} />
 

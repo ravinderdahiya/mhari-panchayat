@@ -19,10 +19,10 @@ class ComplaintWorkflowApiTest extends TestCase
 
     private function makeComplaint(array $overrides = []): Complaint
     {
-        $department = Department::create(['name' => 'Public Works Department', 'code' => 'PWD']);
-        $assetType = AssetType::create(['name' => 'Road', 'icon_key' => 'road']);
-        $assetType->departments()->attach($department);
-        $priority = ComplaintPriority::create(['name' => 'Medium', 'level' => 2, 'sla_hours' => 72]);
+        $department = Department::firstOrCreate(['code' => 'PWD'], ['name' => 'Public Works Department']);
+        $assetType = AssetType::firstOrCreate(['name' => 'Road'], ['icon_key' => 'road']);
+        $assetType->departments()->syncWithoutDetaching([$department->id]);
+        $priority = ComplaintPriority::firstOrCreate(['name' => 'Medium'], ['level' => 2, 'sla_hours' => 72]);
         $citizen = User::factory()->create(['role' => 'citizen']);
 
         return Complaint::create([
