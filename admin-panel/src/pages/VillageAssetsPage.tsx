@@ -16,6 +16,7 @@ import {
   Search, MapPin, Plus, X, Trash2, Undo2, Inbox, ChevronLeft, ChevronRight, Crosshair, PenLine,
 } from 'lucide-react';
 import * as api from '../services/api';
+import { confirmDialog } from '../components/dialogs';
 import { masterApi } from '../services/api';
 import type { VillageAsset, AssetCategoryDef, Village, AssetGeometryType } from '../types';
 
@@ -429,7 +430,7 @@ export default function VillageAssetsPage() {
 
   const deleteAsset = async () => {
     if (!selected) return;
-    if (!confirm(`Delete "${selected.asset_name}"? This cannot be undone.`)) return;
+    if (!await confirmDialog({ title: 'Delete asset?', message: `"${selected.asset_name}" will be permanently deleted. This cannot be undone.` })) return;
     setIsSubmitting(true);
     try {
       await api.deleteVillageAsset(selected.id);

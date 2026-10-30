@@ -387,6 +387,18 @@ class ComplaintController extends Controller
             'photos.max' => 'A maximum of 5 issue photos is allowed',
         ]);
 
+        // Citizens may only file inside their own panchayat; enforced here as well as in the app.
+        $geofence = app(AppServicesCitizenGeofence::class);
+        if (AppModelsCitizenProfile::where('user_id', $request->user()->id)->exists()) {
+            if (! isset($data['lat'], $data['long'])) {
+                return response()->json(['success' => false, 'message' => 'GPS location is required to file a complaint'], 422);
+            }
+            $fence = $geofence->check($request->user(), (float) $data['lat'], (float) $data['long']);
+            if (! $fence['allowed']) {
+                return response()->json(['success' => false, 'message' => $fence['message']], 422);
+            }
+        }
+
         $photoFiles = [];
         if ($request->hasFile('photos')) {
             $uploaded = $request->file('photos');
@@ -499,6 +511,8 @@ class ComplaintController extends Controller
             $village?->panchayat_id,
             $village?->id,
         );
+
+        $geofence->rememberHome($request->user(), $village?->panchayat_id);
 
         $complaint = Complaint::create([
             'user_id' => $request->user()->id,

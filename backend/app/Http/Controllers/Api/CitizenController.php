@@ -137,6 +137,17 @@ class CitizenController extends Controller
         return response()->json(['success' => true, 'saved' => true]);
     }
 
+    /** Capture-GPS check from the complaint form: is this point inside the citizen's own panchayat? */
+    public function geofence(Request $request, CitizenGeofence $geofence): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        return response()->json(['success' => true] + $geofence->check($request->user(), (float) $data['latitude'], (float) $data['longitude']));
+    }
+
     /** Saved device location, or the place of the latest complaint for citizens who have not shared one. */
     private function locationOf(CitizenProfile $profile): ?array
     {

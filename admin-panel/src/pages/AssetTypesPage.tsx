@@ -4,6 +4,7 @@ import {
   Pencil, Plus, RefreshCw, Trash2, X,
 } from 'lucide-react';
 import * as api from '../services/api';
+import { confirmDialog } from '../components/dialogs';
 import type { MasterPagination } from '../services/api';
 import type { Department } from '../types';
 
@@ -176,7 +177,7 @@ export default function AssetTypesPage() {
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm('Delete this asset type?')) return;
+    if (!await confirmDialog({ title: 'Delete asset type?', message: 'This asset type will be removed. Surveys already filed under it are not deleted.' })) return;
     setPageError('');
     try {
       await api.deleteAdminAssetType(Number(id));

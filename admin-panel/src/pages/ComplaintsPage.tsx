@@ -5,6 +5,7 @@ import {
   Navigation, Camera, ExternalLink, UserX, Building2, Landmark, Trash2,
 } from 'lucide-react';
 import * as api from '../services/api';
+import { confirmDialog, noticeDialog } from '../components/dialogs';
 import { masterApi } from '../services/api';
 import type { AssignableUser, Complaint, ComplaintCategory, ComplaintStatus, User as UserType } from '../types';
 import { StatusBadge, PriorityBadge, statusAccent } from '../components/StatusBadge';
@@ -153,13 +154,14 @@ export default function ComplaintsPage({ currentUser, initialStatus, initialComp
   };
 
   const removeComplaint = async (complaint: Complaint) => {
-    if (!window.confirm(`Delete complaint ${complaint.code ?? `CMP-${complaint.id}`}? This cannot be undone.`)) return;
+    const label = complaint.code ?? `CMP-${complaint.id}`;
+    if (!await confirmDialog({ title: 'Delete complaint?', message: `Complaint ${label} and its timeline will be permanently deleted. This cannot be undone.` })) return;
     try {
       await api.deleteComplaint(complaint.id);
       setComplaints((prev) => prev.filter((c) => c.id !== complaint.id));
       if (selected?.id === complaint.id) setSelected(null);
     } catch (err) {
-      window.alert((err as Error).message || 'Could not delete this complaint.');
+      void noticeDialog('Could not delete', (err as Error).message || 'Could not delete this complaint.');
     }
   };
 

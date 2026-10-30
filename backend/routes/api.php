@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/extent', [LocationController::class, 'extent']);
     Route::get('/location/search', [LocationController::class, 'search']);
     Route::put('/auth/citizen/location', [CitizenController::class, 'updateMyLocation'])->middleware('throttle:30,1');
+    Route::get('/auth/citizen/geofence', [CitizenController::class, 'geofence'])->middleware('throttle:60,1');
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
     Route::post('/auth/profile/photo', [AuthController::class, 'updateProfilePhoto'])->middleware('throttle:20,1');

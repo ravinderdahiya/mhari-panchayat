@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Camera, Check, ChevronLeft, ChevronRight, ClipboardList, Download, Eye, Forward, MapPin, RotateCcw, Search, ShieldAlert, Trash2, UserRound, X } from 'lucide-react';
 import * as api from '../services/api';
+import { confirmDialog } from '../components/dialogs';
 import { PhotoThumbnail, PhotoLightbox } from '../components/PhotoLightbox';
 import type { AssetSurvey, AssetSurveyPagination, AssetSurveyReviewStatus, AssetSurveyStats, User } from '../types';
 
@@ -306,7 +307,7 @@ export default function AssetSurveysPage({ currentUser, childId }: AssetSurveysP
     runStageAction(survey, () => ACTION_API[kind](survey.id));
 
   const handleDelete = async (survey: AssetSurvey) => {
-    if (!confirm(`Delete survey for "${survey.assetName}"? This cannot be undone.`)) return;
+    if (!await confirmDialog({ title: 'Delete survey?', message: `The survey for "${survey.assetName}" will be permanently deleted. This cannot be undone.` })) return;
     setActioningId(survey.id);
     setActionError('');
     try {
