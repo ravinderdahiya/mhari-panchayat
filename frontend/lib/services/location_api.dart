@@ -115,6 +115,29 @@ class LocationApi {
     }
   }
 
+  /// Asks the server whether this point is inside a village (panchayat)
+  /// boundary. Returns the message to show when it is not, or null when it is
+  /// fine or the check could not be made; the server enforces the same rule
+  /// again when the complaint is submitted.
+  static Future<String?> geofenceViolation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final session = await AuthService.getSession();
+    if (session == null || !session.isValid) return null;
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/citizen/geofence').replace(
+      queryParameters: {'latitude': '$latitude', 'longitude': '$longitude'},
+    );
+    final body = await _getJson(uri, session.token);
+    if (body == null || body['allowed'] != false) return null;
+    final message = body['message']?.toString().trim();
+
+    return message == null || message.isEmpty
+        ? 'You are outside any village boundary.'
+        : message;
+  }
+
   static Future<DetectedLocation?> reverse({
     required double latitude,
     required double longitude,

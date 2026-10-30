@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'user_id', 'full_name', 'mobile', 'email', 'registration_source',
     'registered_at', 'last_login_at',
-    'latitude', 'longitude', 'state', 'district', 'tehsil', 'block', 'panchayat', 'village', 'address', 'location_updated_at', 'home_panchayat_id',
+    'latitude', 'longitude', 'state', 'district', 'tehsil', 'block', 'panchayat', 'village', 'address', 'location_updated_at',
 ])]
 class CitizenProfile extends Model
 {

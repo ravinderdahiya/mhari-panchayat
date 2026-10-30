@@ -338,6 +338,31 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         );
       }
 
+      // A citizen can file from any village, but only from inside a village boundary.
+      final outside = await LocationApi.geofenceViolation(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      if (outside != null) {
+        if (mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              icon: const Icon(Icons.location_off_rounded, size: 36),
+              title: const Text('Outside village boundary'),
+              content: Text(outside),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+        throw _LocationFailure(outside);
+      }
+
       _lastPosition = position;
       if (!mounted) return;
 

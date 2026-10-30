@@ -137,7 +137,7 @@ class CitizenController extends Controller
         return response()->json(['success' => true, 'saved' => true]);
     }
 
-    /** Capture-GPS check from the complaint form: is this point inside the citizen's own panchayat? */
+    /** Capture-GPS check from the complaint form: is this point inside any village (panchayat) boundary? */
     public function geofence(Request $request, CitizenGeofence $geofence): JsonResponse
     {
         $data = $request->validate([

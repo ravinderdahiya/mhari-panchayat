@@ -512,8 +512,6 @@ class ComplaintController extends Controller
             $village?->id,
         );
 
-        $geofence->rememberHome($request->user(), $village?->panchayat_id);
-
         $complaint = Complaint::create([
             'user_id' => $request->user()->id,
             'category_id' => $data['category_id'] ?? null,

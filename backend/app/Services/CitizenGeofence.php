@@ -2,87 +2,46 @@
 
 namespace App\Services;
 
-use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\Api\GisController;
 use App\Models\CitizenProfile;
-use App\Models\Complaint;
-use App\Models\Panchayat;
 use App\Models\User;
 
 /**
- * Keeps a citizen's complaints inside their own panchayat. The home panchayat is
- * fixed by the citizen's first complaint (registering or signing in from anywhere
- * does not fix it), so moving around later does not widen it. Staff accounts are never restricted.
+ * Citizens may file a complaint from any village, but only from inside a village
+ * (gram panchayat) boundary: a point in open land, a city or outside Haryana is
+ * refused. Staff accounts are never restricted.
  */
 class CitizenGeofence
 {
-    public const MESSAGE = 'आप अपनी पंचायत के क्षेत्र से बाहर हैं। शिकायत केवल अपनी पंचायत की सीमा के अंदर ही दर्ज हो सकती है। '
-        .'You are outside your panchayat area. A complaint can only be filed within your own panchayat boundary.';
+    public const MESSAGE = 'आप किसी भी गाँव / पंचायत की सीमा के अंदर नहीं हैं। शिकायत केवल गाँव की सीमा के अंदर से ही दर्ज हो सकती है। '
+        .'You are outside any village (panchayat) boundary. A complaint can only be filed from inside a village boundary.';
 
-    public function __construct(private LocationController $locations) {}
+    public function __construct(private GisController $gis) {}
 
     /**
-     * @return array{allowed: bool, home: ?string, current: ?string, message: ?string}
+     * @return array{allowed: bool, panchayat: ?string, message: ?string}
      */
     public function check(User $user, float $lat, float $lng): array
     {
-        // A guard must never take complaint filing down with it (e.g. a migration not yet run).
+        $allowed = ['allowed' => true, 'panchayat' => null, 'message' => null];
+        if (! CitizenProfile::where('user_id', $user->id)->exists()) {
+            return $allowed;
+        }
+
+        // A guard must never take complaint filing down with it.
         try {
-            return $this->evaluate($user, $lat, $lng);
-        } catch (Throwable $e) {
+            $match = $this->gis->pointStatus($lat, $lng);
+        } catch (\Throwable $e) {
             report($e);
 
-            return ['allowed' => true, 'home' => null, 'current' => null, 'message' => null];
-        }
-    }
-
-    /** @return array{allowed: bool, home: ?string, current: ?string, message: ?string} */
-    private function evaluate(User $user, float $lat, float $lng): array
-    {
-        $profile = CitizenProfile::where('user_id', $user->id)->first();
-        $homeId = $profile ? $this->homePanchayatId($profile) : null;
-        if (! $profile || ! $homeId) {
-            return ['allowed' => true, 'home' => null, 'current' => null, 'message' => null];
+            return $allowed;
         }
 
-        $place = $this->locations->lookup($lat, $lng);
-        // Both location services unreachable: the point cannot be judged, so do not block the citizen.
-        if ($place === null) {
-            return ['allowed' => true, 'home' => Panchayat::whereKey($homeId)->value('name'), 'current' => null, 'message' => null];
-        }
-        $currentId = $place['panchayatId'] ?? null;
-        $allowed = $currentId !== null && (int) $currentId === $homeId;
-
-        return [
-            'allowed' => $allowed,
-            'home' => Panchayat::whereKey($homeId)->value('name'),
-            'current' => $place['panchayat'] ?? null,
-            'message' => $allowed ? null : self::MESSAGE,
-        ];
-    }
-
-    /** Home panchayat, remembered on first use from the saved location or the latest complaint. */
-    public function homePanchayatId(CitizenProfile $profile): ?int
-    {
-        if ($profile->home_panchayat_id) {
-            return (int) $profile->home_panchayat_id;
-        }
-        $fromComplaint = Complaint::where('user_id', $profile->user_id)->whereNotNull('panchayat_id')->orderBy('id')->value('panchayat_id');
-        if ($fromComplaint) {
-            $profile->update(['home_panchayat_id' => $fromComplaint]);
-        }
-
-        return $fromComplaint ? (int) $fromComplaint : null;
-    }
-
-    public function rememberHome(User $user, ?int $panchayatId): void
-    {
-        if (! $panchayatId) {
-            return;
-        }
-        try {
-            CitizenProfile::where('user_id', $user->id)->whereNull('home_panchayat_id')->update(['home_panchayat_id' => $panchayatId]);
-        } catch (Throwable $e) {
-            report($e);
-        }
+        return match ($match['status']) {
+            'matched' => ['allowed' => true, 'panchayat' => $match['name'] ?? null, 'message' => null],
+            // The boundary service could not be reached, so the point cannot be judged: do not block.
+            'unavailable' => $allowed,
+            default => ['allowed' => false, 'panchayat' => null, 'message' => self::MESSAGE],
+        };
     }
 }

@@ -46,6 +46,53 @@ class GisController extends Controller
     }
 
     /**
+     * Like pointInPanchayat(), but tells "no panchayat contains this point" apart from
+     * "the boundary service could not be asked".
+     *
+     * @return array{status: 'matched'|'none'|'unavailable', code?: string, name?: ?string}
+     */
+    public function pointStatus(float $latitude, float $longitude): array
+    {
+        $token = $this->resolveToken('harsac_gis');
+        if (! $token) {
+            return ['status' => 'unavailable'];
+        }
+
+        try {
+            $http = Http::timeout(15);
+            if (! app()->environment('production')) {
+                $http = $http->withOptions(['verify' => false]);
+            }
+            $response = $http->get(self::PANCHAYAT_MAPSERVER_URL.'/1/query', [
+                'f' => 'json',
+                'geometry' => "{$longitude},{$latitude}",
+                'geometryType' => 'esriGeometryPoint',
+                'inSR' => 4326,
+                'spatialRel' => 'esriSpatialRelIntersects',
+                'outFields' => 'local_body_code,localbodyname',
+                'returnGeometry' => 'false',
+                'token' => $token,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('GIS point-in-panchayat query failed', ['reason' => $exception->getMessage()]);
+
+            return ['status' => 'unavailable'];
+        }
+
+        // An error body (bad token, service down) has no 'features' array at all.
+        if (! $response->successful() || $response->json('error') || ! is_array($response->json('features'))) {
+            return ['status' => 'unavailable'];
+        }
+
+        $attributes = $response->json('features.0.attributes');
+        if (! $attributes || empty($attributes['local_body_code'])) {
+            return ['status' => 'none'];
+        }
+
+        return ['status' => 'matched', 'code' => (string) $attributes['local_body_code'], 'name' => $attributes['localbodyname'] ?? null];
+    }
+
+    /**
      * Precise point-in-polygon lookup against the real panchayat boundary
      * layer (sublayer 1, panchayat_bnd - same layer the admin dashboard's
      * map overlays) - used by LocationController::lookup() as the geofence
