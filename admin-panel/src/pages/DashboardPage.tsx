@@ -344,9 +344,9 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
   // was tried and reverted: it broke the geometry engine's WASM module load
   // under this project's Vite base-path setup. Switch back to the vector
   // layer only if HARSAC republishes it in Web Mercator.
-  // This service only has 2 layers - dist_bn (district boundary, id 0) and
-  // panchayat_bnd (panchayat boundary, id 1) - both wanted, so no sublayers
-  // filter needed. Each already has its own minScale set server-side, so
+  // This service has 3 layers - dist_bn (district boundary, id 0),
+  // panchayat_bnd (panchayat boundary, id 1) and the village boundary (id 2) -
+  // all wanted, listed explicitly below. Each already has its own minScale set server-side, so
   // they fade in/out correctly as you zoom without client-side scale logic.
   const boundaryLayerRef = useRef<MapImageLayer | null>(null);
   useEffect(() => {
@@ -386,6 +386,7 @@ export default function DashboardPage({ onNavigateToComplaints, onNavigateToComp
             },
           },
         },
+        { id: 2, popupEnabled: false }, // village boundary
       ],
     });
     view.map.add(layer, 0);

@@ -37,7 +37,10 @@ export default function HomeMap({ t, lang, filters }: Props) {
   // Boundary + points layers, added once the view exists.
   useEffect(() => {
     if (!view?.map) return undefined;
-    const boundary = new MapImageLayer({ url: api.gisPanchayatMapServerUrl });
+    const boundary = new MapImageLayer({
+      url: api.gisPanchayatMapServerUrl,
+      sublayers: [{ id: 0 }, { id: 1 }, { id: 2 }], // district, panchayat, village
+    });
     const layer = new GraphicsLayer();
     view.map.addMany([boundary, layer]);
     layerRef.current = layer;
