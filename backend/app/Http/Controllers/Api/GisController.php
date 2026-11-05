@@ -31,6 +31,9 @@ class GisController extends Controller
     //private const PANCHAYAT_MAPSERVER_URL = 'https://hsac.org.in/server/rest/services/EODB/EODB_HR24/MapServer';
     private const PANCHAYAT_MAPSERVER_URL = 'https://gis.harsac.in/server/rest/services/Panchayat/MapServer';
 
+    // Sublayer of the Panchayat MapServer holding village polygons - the complaint geofence checks this one.
+    private const VILLAGE_LAYER_ID = 2;
+
     private const PANCHAYAT_VECTORTILE_URL = 'https://gis.harsac.in/server/rest/services/Panchayat/MapServer';
 
     /**
@@ -58,7 +61,7 @@ class GisController extends Controller
     }
 
     /**
-     * Like pointInPanchayat(), but tells "no panchayat contains this point" apart from
+     * Checks the point against the village boundary layer (id 2) and tells "no village contains this point" apart from
      * "the boundary service could not be asked".
      *
      * @return array{status: 'matched'|'none'|'unavailable', code?: string, name?: ?string}
@@ -81,18 +84,20 @@ class GisController extends Controller
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
-            $response = $http->get(self::PANCHAYAT_MAPSERVER_URL.'/1/query', [
+            // Village boundary layer (id 2): the point must fall inside a village polygon.
+            // Its field names are not pinned down, so ask for all of them.
+            $response = $http->get(self::PANCHAYAT_MAPSERVER_URL.'/'.self::VILLAGE_LAYER_ID.'/query', [
                 'f' => 'json',
                 'geometry' => "{$longitude},{$latitude}",
                 'geometryType' => 'esriGeometryPoint',
                 'inSR' => 4326,
                 'spatialRel' => 'esriSpatialRelIntersects',
-                'outFields' => 'localbodyc,localbodyn',
+                'outFields' => '*',
                 'returnGeometry' => 'false',
                 'token' => $token,
             ]);
         } catch (\Throwable $exception) {
-            Log::warning('GIS point-in-panchayat query failed', ['reason' => $exception->getMessage()]);
+            Log::warning('GIS point-in-village query failed', ['reason' => $exception->getMessage()]);
             $this->pauseService();
 
             return ['status' => 'unavailable'];
@@ -106,11 +111,26 @@ class GisController extends Controller
         }
 
         $attributes = $response->json('features.0.attributes');
-        if (! $attributes || empty($attributes['localbodyc'])) {
+        if (! $attributes) {
             return ['status' => 'none'];
         }
 
-        return ['status' => 'matched', 'code' => (string) $attributes['localbodyc'], 'name' => $attributes['localbodyn'] ?? null];
+        $attributes = array_change_key_case($attributes, CASE_LOWER);
+        $pick = function (array $keys) use ($attributes) {
+            foreach ($keys as $key) {
+                if (! empty($attributes[$key])) {
+                    return (string) $attributes[$key];
+                }
+            }
+
+            return null;
+        };
+
+        return [
+            'status' => 'matched',
+            'code' => $pick(['localbodyc', 'local_body_code', 'village_code', 'vill_code', 'lgd_code']),
+            'name' => $pick(['localbodyn', 'localbodyname', 'village_name', 'villagename', 'vill_name', 'village', 'name']),
+        ];
     }
 
     /**

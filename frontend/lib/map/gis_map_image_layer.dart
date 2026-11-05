@@ -79,7 +79,7 @@ class _GisMapImageLayerState extends State<GisMapImageLayer> {
     }
 
     final visible = camera.visibleBounds;
-    final layers = zoom >= _villageZoom ? 'show:0,1' : 'show:0';
+    final layers = zoom >= _villageZoom ? 'show:0,1,2' : 'show:0';
 
     var width = camera.nonRotatedSize.width.round();
     var height = camera.nonRotatedSize.height.round();

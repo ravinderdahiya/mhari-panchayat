@@ -62,7 +62,7 @@ class GisResilienceTest extends TestCase
 
     private function queryRequests(): int
     {
-        return $this->callsTo('/MapServer/1/query');
+        return $this->callsTo('/MapServer/2/query');
     }
 
     public function test_a_failing_gis_query_is_reported_as_unavailable(): void
