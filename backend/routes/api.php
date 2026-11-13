@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\CitizenController;
 use App\Http\Controllers\Api\ElectedRepresentativeController;
 use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\LoginLogController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\PublicHomeController;
 use App\Http\Controllers\Api\SiteSettingController;
@@ -182,6 +183,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/feedback', [FeedbackController::class, 'store']);
     Route::get('/feedback', [FeedbackController::class, 'index'])
         ->middleware('permission:feedback.view');
+
+    // Sign-in history for the admin "Audit Log" page.
+    Route::get('/login-logs', [LoginLogController::class, 'index'])
+        ->middleware('permission:audit.view');
 
     // Complaints
     Route::post('/complaints', [ComplaintController::class, 'store'])

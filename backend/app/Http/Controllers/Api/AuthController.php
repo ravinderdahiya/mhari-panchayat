@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PasswordResetToken;
 use App\Models\CitizenProfile;
+use App\Models\LoginLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -364,6 +365,7 @@ class AuthController extends Controller
             if ($attempts > self::CITIZEN_OTP_MAX_ATTEMPTS) {
                 Cache::forget($this->citizenOtpKey($mobile));
                 Cache::forget($this->citizenOtpAttemptsKey($mobile));
+                LoginLog::record($request, 'otp', 'failed', $mobile, null, 'Too many incorrect OTP attempts');
 
                 return response()->json([
                     'success' => false,
@@ -372,6 +374,8 @@ class AuthController extends Controller
             }
 
             if (! is_string($cachedOtp) || ! hash_equals($cachedOtp, $data['otp'])) {
+                LoginLog::record($request, 'otp', 'failed', $mobile, null, 'Invalid or expired OTP');
+
                 return response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 400);
             }
         }
@@ -385,6 +389,8 @@ class AuthController extends Controller
             ->orWhere('username', $mobile)
             ->first();
         if ($user && $user->role !== 'citizen') {
+            LoginLog::record($request, 'otp', 'failed', $mobile, $user, 'Staff account used citizen OTP login');
+
             return response()->json([
                 'success' => false,
                 'message' => 'This mobile number belongs to a staff account. Use Staff Login.',
@@ -404,9 +410,13 @@ class AuthController extends Controller
             ]);
         } else {
             if ($user->registration_status === 'rejected') {
+                LoginLog::record($request, 'otp', 'failed', $mobile, $user, 'Citizen account is rejected');
+
                 return response()->json(['success' => false, 'message' => 'Citizen account is rejected'], 403);
             }
             if ($user->registration_status !== 'active' || ! $user->is_active) {
+                LoginLog::record($request, 'otp', 'failed', $mobile, $user, 'Citizen account is not active');
+
                 return response()->json(['success' => false, 'message' => 'Citizen account is not active'], 403);
             }
             $user->forceFill([
@@ -428,6 +438,7 @@ class AuthController extends Controller
         );
 
         $token = $user->createToken('citizen-mobile')->plainTextToken;
+        LoginLog::record($request, 'otp', 'success', $mobile, $user);
 
         return response()->json([
             'success' => true,
@@ -455,22 +466,31 @@ class AuthController extends Controller
             ->first();
 
         if (! $user || ! Hash::check($request->input('password'), $user->password)) {
+            LoginLog::record($request, 'password', 'failed', $login, $user, 'Invalid credentials');
+
             return response()->json(['success' => false, 'message' => 'Invalid credentials'], 401);
         }
 
         if ($user->registration_status === 'rejected') {
+            LoginLog::record($request, 'password', 'failed', $login, $user, 'Registration rejected');
+
             return response()->json(['success' => false, 'message' => "Registration rejected: {$user->rejection_reason}"], 403);
         }
 
         if ($user->registration_status !== 'active') {
+            LoginLog::record($request, 'password', 'failed', $login, $user, 'Registration still being processed');
+
             return response()->json(['success' => false, 'message' => 'Your registration is still being processed'], 403);
         }
 
         if (! $user->is_active) {
+            LoginLog::record($request, 'password', 'failed', $login, $user, 'Account is disabled');
+
             return response()->json(['success' => false, 'message' => 'Account is disabled'], 403);
         }
 
         $token = $user->createToken('auth')->plainTextToken;
+        LoginLog::record($request, 'password', 'success', $login, $user);
         $user->load(['department', 'departments', 'district', 'block:id,name', 'panchayat:id,name']);
 
         return response()->json([
