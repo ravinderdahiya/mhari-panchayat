@@ -114,6 +114,34 @@ class LoginLogApiTest extends TestCase
             ->getJson('/api/login-logs')->assertOk();
     }
 
+    public function test_login_logs_are_paginated(): void
+    {
+        foreach (range(1, 23) as $i) {
+            LoginLog::create([
+                'identifier' => "user{$i}", 'method' => 'password', 'status' => 'failed',
+                'created_at' => now()->subMinutes(30 - $i),
+            ]);
+        }
+
+        $this->actingAs(User::factory()->create(['role' => 'super_admin']), 'sanctum');
+
+        $this->getJson('/api/login-logs?per_page=10')
+            ->assertJsonCount(10, 'logs')
+            ->assertJsonPath('meta.total', 23)
+            ->assertJsonPath('meta.lastPage', 3)
+            ->assertJsonPath('meta.perPage', 10)
+            ->assertJsonPath('logs.0.identifier', 'user23');
+
+        $this->getJson('/api/login-logs?per_page=10&page=3')
+            ->assertJsonCount(3, 'logs')
+            ->assertJsonPath('meta.page', 3)
+            ->assertJsonPath('logs.2.identifier', 'user1')
+            // summary covers every page, not just the visible one
+            ->assertJsonPath('summary.failed', 23);
+
+        $this->getJson('/api/login-logs?per_page=5')->assertUnprocessable();
+    }
+
     public function test_admin_sees_newest_first_and_can_filter_by_status_and_search(): void
     {
         $user = $this->staff(['name' => 'Karnal DDPO']);

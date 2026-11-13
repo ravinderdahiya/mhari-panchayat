@@ -433,6 +433,7 @@ export interface LoginLogFilters {
   from?: string;
   to?: string;
   page?: number;
+  per_page?: number;
 }
 
 export const getLoginLogs = (filters: LoginLogFilters = {}) => {

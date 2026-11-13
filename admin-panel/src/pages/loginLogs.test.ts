@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { describeDevice } from './loginLogs';
+import { describeDevice, pageItems, rangeLabel } from './loginLogs';
+
+describe('pageItems', () => {
+  it('lists every page when there are few', () => {
+    expect(pageItems(1, 1)).toEqual([1]);
+    expect(pageItems(3, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(pageItems(1, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('collapses distant pages into gaps around the current page', () => {
+    expect(pageItems(1, 20)).toEqual([1, 2, 3, 4, 5, 'gap', 20]);
+    expect(pageItems(10, 20)).toEqual([1, 'gap', 9, 10, 11, 'gap', 20]);
+    expect(pageItems(20, 20)).toEqual([1, 'gap', 16, 17, 18, 19, 20]);
+  });
+
+  it('treats an empty result as a single page', () => {
+    expect(pageItems(1, 0)).toEqual([1]);
+  });
+});
+
+describe('rangeLabel', () => {
+  it('shows the visible slice of the total', () => {
+    expect(rangeLabel(1, 25, 2)).toBe('Showing 1–2 of 2');
+    expect(rangeLabel(2, 25, 60)).toBe('Showing 26–50 of 60');
+    expect(rangeLabel(3, 25, 60)).toBe('Showing 51–60 of 60');
+    expect(rangeLabel(1, 25, 0)).toBe('Showing 0 of 0');
+  });
+});
 
 describe('describeDevice', () => {
   it('names browser and OS for desktop browsers', () => {

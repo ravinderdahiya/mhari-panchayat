@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, ChevronLeft, ChevronRight, Inbox, RefreshCw, Search, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, RefreshCw, Search, XCircle } from 'lucide-react';
 import * as api from '../services/api';
 import type { LoginLog, LoginLogPage, LoginLogStatus } from '../types';
-import { describeDevice } from './loginLogs';
+import { describeDevice, pageItems, rangeLabel } from './loginLogs';
+
+const PAGE_SIZES = [10, 25, 50, 100];
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
@@ -20,6 +22,7 @@ export default function AuditLogPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [reloadKey, setReloadKey] = useState(0);
   const [data, setData] = useState<LoginLogPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,13 +41,18 @@ export default function AuditLogPage() {
     api.getLoginLogs({
       status: status === 'all' ? undefined : status,
       method: method || undefined,
-      search, from, to, page,
+      search, from, to, page, per_page: perPage,
     })
-      .then((res) => { if (!cancelled) setData(res); })
+      .then((res) => {
+        if (cancelled) return;
+        // e.g. filters shrank the result: jump back to the last page that exists.
+        if (res.meta.page > res.meta.lastPage) { setPage(res.meta.lastPage); return; }
+        setData(res);
+      })
       .catch((reason: Error) => { if (!cancelled) setError(reason.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [status, method, search, from, to, page, reloadKey]);
+  }, [status, method, search, from, to, page, perPage, reloadKey]);
 
   const summary = data?.summary ?? { success: 0, failed: 0 };
   const meta = data?.meta;
@@ -165,20 +173,56 @@ export default function AuditLogPage() {
           </div>
         )}
 
-        {meta && meta.lastPage > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
-            <span>Page {meta.page} of {meta.lastPage} · {meta.total} entries</span>
-            <div className="flex gap-1">
-              <button type="button" aria-label="Previous page" disabled={meta.page <= 1 || loading} onClick={() => setPage((p) => p - 1)}
-                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer disabled:cursor-default">
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button type="button" aria-label="Next page" disabled={meta.page >= meta.lastPage || loading} onClick={() => setPage((p) => p + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer disabled:cursor-default">
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+        {meta && (
+          <nav aria-label="Login history pages" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
+            <div className="flex items-center gap-3">
+              <span className="tabular-nums">{rangeLabel(meta.page, meta.perPage, meta.total)}</span>
+              <label className="flex items-center gap-1.5">
+                Rows per page
+                <select
+                  value={perPage}
+                  onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+                  className="text-xs border border-slate-200 rounded-md px-1.5 py-1 bg-white text-slate-700"
+                >
+                  {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
             </div>
-          </div>
+
+            <div className="flex items-center gap-1">
+              {([
+                ['First page', ChevronsLeft, 1, meta.page <= 1],
+                ['Previous page', ChevronLeft, meta.page - 1, meta.page <= 1],
+              ] as const).map(([label, Icon, target, disabled]) => (
+                <button key={label} type="button" aria-label={label} disabled={disabled || loading} onClick={() => setPage(target)}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer disabled:opacity-40 disabled:cursor-default">
+                  <Icon className="w-3.5 h-3.5" />
+                </button>
+              ))}
+
+              {pageItems(meta.page, meta.lastPage).map((item, i) => item === 'gap' ? (
+                <span key={`gap-${i}`} className="px-1 text-slate-400">…</span>
+              ) : (
+                <button key={item} type="button" aria-label={`Page ${item}`} aria-current={item === meta.page ? 'page' : undefined}
+                  disabled={loading} onClick={() => setPage(item)}
+                  className={`min-w-7 h-7 px-2 rounded-lg border text-xs font-semibold tabular-nums cursor-pointer ${
+                    item === meta.page ? 'bg-sidebar text-white border-sidebar' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}>
+                  {item}
+                </button>
+              ))}
+
+              {([
+                ['Next page', ChevronRight, meta.page + 1, meta.page >= meta.lastPage],
+                ['Last page', ChevronsRight, meta.lastPage, meta.page >= meta.lastPage],
+              ] as const).map(([label, Icon, target, disabled]) => (
+                <button key={label} type="button" aria-label={label} disabled={disabled || loading} onClick={() => setPage(target)}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer disabled:opacity-40 disabled:cursor-default">
+                  <Icon className="w-3.5 h-3.5" />
+                </button>
+              ))}
+            </div>
+          </nav>
         )}
       </div>
     </div>
