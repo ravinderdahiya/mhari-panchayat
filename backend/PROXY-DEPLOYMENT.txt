@@ -1,0 +1,36 @@
+Audit log client IP deployment
+=============================
+
+Deploy bootstrap/app.php and config/trustedproxy.php together.
+
+In the live backend .env set:
+TRUSTED_PROXIES=127.0.0.1,::1
+
+If the reverse proxy connects from another address, add that proxy's actual
+IP/CIDR to this list. Avoid * unless direct backend access is blocked and all
+requests come through a controlled proxy.
+
+The reverse proxy must forward the visitor IP. For nginx, in the existing
+location that proxies requests to the Laravel backend, use:
+
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+For nginx with PHP-FPM, preserve the real client address with:
+
+    fastcgi_param REMOTE_ADDR $remote_addr;
+
+If another load balancer/CDN precedes nginx, configure its trusted addresses
+and real-IP handling first. Do not accept arbitrary client-supplied real-IP headers.
+
+From the live backend directory run:
+
+    php artisan config:cache
+
+Reload long-running application workers if used. If nginx was changed, validate
+with nginx -t before reloading it.
+
+Verify a fresh admin login and a fresh mobile OTP login in Audit Log. Their IP
+should match the public source IP seen by the proxy (shared networks may share
+one public IP). Previous rows containing 127.0.0.1 remain historical records;
+their original IP cannot be recovered unless corresponding proxy logs exist.

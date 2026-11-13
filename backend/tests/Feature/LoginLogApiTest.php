@@ -63,6 +63,21 @@ class LoginLogApiTest extends TestCase
         $this->assertStringNotContainsString('wrong-guess', json_encode($log->toArray()));
     }
 
+    public function test_staff_login_logs_store_visitor_ip_behind_local_reverse_proxy(): void
+    {
+        config(['trustedproxy.proxies' => ['127.0.0.1', '::1']]);
+        $this->staff();
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->withHeader('X-Forwarded-For', '203.0.113.7');
+
+        $this->postJson('/api/auth/login', ['username' => 'ddpo.karnal', 'password' => 'wrong'])
+            ->assertUnauthorized();
+        $this->postJson('/api/auth/login', ['username' => 'ddpo.karnal', 'password' => 'secret-pass'])
+            ->assertOk();
+
+        $this->assertSame(['203.0.113.7', '203.0.113.7'], LoginLog::orderBy('id')->pluck('ip_address')->all());
+    }
+
     public function test_unknown_username_is_recorded_as_failed_with_no_user(): void
     {
         $this->postJson('/api/auth/login', ['username' => 'nobody', 'password' => 'x'])->assertStatus(401);
@@ -87,6 +102,9 @@ class LoginLogApiTest extends TestCase
     {
         // .env may carry a static bypass code; keep this test independent of it.
         config(['services.otp_bypass.code' => null, 'services.otp_demo.code' => null]);
+        config(['trustedproxy.proxies' => ['127.0.0.1', '::1']]);
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->withHeader('X-Forwarded-For', '203.0.113.8');
 
         $this->postJson('/api/auth/verify-otp', ['mobile' => '9999999999', 'otp' => '5678'])->assertStatus(400);
         $this->postJson('/api/auth/verify-otp', ['mobile' => '9999999999', 'otp' => '0000'])->assertOk();
@@ -97,6 +115,7 @@ class LoginLogApiTest extends TestCase
         $this->assertSame('otp', $logs[1]->method);
         $this->assertSame('citizen', $logs[1]->role);
         $this->assertNotNull($logs[1]->user_id);
+        $this->assertSame(['203.0.113.8', '203.0.113.8'], $logs->pluck('ip_address')->all());
     }
 
     public function test_only_audit_permission_holders_can_list_login_logs(): void

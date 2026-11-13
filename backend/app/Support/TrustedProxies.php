@@ -5,7 +5,7 @@ namespace App\Support;
 /** Reads the TRUSTED_PROXIES env value ('*' or "10.0.0.1, 192.168.1.0/24") for Laravel's trustProxies(). */
 class TrustedProxies
 {
-    /** @return string|list<string>|null null = trust nobody (the safe default) */
+    /** @return string|list<string>|null null disables proxy trust */
     public static function fromEnv(mixed $value): string|array|null
     {
         $value = is_string($value) ? trim($value) : '';

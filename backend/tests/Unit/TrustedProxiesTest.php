@@ -20,7 +20,7 @@ class TrustedProxiesTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_nothing_is_trusted_by_default(): void
+    public function test_empty_proxy_setting_disables_trust(): void
     {
         $this->assertNull(TrustedProxies::fromEnv(null));
         $this->assertNull(TrustedProxies::fromEnv(''));
@@ -50,12 +50,57 @@ class TrustedProxiesTest extends TestCase
             ->assertSee('203.0.113.7');
     }
 
+    public function test_default_loopback_proxy_uses_the_forwarded_visitor_ip(): void
+    {
+        // Load the same proxy list as production without relying on the local .env.
+        config(['trustedproxy.proxies' => TrustedProxies::fromEnv('127.0.0.1,::1')]);
+        Route::get('/_ip', fn (Request $request) => $request->ip());
+
+        foreach (['127.0.0.1', '::1'] as $proxy) {
+            $this->withServerVariables(['REMOTE_ADDR' => $proxy])
+                ->get('/_ip', ['X-Forwarded-For' => '203.0.113.7'])
+                ->assertContent('203.0.113.7');
+        }
+    }
+
+    public function test_configured_proxy_list_is_used_without_bootstrap_static_state(): void
+    {
+        TrustProxies::flushState();
+        config(['trustedproxy.proxies' => TrustedProxies::fromEnv('10.9.9.9')]);
+        Route::get('/_ip', fn (Request $request) => $request->ip());
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.9.9.9'])
+            ->get('/_ip', ['X-Forwarded-For' => '203.0.113.7'])
+            ->assertContent('203.0.113.7');
+    }
+
+    public function test_loopback_proxy_uses_nearest_untrusted_ip_in_forwarded_chain(): void
+    {
+        config(['trustedproxy.proxies' => ['127.0.0.1', '::1']]);
+        Route::get('/_ip', fn (Request $request) => $request->ip());
+
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->get('/_ip', ['X-Forwarded-For' => '198.51.100.99, 203.0.113.7'])
+            ->assertContent('203.0.113.7');
+    }
+
     public function test_a_forwarded_header_is_ignored_when_no_proxy_is_trusted(): void
     {
+        config(['trustedproxy.proxies' => null]);
         Route::get('/_ip', fn (Request $request) => $request->ip());
 
         $this->withServerVariables(['REMOTE_ADDR' => '10.9.9.9'])
             ->get('/_ip', ['X-Forwarded-For' => '203.0.113.7'])
             ->assertSee('10.9.9.9');
+    }
+
+    public function test_untrusted_client_cannot_override_ip_with_forwarded_header(): void
+    {
+        config(['trustedproxy.proxies' => ['127.0.0.1', '::1']]);
+        Route::get('/_ip', fn (Request $request) => $request->ip());
+
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
+            ->get('/_ip', ['X-Forwarded-For' => '198.51.100.99'])
+            ->assertContent('203.0.113.7');
     }
 }
