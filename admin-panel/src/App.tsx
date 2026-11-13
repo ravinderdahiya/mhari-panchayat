@@ -24,16 +24,12 @@ import AppVersionPage from './pages/AppVersionPage';
 import HomeContentPage from './pages/HomeContentPage';
 import ProfilePage from './pages/ProfilePage';
 import FeedbackPage from './pages/FeedbackPage';
-import ComingSoon from './components/ComingSoon';
+import AuditLogPage from './pages/AuditLogPage';
 import SettingsPage from './pages/SettingsPage';
 import Layout from './components/Layout';
 import type { View } from './components/Layout';
 
 type PreAuthView = 'home' | 'login' | 'register' | 'forgot';
-
-const PLACEHOLDER_TITLES: Partial<Record<View, string>> = {
-  'audit-log': 'Audit Log',
-};
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -149,7 +145,7 @@ export default function App() {
       {activeView === 'home-content' && <HomeContentPage />}
       {activeView === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
       {activeView === 'profile' && <ProfilePage currentUser={currentUser} onProfileUpdated={setCurrentUser} />}
-      {PLACEHOLDER_TITLES[activeView] && <ComingSoon title={PLACEHOLDER_TITLES[activeView]!} />}
+      {activeView === 'audit-log' && <AuditLogPage />}
     </Layout>
   );
 }

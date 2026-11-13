@@ -122,7 +122,7 @@ const PAGE_SUBTITLES: Record<View, string> = {
   roles: 'Configure role-based permissions',
   'project-meeting': 'Slide-style project overview, workflows and next actions',
   settings: 'System configuration',
-  'audit-log': 'System activity history',
+  'audit-log': 'Login history - who signed in, when, from where',
   'app-version': 'Release settings that decide when the mobile app asks users to update',
   'home-content': 'Announcement banner and contact details shown on the public home page',
   profile: 'Your account details',

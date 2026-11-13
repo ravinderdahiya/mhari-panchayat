@@ -329,6 +329,30 @@ export interface Feedback {
   createdAt: string;
 }
 
+export type LoginLogStatus = 'success' | 'failed';
+export type LoginLogMethod = 'password' | 'otp';
+
+export interface LoginLog {
+  id: number;
+  userId: number | null;
+  userName: string | null;
+  identifier: string | null;
+  role: string | null;
+  method: LoginLogMethod;
+  status: LoginLogStatus;
+  reason: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface LoginLogPage {
+  success: boolean;
+  logs: LoginLog[];
+  summary: { success: number; failed: number };
+  meta: { total: number; page: number; lastPage: number; perPage: number };
+}
+
 // CPLO/surveyor -> Gram Sachiv -> BDPO -> DDPO -> XEN-PR (technical asset
 // types only) -> CEO-ZP approval chain. Every non-terminal stage is a
 // review-then-forward pair: the actor marks their own work reviewed (the

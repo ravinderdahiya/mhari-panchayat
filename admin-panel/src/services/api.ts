@@ -1,4 +1,4 @@
-import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, ElectedRepresentative, Feedback, RolePermissionMatrix, User, VillageAsset } from '../types';
+import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, ElectedRepresentative, Feedback, LoginLogPage, LoginLogStatus, RolePermissionMatrix, User, VillageAsset } from '../types';
 
 // 127.0.0.1, not localhost - on this machine "localhost" resolves to ::1
 // first, and the dev server only listens on IPv4, so every request pays a
@@ -425,6 +425,24 @@ export const getAssetSurveysForMap = () =>
 // default, see PermissionSeeder).
 export const getFeedback = () =>
   request<{ success: boolean; feedback: Feedback[] }>('/api/feedback');
+
+export interface LoginLogFilters {
+  status?: LoginLogStatus;
+  method?: 'password' | 'otp';
+  search?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+}
+
+export const getLoginLogs = (filters: LoginLogFilters = {}) => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  });
+  const query = params.toString();
+  return request<LoginLogPage>(`/api/login-logs${query ? `?${query}` : ''}`);
+};
 
 // Filters shared by the Asset Surveys list and its Excel export.
 export interface AssetSurveyFilters {
