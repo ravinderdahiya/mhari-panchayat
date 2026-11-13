@@ -46,6 +46,8 @@ class LoginLogApiTest extends TestCase
         $this->assertSame('ddpo.karnal', $log->identifier);
         $this->assertSame('ddpo', $log->role);
         $this->assertSame('127.0.0.1', $log->ip_address);
+        $this->assertNull($log->latitude);
+        $this->assertNull($log->longitude);
         $this->assertSame('Mozilla/5.0 TestBrowser', $log->user_agent);
     }
 
@@ -88,6 +90,57 @@ class LoginLogApiTest extends TestCase
         $this->assertSame('failed', $log->status);
     }
 
+    public function test_staff_login_coordinates_are_saved_per_attempt_and_returned_in_audit_log(): void
+    {
+        $this->staff();
+        $this->postJson('/api/auth/login', [
+            'username' => 'ddpo.karnal', 'password' => 'wrong',
+            'latitude' => 29.6857, 'longitude' => 76.9905,
+        ])->assertUnauthorized();
+        $this->postJson('/api/auth/login', [
+            'username' => 'ddpo.karnal', 'password' => 'secret-pass',
+            'latitude' => 0, 'longitude' => 0,
+        ])->assertOk();
+
+        $logs = LoginLog::orderBy('id')->get();
+        $this->assertSame(29.6857, $logs[0]->latitude);
+        $this->assertSame(76.9905, $logs[0]->longitude);
+        $this->assertSame(0.0, $logs[1]->latitude);
+        $this->assertSame(0.0, $logs[1]->longitude);
+
+        $this->actingAs(User::factory()->create(['role' => 'super_admin']), 'sanctum')
+            ->getJson('/api/login-logs')->assertOk()
+            ->assertJsonPath('logs.0.latitude', 0)
+            ->assertJsonPath('logs.0.longitude', 0)
+            ->assertJsonPath('logs.1.latitude', 29.6857)
+            ->assertJsonPath('logs.1.longitude', 76.9905);
+    }
+
+    public function test_both_login_methods_reject_invalid_or_incomplete_coordinates(): void
+    {
+        $endpoints = [
+            '/api/auth/login' => ['username' => 'nobody', 'password' => 'x'],
+            '/api/auth/verify-otp' => ['mobile' => '9999999999', 'otp' => '0000'],
+        ];
+        $invalid = [
+            ['latitude' => 91, 'longitude' => 76],
+            ['latitude' => -91, 'longitude' => 76],
+            ['latitude' => 29, 'longitude' => 181],
+            ['latitude' => 29, 'longitude' => -181],
+            ['latitude' => 'bad', 'longitude' => 76],
+            ['latitude' => 0],
+            ['longitude' => 0],
+            ['latitude' => null, 'longitude' => 76],
+        ];
+        foreach ($endpoints as $path => $credentials) {
+            foreach ($invalid as $coordinates) {
+                Cache::flush();
+                $this->postJson($path, [...$credentials, ...$coordinates])->assertUnprocessable();
+            }
+        }
+        $this->assertSame(0, LoginLog::count());
+    }
+
     public function test_disabled_account_login_is_recorded_as_failed_with_reason(): void
     {
         $this->staff(['is_active' => false]);
@@ -106,8 +159,9 @@ class LoginLogApiTest extends TestCase
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->withHeader('X-Forwarded-For', '203.0.113.8');
 
-        $this->postJson('/api/auth/verify-otp', ['mobile' => '9999999999', 'otp' => '5678'])->assertStatus(400);
-        $this->postJson('/api/auth/verify-otp', ['mobile' => '9999999999', 'otp' => '0000'])->assertOk();
+        $coordinates = ['latitude' => 29.6857, 'longitude' => 76.9905];
+        $this->postJson('/api/auth/verify-otp', ['mobile' => '9999999999', 'otp' => '5678', ...$coordinates])->assertStatus(400);
+        $this->postJson('/api/auth/verify-otp', ['mobile' => '9999999999', 'otp' => '0000', ...$coordinates])->assertOk();
 
         $logs = LoginLog::orderBy('id')->get();
         $this->assertCount(2, $logs);
@@ -116,6 +170,8 @@ class LoginLogApiTest extends TestCase
         $this->assertSame('citizen', $logs[1]->role);
         $this->assertNotNull($logs[1]->user_id);
         $this->assertSame(['203.0.113.8', '203.0.113.8'], $logs->pluck('ip_address')->all());
+        $this->assertSame([29.6857, 29.6857], $logs->pluck('latitude')->all());
+        $this->assertSame([76.9905, 76.9905], $logs->pluck('longitude')->all());
     }
 
     public function test_only_audit_permission_holders_can_list_login_logs(): void

@@ -342,6 +342,8 @@ export interface LoginLog {
   status: LoginLogStatus;
   reason: string | null;
   ipAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
   userAgent: string | null;
   createdAt: string;
 }

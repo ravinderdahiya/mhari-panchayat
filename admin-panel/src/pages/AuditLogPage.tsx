@@ -137,6 +137,7 @@ export default function AuditLogPage() {
                   <th className="text-left font-semibold px-4 py-2.5">Method</th>
                   <th className="text-left font-semibold px-4 py-2.5">Result</th>
                   <th className="text-left font-semibold px-4 py-2.5">IP address</th>
+                  <th className="text-left font-semibold px-4 py-2.5">Coordinates</th>
                   <th className="text-left font-semibold px-4 py-2.5">Device</th>
                 </tr>
               </thead>
@@ -165,6 +166,13 @@ export default function AuditLogPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 tabular-nums whitespace-nowrap">{log.ipAddress || '—'}</td>
+                    <td className="px-4 py-2.5 text-slate-600 tabular-nums whitespace-nowrap">
+                      {log.latitude != null && log.longitude != null ? (
+                        <a href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" title="View login location on map">
+                          {log.latitude.toFixed(6)}, {log.longitude.toFixed(6)}
+                        </a>
+                      ) : <span className="text-slate-400">Not available</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap" title={log.userAgent ?? undefined}>{describeDevice(log.userAgent)}</td>
                   </tr>
                 ))}

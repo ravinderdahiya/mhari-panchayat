@@ -34,3 +34,17 @@ Verify a fresh admin login and a fresh mobile OTP login in Audit Log. Their IP
 should match the public source IP seen by the proxy (shared networks may share
 one public IP). Previous rows containing 127.0.0.1 remain historical records;
 their original IP cannot be recovered unless corresponding proxy logs exist.
+
+Login coordinates
+-----------------
+Deploy the new login_logs coordinates migration and backend code first, then run:
+
+    php artisan migrate --force
+
+Build/deploy the updated admin panel and rebuild/distribute the updated mobile
+app. Both now send optional latitude/longitude with password and OTP logins.
+The browser requires HTTPS (or localhost) and location permission. The app needs
+location permission and enabled location services. GPS timeout/denial does not
+block login; Audit Log shows "Not available" when coordinates were not supplied.
+Old login rows and logins from older app versions have no coordinates. Locations
+come from the client device; the backend does not infer GPS coordinates from IP.

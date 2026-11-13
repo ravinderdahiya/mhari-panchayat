@@ -7,6 +7,7 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 import '../config/api_config.dart';
 import 'app_version_service.dart';
 import 'auth_service.dart';
+import 'login_location.dart';
 import 'session_guard.dart';
 
 class AuthApiException implements Exception {
@@ -213,7 +214,12 @@ class AuthApi {
   }
 
   static Future<OtpVerifyResult> verifyOtp(String mobile, String otp) async {
-    final body = await _post('/verify-otp', {'mobile': mobile, 'otp': otp});
+    final coordinates = await LoginLocation.capture();
+    final body = await _post('/verify-otp', {
+      'mobile': mobile,
+      'otp': otp,
+      ...coordinates,
+    });
     final user = body['user'] as Map<String, dynamic>?;
     return OtpVerifyResult(
       token: body['token'] as String? ?? '',
@@ -228,9 +234,11 @@ class AuthApi {
     String staffId,
     String password,
   ) async {
+    final coordinates = await LoginLocation.capture();
     final body = await _post('/login', {
       'username': staffId,
       'password': password,
+      ...coordinates,
     });
     final user = body['user'] as Map<String, dynamic>? ?? const {};
     final role = (user['role'] as String? ?? 'department_officer')

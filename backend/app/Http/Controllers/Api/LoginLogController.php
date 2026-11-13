@@ -64,6 +64,8 @@ class LoginLogController extends Controller
                 'status' => $log->status,
                 'reason' => $log->reason,
                 'ipAddress' => $log->ip_address,
+                'latitude' => $log->latitude,
+                'longitude' => $log->longitude,
                 'userAgent' => $log->user_agent,
                 'createdAt' => $log->created_at?->toISOString(),
             ])->values(),

@@ -339,6 +339,8 @@ class AuthController extends Controller
         $data = $request->validate([
             'mobile' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
             'otp' => ['required', 'string', 'regex:/^\d{4}$/'],
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
         ]);
         $mobile = $data['mobile'];
         $isLocalTestLogin = ! app()->environment('production')
@@ -452,6 +454,8 @@ class AuthController extends Controller
         $request->validate([
             'username' => ['required', 'string'],
             'password' => ['required', 'string'],
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
         ]);
 
         $login = trim((string) $request->input('username'));

@@ -1,5 +1,7 @@
 import type { AdminUser, AssetCategoryDef, AssetSurvey, AssignableUser, CitizenProfile, CitizenStats, Complaint, ComplaintReports, ElectedRepresentative, Feedback, LoginLogPage, LoginLogStatus, RolePermissionMatrix, User, VillageAsset } from '../types';
 
+import { getLoginLocation } from './loginLocation';
+
 // 127.0.0.1, not localhost - on this machine "localhost" resolves to ::1
 // first, and the dev server only listens on IPv4, so every request pays a
 // ~200ms IPv6-then-IPv4 fallback penalty before falling back to the working
@@ -58,8 +60,10 @@ const formRequest = <T = any>(path: string, method: string, form: FormData) =>
 export const register = (username: string, password: string, name?: string, email?: string) =>
   jsonRequest<{ success: boolean; token: string; user: User }>('/api/auth/register', 'POST', { username, password, name, email });
 
-export const login = (username: string, password: string) =>
-  jsonRequest<{ success: boolean; token: string; user: User }>('/api/auth/login', 'POST', { username, password });
+export const login = async (username: string, password: string) => {
+  const coordinates = await getLoginLocation();
+  return jsonRequest<{ success: boolean; token: string; user: User }>('/api/auth/login', 'POST', { username, password, ...coordinates });
+};
 
 export const getMe = () => request<{ success: boolean; user: User }>('/api/auth/me');
 
