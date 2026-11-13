@@ -205,18 +205,17 @@ class AuthController extends Controller
             if (! app()->environment('production')) {
                 $http = $http->withOptions(['verify' => false]);
             }
+            // pixabits.ai/api/sms/send (see "HARSAC Api cURL.pdf"). `message` must be the registered
+            // DLT template ("APP auto verification") with its three {#var#} slots filled in:
+            //   "{#var#} is OTP for Login at {#var#} HARSAC. {#var#}."
+            // Any other wording is rejected by the operator (error 633 "Template not matched").
             $response = $http->post(config('services.pixabits.url'), [
-                'key' => $apiKey,
-                'text' => "Your One Time Password is {$otp} for Mhari Panchayat. Don't share OTP with anyone.{$senderId}",
+                'api_key' => $apiKey,
+                'to' => '91'.$mobile,
+                'dltTemplateId' => config('services.pixabits.dlt_id'),
                 'senderId' => $senderId,
-                'tempDltId' => config('services.pixabits.dlt_id'),
-                'route' => config('services.pixabits.route'),
-                'phoneno' => $mobile,
-                'groupIds' => [' '],
-                'trans' => 1,
-                'unicode' => 0,
-                'flash' => false,
-                'tiny' => false,
+                'message' => "{$otp} is OTP for Login at Mhari Panchayat HARSAC. Do not share.",
+                'filterDnd' => false,
             ]);
 
             if (! $response->successful()) {
